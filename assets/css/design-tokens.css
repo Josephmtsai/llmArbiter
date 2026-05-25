@@ -1,0 +1,230 @@
+/* ============================================================
+   Arbiter Design System — Foundations
+   Visual lineage: Vercel / Railway / Linear — amber-tinted dark.
+   Theme switching: <html data-theme="dark|light">
+   ============================================================ */
+
+:root,
+:root[data-theme='dark'] {
+  --theme: dark;
+
+  /* Surfaces — amber-tinted near-blacks */
+  --bg-0: #0f0a05;
+  --bg-1: #1c1610;
+  --bg-2: #261e15;
+  --bg-3: #322619;
+  --bg-inset: #080603;
+
+  --bg-tint-accent: rgba(96, 165, 250, 0.08);
+  --bg-tint-success: rgba(52, 211, 153, 0.07);
+  --bg-tint-warning: rgba(251, 191, 36, 0.1);
+  --bg-tint-danger: rgba(248, 113, 113, 0.07);
+
+  /* Borders */
+  --border-subtle: #261e14;
+  --border: #3a2f22;
+  --border-strong: #5a4a36;
+  --border-focus: #60a5fa;
+  --glint: linear-gradient(
+    90deg,
+    transparent,
+    rgba(251, 191, 36, 0.45),
+    rgba(244, 114, 182, 0.28),
+    transparent
+  );
+
+  /* Text — warm cream */
+  --fg-0: #fdf6e8;
+  --fg-1: #ebe0c8;
+  --fg-2: #b8a888;
+  --fg-3: #8a7c63;
+  --fg-4: #5a4f3e;
+
+  /* Accent */
+  --accent: #4f8cf7;
+  --accent-hover: #3b82f6;
+  --accent-press: #2563eb;
+  --accent-soft: rgba(79, 140, 247, 0.14);
+  --accent-ring: rgba(79, 140, 247, 0.38);
+
+  /* Highlight palette */
+  --hl-cyan: #22d3ee;
+  --hl-cyan-soft: rgba(34, 211, 238, 0.14);
+  --hl-magenta: #f472b6;
+  --hl-magenta-soft: rgba(244, 114, 182, 0.14);
+  --hl-lime: #a3e635;
+  --hl-lime-soft: rgba(163, 230, 53, 0.14);
+
+  /* Action palette */
+  --action-rebuild: #38bdf8;
+  --action-rebuild-soft: rgba(56, 189, 248, 0.16);
+  --action-fallback: #f97316;
+  --action-fallback-soft: rgba(249, 115, 22, 0.16);
+  --action-restart: #a855f7;
+  --action-restart-soft: rgba(168, 85, 247, 0.16);
+  --action-notify: #ef4444;
+  --action-notify-soft: rgba(239, 68, 68, 0.16);
+  --action-email: #cbd5e1;
+  --action-email-soft: rgba(203, 213, 225, 0.14);
+
+  /* Confidence bands */
+  --conf-high: #22c55e;
+  --conf-high-soft: rgba(34, 197, 94, 0.14);
+  --conf-mid: #eab308;
+  --conf-mid-soft: rgba(234, 179, 8, 0.14);
+  --conf-low: #ef4444;
+  --conf-low-soft: rgba(239, 68, 68, 0.14);
+
+  /* Semantic */
+  --success: #22c55e;
+  --success-soft: rgba(34, 197, 94, 0.14);
+  --warning: #eab308;
+  --warning-soft: rgba(234, 179, 8, 0.14);
+  --danger: #ef4444;
+  --danger-soft: rgba(239, 68, 68, 0.14);
+  --info: #3b82f6;
+  --info-soft: rgba(59, 130, 246, 0.14);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+:root[data-theme='light'] {
+  --theme: light;
+
+  --bg-0: #faf4e6;
+  --bg-1: #fffbf2;
+  --bg-2: #f0e7cf;
+  --bg-3: #e3d6b3;
+  --bg-inset: #ede2c0;
+
+  --bg-tint-accent: rgba(37, 99, 235, 0.07);
+  --bg-tint-success: rgba(16, 163, 74, 0.07);
+  --bg-tint-warning: rgba(202, 138, 4, 0.1);
+  --bg-tint-danger: rgba(220, 38, 38, 0.07);
+
+  --border-subtle: #eadfbf;
+  --border: #d3c194;
+  --border-strong: #9c8a5e;
+  --border-focus: #2563eb;
+  --glint: linear-gradient(
+    90deg,
+    transparent,
+    rgba(202, 138, 4, 0.45),
+    rgba(219, 39, 119, 0.2),
+    transparent
+  );
+
+  --fg-0: #2a1f0d;
+  --fg-1: #4a3a20;
+  --fg-2: #6e5d3c;
+  --fg-3: #8a7a5a;
+  --fg-4: #b3a07d;
+
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-press: #1e40af;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --accent-ring: rgba(37, 99, 235, 0.28);
+
+  --hl-cyan: #0891b2;
+  --hl-cyan-soft: rgba(8, 145, 178, 0.1);
+  --hl-magenta: #db2777;
+  --hl-magenta-soft: rgba(219, 39, 119, 0.1);
+  --hl-lime: #65a30d;
+  --hl-lime-soft: rgba(101, 163, 13, 0.1);
+
+  --action-rebuild: #0284c7;
+  --action-rebuild-soft: rgba(2, 132, 199, 0.12);
+  --action-fallback: #ea580c;
+  --action-fallback-soft: rgba(234, 88, 12, 0.1);
+  --action-restart: #9333ea;
+  --action-restart-soft: rgba(147, 51, 234, 0.1);
+  --action-notify: #dc2626;
+  --action-notify-soft: rgba(220, 38, 38, 0.1);
+  --action-email: #475569;
+  --action-email-soft: rgba(71, 85, 105, 0.1);
+
+  --conf-high: #16a34a;
+  --conf-high-soft: rgba(22, 163, 74, 0.1);
+  --conf-mid: #ca8a04;
+  --conf-mid-soft: rgba(202, 138, 4, 0.1);
+  --conf-low: #dc2626;
+  --conf-low-soft: rgba(220, 38, 38, 0.1);
+
+  --success: #16a34a;
+  --success-soft: rgba(22, 163, 74, 0.1);
+  --warning: #ca8a04;
+  --warning-soft: rgba(202, 138, 4, 0.1);
+  --danger: #dc2626;
+  --danger-soft: rgba(220, 38, 38, 0.1);
+  --info: #2563eb;
+  --info-soft: rgba(37, 99, 235, 0.1);
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(15, 23, 42, 0.05);
+}
+
+:root {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
+    'Liberation Mono', monospace;
+
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 10px;
+  --r-xl: 14px;
+  --r-pill: 999px;
+
+  --ring-focus: 0 0 0 3px var(--accent-ring);
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg-0);
+  color: var(--fg-0);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+}
+
+/* Animations */
+@keyframes arb-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes arb-enter {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes arb-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes arb-slide-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}

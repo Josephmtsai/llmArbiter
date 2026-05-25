@@ -1,0 +1,34 @@
+{
+  "name": "arbiter-dashboard",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "lint": "eslint . --fix",
+    "format": "prettier --write .",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "vue-tsc": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@pinia/nuxt": "^0.7.0",
+    "lucide-vue-next": "^0.477.0",
+    "nuxt": "^3.15.0",
+    "nuxt-auth-utils": "^0.5.0",
+    "pinia": "^2.3.0",
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@nuxtjs/tailwindcss": "^6.12.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "@vue/test-utils": "^2.4.6",
+    "eslint": "^9.9.0",
+    "prettier": "^3.3.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.1.0",
+    "vue-tsc": "^2.1.6"
+  }
+}
