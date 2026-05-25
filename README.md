@@ -11,7 +11,7 @@ Backend lives at `https://artbiter-production.up.railway.app` (FastAPI on Railwa
 | Layer | Choice |
 |-------|--------|
 | Framework | Nuxt 3 (Vue 3 + `<script setup lang="ts">`) |
-| Build | rsbuild (via `@nuxtjs/rsbuild`) |
+| Build | Nuxt default Vite builder |
 | Styling | Tailwind CSS (dark-only, design tokens in `assets/css/design-tokens.css`) |
 | State | Pinia (Composition API style) |
 | Auth | `nuxt-auth-utils` (password-based, server-side session) |
@@ -57,8 +57,10 @@ pnpm test:coverage          # coverage report (target ≥ 80%)
 | Variable | Where | Description |
 |----------|-------|-------------|
 | `NUXT_AUTH_PASSWORD` | server-only | Password for the login page (min 32 chars for `nuxt-auth-utils`) |
+| `NUXT_SESSION_PASSWORD` | server-only | Session encryption key (min 32 chars for `nuxt-auth-utils`) |
 | `NUXT_PUBLIC_API_BASE` | public | Backend base URL (default `https://artbiter-production.up.railway.app`) |
 | `NUXT_PUBLIC_API_KEY` | public | `X-API-Key` header value sent with every API call |
+| `PORT` | server-only | Port for the Nuxt/Nitro server on Railway (`8080` for this deployment) |
 
 > **Rule**: `runtimeConfig.public.*` is exposed to the browser. Never put secrets there.
 > Server-only secrets go under `runtimeConfig.*` (no `public` prefix).
@@ -66,8 +68,10 @@ pnpm test:coverage          # coverage report (target ≥ 80%)
 `.env.example`:
 ```
 NUXT_AUTH_PASSWORD=change-me-at-least-32-characters-long
+NUXT_SESSION_PASSWORD=change-me-at-least-32-characters-long
 NUXT_PUBLIC_API_BASE=https://artbiter-production.up.railway.app
 NUXT_PUBLIC_API_KEY=your-api-key-here
+PORT=8080
 ```
 
 ---
@@ -143,9 +147,9 @@ Full type definitions in `docs/for-claude-design.md` section D.
 
 ---
 
-## rsbuild
+## Optional rsbuild
 
-Switch Nuxt's default Vite bundler to rsbuild for faster builds.
+This project currently uses Nuxt's default Vite builder. rsbuild is an optional future optimization, not required for Railway deploy.
 
 ### Setup
 
@@ -192,17 +196,20 @@ export default defineRsbuildConfig({
 
    | | Command |
    |---|---------|
-   | Build | `pnpm install && pnpm build` |
+   | Build | `pnpm install --frozen-lockfile && pnpm build` |
    | Start | `node .output/server/index.mjs` |
 
 3. **Environment variables** in Railway service settings:
 
    ```
    NUXT_AUTH_PASSWORD=<strong-secret-min-32-chars>
+   NUXT_SESSION_PASSWORD=<strong-session-secret-min-32-chars>
    NUXT_PUBLIC_API_BASE=https://artbiter-production.up.railway.app
    NUXT_PUBLIC_API_KEY=<your-api-key>
-   PORT=3000
+   PORT=8080
    ```
+
+   `NUXT_AUTH_PASSWORD` and `NUXT_SESSION_PASSWORD` must both be at least 32 characters.
 
 4. **Generate domain** → Settings → Networking → Generate Domain.
 
@@ -213,7 +220,7 @@ export default defineRsbuildConfig({
 ```toml
 [build]
 builder = "nixpacks"
-buildCommand = "pnpm install && pnpm build"
+buildCommand = "pnpm install --frozen-lockfile && pnpm build"
 
 [deploy]
 startCommand = "node .output/server/index.mjs"
@@ -251,7 +258,7 @@ Items for Codex to implement in order:
 - [ ] **pages/settings.vue** — three-tab layout: Rules / Provider / Prompts
 - [ ] **pages/cases.vue** — CRUD table + seed button
 - [ ] **pages/evaluate.vue** — `EvaluateRunner` + `EvalResultTable`
-- [ ] **rsbuild.config.ts** — add `builder: 'rsbuild'` to `nuxt.config.ts`, add optional config file
+- [ ] **rsbuild.config.ts** — optional future optimization: add `builder: 'rsbuild'` to `nuxt.config.ts`, add optional config file
 - [ ] **railway.toml** + **nixpacks.toml** — deploy config files
 - [ ] **tests/** — Vitest unit tests for composables (target ≥ 80% coverage)
 
