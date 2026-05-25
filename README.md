@@ -196,7 +196,7 @@ export default defineRsbuildConfig({
 
    | | Command |
    |---|---------|
-   | Build | `pnpm install --frozen-lockfile && pnpm build` |
+   | Build | Dockerfile (`node:20.19.5-slim`, `pnpm@9.15.9`) |
    | Start | `node .output/server/index.mjs` |
 
 3. **Environment variables** in Railway service settings:
@@ -215,12 +215,43 @@ export default defineRsbuildConfig({
 
 5. **Health check** path: `/` (Nuxt returns 200 on root).
 
+### GitHub Actions deploy
+
+The workflow at `.github/workflows/ci.yml` runs CI on pull requests and pushes to `main`.
+On `main` pushes, the `deploy` job runs `railway up --ci` to the Railway `production`
+environment after type-check, tests, and build pass.
+
+Add this GitHub repository secret:
+
+```
+RAILWAY_TOKEN=<Railway project token>
+```
+
+Add these GitHub repository variables:
+
+```
+RAILWAY_PROJECT_ID=<Railway project id>
+RAILWAY_SERVICE_ID=<Railway frontend service id>
+```
+
+Keep application runtime variables in Railway service variables, not GitHub secrets:
+
+```
+NUXT_AUTH_PASSWORD=<strong-secret-min-32-chars>
+NUXT_SESSION_PASSWORD=<strong-session-secret-min-32-chars>
+NUXT_PUBLIC_API_BASE=https://artbiter-production.up.railway.app
+NUXT_PUBLIC_API_KEY=<your-api-key>
+PORT=8080
+```
+
+Use either this GitHub Actions deploy job or Railway GitHub auto-deploys. Do not enable both for the same branch/service, or each push may create duplicate deployments.
+
 ### railway.toml (place in repo root)
 
 ```toml
 [build]
-builder = "nixpacks"
-buildCommand = "pnpm install --frozen-lockfile && pnpm build"
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [deploy]
 startCommand = "node .output/server/index.mjs"
@@ -230,17 +261,28 @@ restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
 ```
 
-### Nixpacks Node version
+### Dockerfile build
 
-```toml
-# nixpacks.toml (repo root)
-[phases.setup]
-nixPkgs = ["nodejs_20"]
+```dockerfile
+FROM node:20.19.5-slim AS build
+WORKDIR /app
+RUN npm install -g pnpm@9.15.9
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY . .
+RUN pnpm build
 ```
 
-Or add `.node-version` file:
+Pin Node with `package.json` and `.node-version`:
+
 ```
-20
+// package.json
+"engines": {
+  "node": "20.19.x"
+}
+
+// .node-version
+20.19.5
 ```
 
 ---
@@ -259,7 +301,7 @@ Items for Codex to implement in order:
 - [ ] **pages/cases.vue** — CRUD table + seed button
 - [ ] **pages/evaluate.vue** — `EvaluateRunner` + `EvalResultTable`
 - [ ] **rsbuild.config.ts** — optional future optimization: add `builder: 'rsbuild'` to `nuxt.config.ts`, add optional config file
-- [ ] **railway.toml** + **nixpacks.toml** — deploy config files
+- [ ] **railway.toml** + **Dockerfile** — deploy config files
 - [ ] **tests/** — Vitest unit tests for composables (target ≥ 80% coverage)
 
 Component specs and visual direction in `docs/for-claude-design.md` sections E–G.

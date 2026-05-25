@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  build:
+  verify:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,13 +19,14 @@ jobs:
         with:
           node-version: 20
 
-      - name: Enable pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@9 --activate
+      - name: Install pnpm
+        run: npm install -g pnpm@9.15.9
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Prepare Nuxt types
+        run: pnpm exec nuxt prepare
 
       - name: Type check
         run: pnpm vue-tsc
@@ -35,3 +36,32 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+          RAILWAY_SERVICE_ID: ${{ vars.RAILWAY_SERVICE_ID }}
+        run: |
+          railway up --ci \
+            --project "$RAILWAY_PROJECT_ID" \
+            --environment production \
+            --service "$RAILWAY_SERVICE_ID"

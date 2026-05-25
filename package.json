@@ -2,6 +2,10 @@
   "name": "arbiter-dashboard",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": "20.19.x"
+  },
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
@@ -11,7 +15,7 @@
     "format": "prettier --write .",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
-    "vue-tsc": "vue-tsc --noEmit"
+    "vue-tsc": "nuxt prepare && vue-tsc --noEmit"
   },
   "dependencies": {
     "@pinia/nuxt": "^0.7.0",
