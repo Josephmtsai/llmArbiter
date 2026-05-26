@@ -50,8 +50,12 @@ export function useApi() {
     analyze: (body: AnalyzeRequest) =>
       api<ArbiterResponse<DecisionData>>('/analyze', { method: 'POST', body }),
 
-    getDecisions: (params?: GetDecisionsParams) =>
-      api<ArbiterResponse<DecisionsPaginatedResponse>>('/decisions', { query: params }),
+    getDecisions: (params?: GetDecisionsParams) => {
+      const query = params
+        ? Object.fromEntries(Object.entries(params).filter(([, v]) => v != null))
+        : undefined
+      return api<ArbiterResponse<DecisionsPaginatedResponse>>('/decisions', { query })
+    },
 
     getDecisionStats: (params?: GetStatsParams) =>
       api<ArbiterResponse<DecisionStats>>('/decisions/stats', { query: params }),
