@@ -9,6 +9,7 @@ import {
 } from 'lucide-vue-next'
 
 const route = useRoute()
+const api = useApi()
 
 const NAV_ITEMS = [
   { id: 'analyze', label: 'Analyze', icon: Zap, href: '/' },
@@ -17,6 +18,30 @@ const NAV_ITEMS = [
   { id: 'evaluate', label: 'Evaluate', icon: Gauge, href: '/evaluate' },
   { id: 'settings', label: 'Settings', icon: SlidersHorizontal, href: '/settings' },
 ]
+
+const apiOnline = ref(false)
+const latencyMs = ref<number | null>(null)
+const activeProvider = ref<string | null>(null)
+
+async function pollStatus() {
+  try {
+    const t0 = Date.now()
+    await api.healthCheck()
+    latencyMs.value = Date.now() - t0
+    apiOnline.value = true
+  } catch {
+    apiOnline.value = false
+    latencyMs.value = null
+  }
+  try {
+    const res = await api.getProviders()
+    activeProvider.value = res.active_provider ?? null
+  } catch {
+    activeProvider.value = null
+  }
+}
+
+onMounted(pollStatus)
 
 function isActive(href: string): boolean {
   if (href === '/') return route.path === '/'
@@ -70,13 +95,19 @@ function isActive(href: string): boolean {
     <!-- Status footer -->
     <div class="arb-sidebar__status">
       <div class="arb-sidebar__status-row">
-        <span class="arb-sidebar__status-dot arb-sidebar__status-dot--online" />
-        <span class="arb-sidebar__status-text">API online</span>
-        <span class="arb-sidebar__status-latency num">42ms</span>
+        <span
+          class="arb-sidebar__status-dot"
+          :class="apiOnline ? 'arb-sidebar__status-dot--online' : 'arb-sidebar__status-dot--offline'"
+        />
+        <span class="arb-sidebar__status-text">{{ apiOnline ? 'API online' : 'API offline' }}</span>
+        <span v-if="latencyMs !== null" class="arb-sidebar__status-latency num">{{ latencyMs }}ms</span>
       </div>
       <div class="arb-sidebar__status-row">
-        <span class="arb-sidebar__status-dot arb-sidebar__status-dot--online" />
-        <span class="arb-sidebar__status-text">ollama · hermes3:8b</span>
+        <span
+          class="arb-sidebar__status-dot"
+          :class="activeProvider ? 'arb-sidebar__status-dot--online' : 'arb-sidebar__status-dot--offline'"
+        />
+        <span class="arb-sidebar__status-text">{{ activeProvider ?? '—' }}</span>
       </div>
     </div>
   </aside>
@@ -239,6 +270,7 @@ function isActive(href: string): boolean {
   flex-shrink: 0;
 }
 .arb-sidebar__status-dot--online { background: var(--success); }
+.arb-sidebar__status-dot--offline { background: var(--conf-low); }
 .arb-sidebar__status-text { font-size: 11px; color: var(--fg-2); flex: 1; }
 .arb-sidebar__status-latency {
   font-family: var(--font-mono);
