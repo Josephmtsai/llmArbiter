@@ -251,7 +251,7 @@ watch(activeTab, (tab) => {
               </UiButton>
             </div>
           </div>
-          <pre class="arb-settings__prompt-preview">{{ p.content.slice(0, 200) }}{{ p.content.length > 200 ? '…' : '' }}</pre>
+          <pre class="arb-settings__prompt-preview">{{ p.content }}</pre>
           <span class="arb-settings__prompt-ts num">{{ new Date(p.created).toLocaleString() }}</span>
         </UiCard>
       </div>
@@ -430,8 +430,8 @@ watch(activeTab, (tab) => {
   padding: 10px 12px;
   white-space: pre-wrap;
   margin: 0;
-  max-height: 80px;
-  overflow: hidden;
+  max-height: 320px;
+  overflow-y: auto;
 }
 .arb-settings__prompt-ts {
   font-family: var(--font-mono);
