@@ -64,7 +64,7 @@ const PRIMARY_ACTIONS: PrimaryAction[] = [
         :key="action"
         class="arb-decisions__stat"
       >
-        <ActionBadge :action="action" size="sm" />
+        <UiActionBadge :action="action" size="sm" />
         <span class="arb-decisions__stat-val num">{{ stats.by_action[action] ?? 0 }}</span>
       </UiCard>
     </div>
@@ -119,10 +119,10 @@ const PRIMARY_ACTIONS: PrimaryAction[] = [
             @click="selectedDecision = d"
           >
             <td class="num">#{{ d.id }}</td>
-            <td><ActionBadge :action="d.primary_action" size="sm" /></td>
-            <td><SmallMeter :value="d.confidence" /></td>
-            <td><SourceBadge :source="d.source" /></td>
-            <td><ProviderChip :provider="d.provider" /></td>
+            <td><UiActionBadge :action="d.primary_action" size="sm" /></td>
+            <td><UiSmallMeter :value="d.confidence" /></td>
+            <td><UiSourceBadge :source="d.source" /></td>
+            <td><UiProviderChip :provider="d.provider" /></td>
             <td class="num arb-decisions__td-time">{{ new Date(d.created_at).toLocaleString() }}</td>
           </tr>
         </tbody>
@@ -151,11 +151,11 @@ const PRIMARY_ACTIONS: PrimaryAction[] = [
         </div>
         <div class="arb-drawer__body">
           <div class="arb-drawer__row">
-            <ActionBadge :action="selectedDecision.primary_action" size="lg" />
-            <SourceBadge :source="selectedDecision.source" />
-            <ProviderChip :provider="selectedDecision.provider" />
+            <UiActionBadge :action="selectedDecision.primary_action" size="lg" />
+            <UiSourceBadge :source="selectedDecision.source" />
+            <UiProviderChip :provider="selectedDecision.provider" />
           </div>
-          <SmallMeter :value="selectedDecision.confidence" />
+          <UiSmallMeter :value="selectedDecision.confidence" />
           <div class="arb-drawer__section">
             <UiEyebrow>Reason</UiEyebrow>
             <p class="arb-drawer__text">{{ selectedDecision.reason }}</p>

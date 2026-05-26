@@ -124,7 +124,7 @@ onMounted(load)
             <span class="arb-cases__item-desc">{{ tc.description }}</span>
           </div>
           <div class="arb-cases__item-actions">
-            <ActionBadge :action="tc.expected_action" size="sm" />
+            <UiActionBadge :action="tc.expected_action" size="sm" />
             <button class="arb-cases__delete-btn" title="Delete" @click="deleteCase(tc.id)">✕</button>
           </div>
         </div>

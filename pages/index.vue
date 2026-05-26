@@ -91,14 +91,14 @@ onMounted(fetchRecent)
       <!-- Result card -->
       <UiCard v-if="result" class="arb-analyze__result">
         <div class="arb-analyze__result-header">
-          <ActionBadge :action="result.primary_action" size="lg" />
+          <UiActionBadge :action="result.primary_action" size="lg" />
           <div class="arb-analyze__result-meta">
-            <ProviderChip :provider="result.provider" />
+            <UiProviderChip :provider="result.provider" />
             <UiChip v-if="result.duration_ms">{{ result.duration_ms }}ms</UiChip>
           </div>
         </div>
 
-        <ConfidenceMeter :value="result.confidence" :animate="true" :large="true" />
+        <UiConfidenceMeter :value="result.confidence" :animate="true" :large="true" />
 
         <div class="arb-analyze__result-section">
           <UiEyebrow>Reason</UiEyebrow>
@@ -111,7 +111,7 @@ onMounted(fetchRecent)
         </div>
 
         <div class="arb-analyze__result-footer">
-          <SourceBadge :source="result.source" />
+          <UiSourceBadge :source="result.source" />
           <span class="arb-analyze__result-id num">#{{ result.decision_id }}</span>
         </div>
       </UiCard>
@@ -134,12 +134,12 @@ onMounted(fetchRecent)
             class="arb-analyze__recent-item"
           >
             <div class="arb-analyze__recent-row">
-              <ActionBadge :action="d.primary_action" size="sm" />
-              <SmallMeter :value="d.confidence" />
+              <UiActionBadge :action="d.primary_action" size="sm" />
+              <UiSmallMeter :value="d.confidence" />
             </div>
             <p class="arb-analyze__recent-snippet">{{ d.log_snippet }}</p>
             <div class="arb-analyze__recent-footer">
-              <SourceBadge :source="d.source" />
+              <UiSourceBadge :source="d.source" />
               <span class="arb-analyze__recent-time num">{{ new Date(d.created_at).toLocaleTimeString() }}</span>
             </div>
           </UiCard>
@@ -150,15 +150,15 @@ onMounted(fetchRecent)
         <UiEyebrow style="margin-bottom: 10px">Action routing</UiEyebrow>
         <div class="arb-analyze__routing-list">
           <div class="arb-analyze__routing-row">
-            <ActionBadge action="trigger_rebuild" size="sm" />
+            <UiActionBadge action="trigger_rebuild" size="sm" />
             <span class="arb-analyze__routing-label">≥ 80% confidence</span>
           </div>
           <div class="arb-analyze__routing-row">
-            <ActionBadge action="trigger_fallback" size="sm" />
+            <UiActionBadge action="trigger_fallback" size="sm" />
             <span class="arb-analyze__routing-label">50–79% + notify</span>
           </div>
           <div class="arb-analyze__routing-row">
-            <ActionBadge action="notify_human" size="sm" />
+            <UiActionBadge action="notify_human" size="sm" />
             <span class="arb-analyze__routing-label">&lt; 50% — human review</span>
           </div>
         </div>

@@ -125,8 +125,8 @@ onMounted(loadPrompts)
               :class="r.is_correct ? 'arb-eval__row--pass' : 'arb-eval__row--fail'"
             >
               <td class="num">#{{ r.test_case_id }}</td>
-              <td><ActionBadge :action="r.expected_action" size="sm" /></td>
-              <td><ActionBadge :action="r.predicted_action" size="sm" /></td>
+              <td><UiActionBadge :action="r.expected_action" size="sm" /></td>
+              <td><UiActionBadge :action="r.predicted_action" size="sm" /></td>
               <td class="num arb-eval__td-latency">{{ r.latency_ms }}ms</td>
               <td class="arb-eval__td-pass">
                 <span v-if="r.is_correct" class="arb-eval__pass-dot arb-eval__pass-dot--ok" />
