@@ -4,7 +4,6 @@ import type {
   DecisionsPaginatedResponse,
   AnalyzeRequest,
   DecisionData,
-  DecisionRecord,
   DecisionStats,
   GetDecisionsParams,
   GetStatsParams,
