@@ -34,7 +34,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function check(): Promise<boolean> {
     try {
-      const res = await $fetch<{ ok: boolean }>('/api/auth/check')
+      const headers = useRequestHeaders(['cookie'])
+      const res = await $fetch<{ ok: boolean }>('/api/auth/check', { headers })
       authenticated.value = res.ok
       return res.ok
     } catch {
