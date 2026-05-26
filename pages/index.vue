@@ -40,7 +40,7 @@ async function fetchRecent() {
   loadingRecent.value = true
   try {
     const res = await api.getDecisions({ limit: 5 })
-    if (res.status === 'success') recentDecisions.value = res.data
+    if (res.status === 'success') recentDecisions.value = res.data.decisions
   } catch { /* silent */ } finally {
     loadingRecent.value = false
   }
@@ -134,13 +134,13 @@ onMounted(fetchRecent)
             class="arb-analyze__recent-item"
           >
             <div class="arb-analyze__recent-row">
-              <ActionBadge :action="d.action" size="sm" />
+              <ActionBadge :action="d.primary_action" size="sm" />
               <SmallMeter :value="d.confidence" />
             </div>
-            <p class="arb-analyze__recent-snippet">{{ d.snippet }}</p>
+            <p class="arb-analyze__recent-snippet">{{ d.log_snippet }}</p>
             <div class="arb-analyze__recent-footer">
               <SourceBadge :source="d.source" />
-              <span class="arb-analyze__recent-time num">{{ new Date(d.created).toLocaleTimeString() }}</span>
+              <span class="arb-analyze__recent-time num">{{ new Date(d.created_at).toLocaleTimeString() }}</span>
             </div>
           </UiCard>
         </div>
