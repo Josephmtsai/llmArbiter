@@ -140,19 +140,20 @@ export interface TestCase {
 }
 
 export interface EvalResult {
-  case_id: number
+  test_case_id: number
   description: string
-  expected: PrimaryAction
-  actual: PrimaryAction
-  confidence: number
-  pass: boolean
+  expected_action: PrimaryAction
+  predicted_action: PrimaryAction
+  is_correct: boolean
+  latency_ms: number
 }
 
 export interface EvaluationSummary {
-  score: number
-  pass_count: number
-  total_count: number
-  avg_confidence: number
+  prompt_version_id: number
+  total: number
+  correct: number
+  timeout_count: number
+  accuracy: number
   results: EvalResult[]
 }
 
