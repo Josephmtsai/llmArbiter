@@ -41,7 +41,7 @@ async function runEval() {
 
 const scoreColor = computed(() => {
   if (!result.value) return 'var(--fg-3)'
-  const s = result.value.score
+  const s = result.value.accuracy
   if (s >= 0.8) return 'var(--conf-high)'
   if (s >= 0.5) return 'var(--conf-mid)'
   return 'var(--conf-low)'
@@ -91,18 +91,18 @@ onMounted(loadPrompts)
     <template v-if="result">
       <div class="arb-eval__summary">
         <UiCard class="arb-eval__summary-stat">
-          <UiEyebrow>Score</UiEyebrow>
+          <UiEyebrow>Accuracy</UiEyebrow>
           <span class="arb-eval__score-val num" :style="{ color: scoreColor }">
-            {{ Math.round(result.score * 100) }}%
+            {{ Math.round(result.accuracy * 100) }}%
           </span>
         </UiCard>
         <UiCard class="arb-eval__summary-stat">
-          <UiEyebrow>Pass / Total</UiEyebrow>
-          <span class="arb-eval__score-val num">{{ result.pass_count }} / {{ result.total_count }}</span>
+          <UiEyebrow>Correct / Total</UiEyebrow>
+          <span class="arb-eval__score-val num">{{ result.correct }} / {{ result.total }}</span>
         </UiCard>
         <UiCard class="arb-eval__summary-stat">
-          <UiEyebrow>Avg confidence</UiEyebrow>
-          <span class="arb-eval__score-val num">{{ Math.round(result.avg_confidence * 100) }}%</span>
+          <UiEyebrow>Timeouts</UiEyebrow>
+          <span class="arb-eval__score-val num">{{ result.timeout_count }}</span>
         </UiCard>
       </div>
 
@@ -114,22 +114,22 @@ onMounted(loadPrompts)
               <th>Case</th>
               <th>Expected</th>
               <th>Actual</th>
-              <th>Confidence</th>
+              <th>Latency</th>
               <th>Pass</th>
             </tr>
           </thead>
           <tbody>
             <tr
               v-for="r in result.results"
-              :key="r.case_id"
-              :class="r.pass ? 'arb-eval__row--pass' : 'arb-eval__row--fail'"
+              :key="r.test_case_id"
+              :class="r.is_correct ? 'arb-eval__row--pass' : 'arb-eval__row--fail'"
             >
-              <td class="num">#{{ r.case_id }}</td>
-              <td><ActionBadge :action="r.expected" size="sm" /></td>
-              <td><ActionBadge :action="r.actual" size="sm" /></td>
-              <td><SmallMeter :value="r.confidence" /></td>
+              <td class="num">#{{ r.test_case_id }}</td>
+              <td><ActionBadge :action="r.expected_action" size="sm" /></td>
+              <td><ActionBadge :action="r.predicted_action" size="sm" /></td>
+              <td class="num arb-eval__td-latency">{{ r.latency_ms }}ms</td>
               <td class="arb-eval__td-pass">
-                <span v-if="r.pass" class="arb-eval__pass-dot arb-eval__pass-dot--ok" />
+                <span v-if="r.is_correct" class="arb-eval__pass-dot arb-eval__pass-dot--ok" />
                 <span v-else class="arb-eval__pass-dot arb-eval__pass-dot--fail" />
               </td>
             </tr>
@@ -214,6 +214,7 @@ onMounted(loadPrompts)
 .arb-eval__table tr:last-child td { border-bottom: none; }
 .arb-eval__row--pass td { background: rgba(52, 211, 153, 0.03); }
 .arb-eval__row--fail td { background: rgba(248, 113, 113, 0.03); }
+.arb-eval__td-latency { font-size: 11px; color: var(--fg-4); }
 .arb-eval__td-pass { text-align: center; }
 .arb-eval__pass-dot {
   display: inline-block;
