@@ -60,11 +60,16 @@ export function useApi() {
       api<ArbiterResponse<DecisionStats>>('/decisions/stats', { query: params }),
 
     getRules: async () => {
-      const res = await api<ArbiterResponse<Record<string, { value: RuleValue; description?: string }>>>('/config/rules')
-      const rules: Rule[] = Object.entries(res.data ?? {}).map(([name, obj]) => ({
+      const res = await api<ArbiterResponse<Record<string, {
+        rule_name: string
+        rule_value: { value: RuleValue }
+        description: string
+        updated_at: string
+      }>>>('/config/rules')
+      const rules: Rule[] = Object.entries(res.data ?? {}).map(([name, entry]) => ({
         name,
-        value: obj.value,
-        description: obj.description,
+        value: entry.rule_value.value,
+        description: entry.description,
       }))
       return { ...res, data: rules }
     },
