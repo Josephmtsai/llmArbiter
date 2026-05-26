@@ -1,6 +1,7 @@
 import type {
   ArbiterResponse,
   PaginatedResponse,
+  DecisionsPaginatedResponse,
   AnalyzeRequest,
   DecisionData,
   DecisionRecord,
@@ -51,7 +52,7 @@ export function useApi() {
       api<ArbiterResponse<DecisionData>>('/analyze', { method: 'POST', body }),
 
     getDecisions: (params?: GetDecisionsParams) =>
-      api<ArbiterResponse<DecisionRecord[]>>('/decisions', { query: params }),
+      api<ArbiterResponse<DecisionsPaginatedResponse>>('/decisions', { query: params }),
 
     getDecisionStats: (params?: GetStatsParams) =>
       api<ArbiterResponse<DecisionStats>>('/decisions/stats', { query: params }),

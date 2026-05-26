@@ -26,7 +26,7 @@ async function load() {
       }),
       stats.value ? Promise.resolve(null) : api.getDecisionStats(),
     ])
-    if (dRes.status === 'success') decisions.value = dRes.data
+    if (dRes.status === 'success') decisions.value = dRes.data.decisions
     if (sRes?.status === 'success') stats.value = sRes.data
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Load failed'
@@ -125,11 +125,11 @@ const PRIMARY_ACTIONS: PrimaryAction[] = [
             @click="selectedDecision = d"
           >
             <td class="num">#{{ d.id }}</td>
-            <td><ActionBadge :action="d.action" size="sm" /></td>
+            <td><ActionBadge :action="d.primary_action" size="sm" /></td>
             <td><SmallMeter :value="d.confidence" /></td>
             <td><SourceBadge :source="d.source" /></td>
             <td><ProviderChip :provider="d.provider" /></td>
-            <td class="num arb-decisions__td-time">{{ new Date(d.created).toLocaleString() }}</td>
+            <td class="num arb-decisions__td-time">{{ new Date(d.created_at).toLocaleString() }}</td>
           </tr>
         </tbody>
       </table>
@@ -157,7 +157,7 @@ const PRIMARY_ACTIONS: PrimaryAction[] = [
         </div>
         <div class="arb-drawer__body">
           <div class="arb-drawer__row">
-            <ActionBadge :action="selectedDecision.action" size="lg" />
+            <ActionBadge :action="selectedDecision.primary_action" size="lg" />
             <SourceBadge :source="selectedDecision.source" />
             <ProviderChip :provider="selectedDecision.provider" />
           </div>
@@ -168,11 +168,11 @@ const PRIMARY_ACTIONS: PrimaryAction[] = [
           </div>
           <div class="arb-drawer__section">
             <UiEyebrow>Log snippet</UiEyebrow>
-            <pre class="arb-drawer__snippet">{{ selectedDecision.snippet }}</pre>
+            <pre class="arb-drawer__snippet">{{ selectedDecision.log_snippet }}</pre>
           </div>
           <div class="arb-drawer__section">
             <UiEyebrow>Created</UiEyebrow>
-            <span class="arb-drawer__text num">{{ new Date(selectedDecision.created).toLocaleString() }}</span>
+            <span class="arb-drawer__text num">{{ new Date(selectedDecision.created_at).toLocaleString() }}</span>
           </div>
         </div>
       </div>

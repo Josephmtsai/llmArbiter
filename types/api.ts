@@ -87,13 +87,23 @@ export interface TestCaseCreateRequest {
 
 export interface DecisionRecord {
   id: number
-  action: PrimaryAction
+  primary_action: PrimaryAction
+  side_action: SideAction
   confidence: number
   source: Source
   provider: string
-  created: string
+  created_at: string
   reason: string
-  snippet: string
+  log_snippet: string
+  thinking?: string
+  hardware_info?: Record<string, unknown>
+}
+
+export interface DecisionsPaginatedResponse {
+  decisions: DecisionRecord[]
+  total: number
+  limit: number
+  offset: number
 }
 
 export interface DecisionStats {
