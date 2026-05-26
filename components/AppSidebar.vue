@@ -4,7 +4,6 @@ import {
   ListChecks,
   FlaskConical,
   Gauge,
-  History,
   SlidersHorizontal,
   ChevronsUpDown,
 } from 'lucide-vue-next'
@@ -16,7 +15,6 @@ const NAV_ITEMS = [
   { id: 'decisions', label: 'Decisions', icon: ListChecks, href: '/decisions', count: null as number | null },
   { id: 'cases', label: 'Test cases', icon: FlaskConical, href: '/cases', count: null as number | null },
   { id: 'evaluate', label: 'Evaluate', icon: Gauge, href: '/evaluate' },
-  { id: 'audit', label: 'Audit log', icon: History, href: '/audit' },
   { id: 'settings', label: 'Settings', icon: SlidersHorizontal, href: '/settings' },
 ]
 

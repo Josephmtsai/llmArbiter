@@ -13,7 +13,6 @@ import type {
   TestCase,
   TestCaseCreateRequest,
   EvaluationSummary,
-  AuditEvent,
   RuleValue,
   ProviderPatchBody,
   RulePatchBody,
@@ -119,9 +118,6 @@ export function useApi() {
 
     getEvalResults: (params?: GetEvalResultsParams) =>
       api<ArbiterResponse<EvaluationSummary[]>>('/evaluate/results', { query: params }),
-
-    getAudit: (params?: { limit?: number; offset?: number; since?: string }) =>
-      api<ArbiterResponse<AuditEvent[]>>('/audit', { query: params }),
 
     healthCheck: () =>
       api<Record<string, unknown>>('/health'),

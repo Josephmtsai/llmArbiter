@@ -157,13 +157,3 @@ export interface EvaluationSummary {
   results: EvalResult[]
 }
 
-export interface AuditEvent {
-  ts: string
-  actor: string
-  role: 'admin' | 'operator' | 'viewer'
-  kind: string
-  icon: string
-  text: string
-  target: string
-  delta: string | null
-}
