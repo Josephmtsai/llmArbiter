@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import type { DecisionRecord, DecisionStats, PrimaryAction } from '~/types/api'
+import type { DecisionRecord, PrimaryAction } from '~/types/api'
 
 definePageMeta({ middleware: 'auth' })
 
 const api = useApi()
 
 const decisions = ref<DecisionRecord[]>([])
-const stats = ref<DecisionStats | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const selectedDecision = ref<DecisionRecord | null>(null)
@@ -18,16 +17,12 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    const [dRes, sRes] = await Promise.all([
-      api.getDecisions({
-        limit: PAGE_SIZE,
-        offset: page.value * PAGE_SIZE,
-        action: filterAction.value,
-      }),
-      stats.value ? Promise.resolve(null) : api.getDecisionStats(),
-    ])
-    if (dRes.status === 'success') decisions.value = dRes.data.decisions
-    if (sRes?.status === 'success') stats.value = sRes.data
+    const res = await api.getDecisions({
+      limit: PAGE_SIZE,
+      offset: page.value * PAGE_SIZE,
+      action: filterAction.value,
+    })
+    if (res.status === 'success') decisions.value = res.data.decisions
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Load failed'
   } finally {
@@ -45,6 +40,20 @@ const PRIMARY_ACTIONS: PrimaryAction[] = [
   'notify_human',
   'send_email',
 ]
+
+const stats = computed(() => {
+  if (decisions.value.length === 0) return null
+  const by_action: Partial<Record<PrimaryAction, number>> = {}
+  let totalConf = 0
+  for (const d of decisions.value) {
+    by_action[d.primary_action] = (by_action[d.primary_action] ?? 0) + 1
+    totalConf += d.confidence
+  }
+  return {
+    by_action,
+    avg_confidence: totalConf / decisions.value.length,
+  }
+})
 </script>
 
 <template>
@@ -53,7 +62,7 @@ const PRIMARY_ACTIONS: PrimaryAction[] = [
   <div class="arb-decisions">
     <!-- Stats row -->
     <div v-if="stats" class="arb-decisions__stats-section">
-      <UiEyebrow class="arb-decisions__stats-label">Last {{ stats.window_hours }}h</UiEyebrow>
+      <UiEyebrow class="arb-decisions__stats-label">Current page</UiEyebrow>
       <div class="arb-decisions__stats">
       <UiCard class="arb-decisions__stat">
         <UiEyebrow>Avg confidence</UiEyebrow>
