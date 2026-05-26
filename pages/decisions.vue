@@ -48,22 +48,16 @@ const PRIMARY_ACTIONS: PrimaryAction[] = [
 </script>
 
 <template>
-  <AppTopBar title="Decisions" :subtitle="stats ? `${stats.total} total decisions` : undefined" />
+  <AppTopBar title="Decisions" subtitle="Decision history" />
 
   <div class="arb-decisions">
     <!-- Stats row -->
     <div v-if="stats" class="arb-decisions__stats">
       <UiCard class="arb-decisions__stat">
-        <UiEyebrow>Total</UiEyebrow>
-        <span class="arb-decisions__stat-val num">{{ stats.total }}</span>
-      </UiCard>
-      <UiCard class="arb-decisions__stat">
-        <UiEyebrow>Auto-executed</UiEyebrow>
-        <span class="arb-decisions__stat-val num">{{ stats.auto_executed }}</span>
-      </UiCard>
-      <UiCard class="arb-decisions__stat">
         <UiEyebrow>Avg confidence</UiEyebrow>
-        <span class="arb-decisions__stat-val num">{{ Math.round(stats.avg_confidence * 100) }}%</span>
+        <span class="arb-decisions__stat-val num">
+          {{ stats.avg_confidence != null ? Math.round(stats.avg_confidence * 100) + '%' : '—' }}
+        </span>
       </UiCard>
       <UiCard
         v-for="action in PRIMARY_ACTIONS"

@@ -107,10 +107,9 @@ export interface DecisionsPaginatedResponse {
 }
 
 export interface DecisionStats {
-  total: number
-  by_action: Record<PrimaryAction, number>
-  auto_executed: number
-  avg_confidence: number
+  window_hours: number
+  by_action: Partial<Record<PrimaryAction, number>>
+  avg_confidence: number | null
 }
 
 export interface Rule {
