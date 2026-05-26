@@ -15,6 +15,11 @@ export interface ArbiterResponse<T = Record<string, unknown>> {
   message: string
 }
 
+export interface PaginatedResponse<T> {
+  total: number
+  items: T[]
+}
+
 export interface AnalyzeRequest {
   log_snippet: string
   hardware_info?: Record<string, unknown>

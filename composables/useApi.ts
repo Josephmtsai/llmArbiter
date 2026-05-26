@@ -1,5 +1,6 @@
 import type {
   ArbiterResponse,
+  PaginatedResponse,
   AnalyzeRequest,
   DecisionData,
   DecisionRecord,
@@ -90,7 +91,7 @@ export function useApi() {
       }).then(res => ({ ...res, data: normalizePrompt(res.data) })),
 
     getCases: (params?: GetCasesParams) =>
-      api<ArbiterResponse<TestCase[]>>('/cases', { query: params }),
+      api<ArbiterResponse<PaginatedResponse<TestCase>>>('/cases', { query: params }),
 
     getCase: (id: number) =>
       api<ArbiterResponse<TestCase>>(`/cases/${id}`),

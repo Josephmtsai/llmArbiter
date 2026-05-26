@@ -5,6 +5,7 @@ definePageMeta({ middleware: 'auth' })
 
 const api = useApi()
 const cases = ref<TestCase[]>([])
+const casesTotal = ref(0)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const showForm = ref(false)
@@ -30,7 +31,10 @@ async function load() {
   loading.value = true
   try {
     const res = await api.getCases()
-    if (res.status === 'success') cases.value = res.data
+    if (res.status === 'success') {
+      cases.value = res.data.items
+      casesTotal.value = res.data.total
+    }
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Load failed'
   } finally {
@@ -68,7 +72,7 @@ onMounted(load)
 </script>
 
 <template>
-  <AppTopBar title="Test cases" :subtitle="`${cases.length} cases`">
+  <AppTopBar title="Test cases" :subtitle="`${casesTotal} cases`">
     <template #actions>
       <UiButton variant="primary" size="sm" @click="showForm = !showForm">
         {{ showForm ? 'Cancel' : 'New case' }}
