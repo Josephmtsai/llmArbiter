@@ -52,7 +52,9 @@ const PRIMARY_ACTIONS: PrimaryAction[] = [
 
   <div class="arb-decisions">
     <!-- Stats row -->
-    <div v-if="stats" class="arb-decisions__stats">
+    <div v-if="stats" class="arb-decisions__stats-section">
+      <UiEyebrow class="arb-decisions__stats-label">Last {{ stats.window_hours }}h</UiEyebrow>
+      <div class="arb-decisions__stats">
       <UiCard class="arb-decisions__stat">
         <UiEyebrow>Avg confidence</UiEyebrow>
         <span class="arb-decisions__stat-val num">
@@ -67,6 +69,7 @@ const PRIMARY_ACTIONS: PrimaryAction[] = [
         <UiActionBadge :action="action" size="sm" />
         <span class="arb-decisions__stat-val num">{{ stats.by_action[action] ?? 0 }}</span>
       </UiCard>
+    </div>
     </div>
 
     <!-- Filter bar -->
@@ -181,6 +184,14 @@ const PRIMARY_ACTIONS: PrimaryAction[] = [
   flex-direction: column;
   gap: 20px;
   flex: 1;
+}
+.arb-decisions__stats-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.arb-decisions__stats-label {
+  color: var(--fg-4);
 }
 .arb-decisions__stats {
   display: flex;
