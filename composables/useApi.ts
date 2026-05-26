@@ -76,8 +76,8 @@ export function useApi() {
       }),
 
     getPrompts: async () => {
-      const res = await api<ArbiterResponse<PromptVersion[]>>('/config/prompts')
-      return { ...res, data: res.data.map(normalizePrompt) }
+      const res = await api<ArbiterResponse<{ prompts: PromptVersion[] }>>('/config/prompts')
+      return { ...res, data: (res.data.prompts ?? []).map(normalizePrompt) }
     },
 
     createPrompt: (label: string, content: string) =>
