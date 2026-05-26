@@ -289,9 +289,11 @@ onMounted(fetchRecent)
   font-size: 11.5px;
   color: var(--fg-3);
   margin: 0;
-  white-space: nowrap;
+  white-space: pre-wrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   font-family: var(--font-mono);
 }
 .arb-analyze__recent-footer {
