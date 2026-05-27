@@ -10,6 +10,8 @@ const running = ref(false)
 const result = ref<EvaluationSummary | null>(null)
 const error = ref<string | null>(null)
 const loadingPrompts = ref(true)
+const history = ref<EvaluationSummary[]>([])
+const loadingHistory = ref(true)
 
 async function loadPrompts() {
   try {
@@ -24,14 +26,28 @@ async function loadPrompts() {
   }
 }
 
+async function loadHistory() {
+  loadingHistory.value = true
+  try {
+    const res = await api.getEvalResults()
+    if (res.status === 'success') history.value = res.data
+  } catch { /* silent */ } finally {
+    loadingHistory.value = false
+  }
+}
+
 async function runEval() {
   running.value = true
   error.value = null
   result.value = null
   try {
     const res = await api.runEvaluation(selectedPromptId.value)
-    if (res.status === 'success') result.value = res.data
-    else error.value = res.message
+    if (res.status === 'success') {
+      result.value = res.data
+      await loadHistory()
+    } else {
+      error.value = res.message
+    }
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Evaluation failed'
   } finally {
@@ -39,15 +55,21 @@ async function runEval() {
   }
 }
 
+function accuracyColor(v: number): string {
+  if (v >= 0.8) return 'var(--conf-high)'
+  if (v >= 0.5) return 'var(--conf-mid)'
+  return 'var(--conf-low)'
+}
+
 const scoreColor = computed(() => {
   if (!result.value) return 'var(--fg-3)'
-  const s = result.value.accuracy
-  if (s >= 0.8) return 'var(--conf-high)'
-  if (s >= 0.5) return 'var(--conf-mid)'
-  return 'var(--conf-low)'
+  return accuracyColor(result.value.accuracy)
 })
 
-onMounted(loadPrompts)
+onMounted(() => {
+  loadPrompts()
+  loadHistory()
+})
 </script>
 
 <template>
@@ -137,6 +159,40 @@ onMounted(loadPrompts)
         </table>
       </div>
     </template>
+
+    <!-- History -->
+    <div class="arb-eval__history">
+      <UiEyebrow style="margin-bottom: 12px">Past evaluations</UiEyebrow>
+      <div v-if="loadingHistory" class="arb-eval__history-empty">
+        <UiSpinner size="sm" />
+      </div>
+      <div v-else-if="history.length === 0" class="arb-eval__history-empty">
+        No past evaluations.
+      </div>
+      <div v-else class="arb-eval__history-list">
+        <UiCard
+          v-for="(h, i) in history"
+          :key="i"
+          class="arb-eval__history-item"
+          :clickable="true"
+          @click="result = h"
+        >
+          <div class="arb-eval__history-row">
+            <span class="arb-eval__history-acc num" :style="{ color: accuracyColor(h.accuracy) }">
+              {{ Math.round(h.accuracy * 100) }}%
+            </span>
+            <span class="arb-eval__history-ratio num">{{ h.correct }} / {{ h.total }}</span>
+            <UiChip v-if="h.results.filter(r => r.predicted_action === 'timeout').length > 0" color="var(--conf-low)">
+              {{ h.results.filter(r => r.predicted_action === 'timeout').length }} timeout
+            </UiChip>
+          </div>
+          <div class="arb-eval__history-meta">
+            <span class="arb-eval__history-prompt num">prompt v{{ h.prompt_version_id }}</span>
+            <span v-if="h.created_at" class="arb-eval__history-date num">{{ new Date(h.created_at).toLocaleString() }}</span>
+          </div>
+        </UiCard>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -224,4 +280,37 @@ onMounted(loadPrompts)
 }
 .arb-eval__pass-dot--ok { background: var(--conf-high); }
 .arb-eval__pass-dot--fail { background: var(--conf-low); }
+.arb-eval__history { display: flex; flex-direction: column; }
+.arb-eval__history-empty {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+  font-size: 12px;
+  color: var(--fg-4);
+}
+.arb-eval__history-list { display: flex; flex-direction: column; gap: 8px; }
+.arb-eval__history-item { display: flex; flex-direction: column; gap: 6px; cursor: pointer; }
+.arb-eval__history-row { display: flex; align-items: center; gap: 10px; }
+.arb-eval__history-acc {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  min-width: 48px;
+}
+.arb-eval__history-ratio {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg-3);
+}
+.arb-eval__history-meta { display: flex; gap: 12px; align-items: center; }
+.arb-eval__history-prompt {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-4);
+}
+.arb-eval__history-date {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-4);
+}
 </style>
