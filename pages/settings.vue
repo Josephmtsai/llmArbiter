@@ -36,12 +36,14 @@ async function saveRule(rule: Rule) {
 const providerInfo = ref<ProviderResponse | null>(null)
 const loadingProviders = ref(true)
 const settingProvider = ref(false)
+const sharedActiveProvider = useState<string | null>('sidebar:activeProvider', () => null)
 
 async function loadProviders() {
   loadingProviders.value = true
   try {
     const res = await api.getProviders()
     providerInfo.value = res
+    sharedActiveProvider.value = res.active_provider ?? null
   } catch { /* silent */ } finally {
     loadingProviders.value = false
   }
@@ -53,6 +55,7 @@ async function selectProvider(p: string) {
   try {
     const res = await api.setProvider(p)
     providerInfo.value = res
+    sharedActiveProvider.value = res.active_provider ?? null
   } catch { /* silent */ } finally {
     settingProvider.value = false
   }

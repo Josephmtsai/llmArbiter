@@ -23,7 +23,7 @@ const NAV_ITEMS = [
 
 const apiOnline = ref(false)
 const latencyMs = ref<number | null>(null)
-const activeProvider = ref<string | null>(null)
+const activeProvider = useState<string | null>('sidebar:activeProvider', () => null)
 
 async function pollStatus() {
   try {
@@ -44,6 +44,7 @@ async function pollStatus() {
 }
 
 onMounted(pollStatus)
+watch(() => route.path, pollStatus)
 
 function isActive(href: string): boolean {
   if (href === '/') return route.path === '/'
