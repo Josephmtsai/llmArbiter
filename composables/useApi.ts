@@ -19,6 +19,9 @@ import type {
   PromptCreateRequest,
   EvaluateRequest,
   GetEvalResultsParams,
+  EvalRun,
+  EvalRunDetail,
+  EvalCompareResponse,
 } from '~/types/api'
 
 interface GetCasesParams {
@@ -142,6 +145,15 @@ export function useApi() {
       }
       return { ...res, data: list }
     },
+
+    getEvalHistory: () =>
+      api<ArbiterResponse<{ runs: EvalRun[] }>>('/evaluate/history'),
+
+    getEvalRunDetail: (runId: number) =>
+      api<ArbiterResponse<EvalRunDetail>>(`/evaluate/history/${runId}`),
+
+    getEvalCompare: (by: 'provider' | 'prompt_version') =>
+      api<ArbiterResponse<EvalCompareResponse>>('/evaluate/history/compare', { query: { by } }),
 
     healthCheck: () =>
       api<Record<string, unknown>>('/health'),

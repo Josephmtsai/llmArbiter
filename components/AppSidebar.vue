@@ -4,6 +4,7 @@ import {
   ListChecks,
   FlaskConical,
   Gauge,
+  History,
   SlidersHorizontal,
   BookOpen,
   ChevronsUpDown,
@@ -17,6 +18,7 @@ const NAV_ITEMS = [
   { id: 'decisions', label: 'Decisions', icon: ListChecks, href: '/decisions', count: null as number | null },
   { id: 'cases', label: 'Test cases', icon: FlaskConical, href: '/cases', count: null as number | null },
   { id: 'evaluate', label: 'Evaluate', icon: Gauge, href: '/evaluate' },
+  { id: 'eval-history', label: 'Eval history', icon: History, href: '/evaluate/history', count: null as number | null },
   { id: 'settings', label: 'Settings', icon: SlidersHorizontal, href: '/settings' },
   { id: 'guide', label: 'How it works', icon: BookOpen, href: '/guide' },
 ]
@@ -48,6 +50,7 @@ watch(() => route.path, pollStatus)
 
 function isActive(href: string): boolean {
   if (href === '/') return route.path === '/'
+  if (href === '/evaluate') return route.path === '/evaluate'
   return route.path.startsWith(href)
 }
 </script>

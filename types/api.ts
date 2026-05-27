@@ -158,3 +158,53 @@ export interface EvaluationSummary {
   created_at?: string
 }
 
+export interface EvalRun {
+  run_id: number
+  prompt_version_id: number
+  provider: string
+  model: string
+  started_at: string
+  finished_at: string
+  total: number
+  correct: number
+  timeout_count: number
+  accuracy: number
+}
+
+export interface EvalRunResult {
+  test_case_id: number
+  expected_action: PrimaryAction
+  predicted_action: PrimaryAction | 'timeout'
+  is_correct: boolean
+  latency_ms: number | null
+}
+
+export interface EvalRunDetail {
+  run: EvalRun
+  results: EvalRunResult[]
+}
+
+export interface EvalCompareGroupByProvider {
+  provider: string
+  model: string
+  run_count: number
+  avg_accuracy: number
+  best_accuracy: number
+  runs: EvalRun[]
+}
+
+export interface EvalCompareGroupByPromptVersion {
+  prompt_version_id: number
+  run_count: number
+  avg_accuracy: number
+  best_accuracy: number
+  runs: EvalRun[]
+}
+
+export type EvalCompareGroup = EvalCompareGroupByProvider | EvalCompareGroupByPromptVersion
+
+export interface EvalCompareResponse {
+  dimension: 'provider' | 'prompt_version'
+  groups: EvalCompareGroup[]
+}
+
