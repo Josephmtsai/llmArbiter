@@ -102,7 +102,7 @@ onMounted(loadPrompts)
         </UiCard>
         <UiCard class="arb-eval__summary-stat">
           <UiEyebrow>Timeouts</UiEyebrow>
-          <span class="arb-eval__score-val num">{{ result.timeout_count }}</span>
+          <span class="arb-eval__score-val num">{{ result.results.filter(r => r.predicted_action === 'timeout').length }}</span>
         </UiCard>
       </div>
 
@@ -127,7 +127,7 @@ onMounted(loadPrompts)
               <td class="num">#{{ r.test_case_id }}</td>
               <td><UiActionBadge :action="r.expected_action" size="sm" /></td>
               <td><UiActionBadge :action="r.predicted_action" size="sm" /></td>
-              <td class="num arb-eval__td-latency">{{ r.latency_ms }}ms</td>
+              <td class="num arb-eval__td-latency">{{ r.latency_ms != null ? `${r.latency_ms}ms` : '—' }}</td>
               <td class="arb-eval__td-pass">
                 <span v-if="r.is_correct" class="arb-eval__pass-dot arb-eval__pass-dot--ok" />
                 <span v-else class="arb-eval__pass-dot arb-eval__pass-dot--fail" />
