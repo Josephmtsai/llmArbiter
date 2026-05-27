@@ -147,19 +147,23 @@ onMounted(fetchRecent)
       </div>
 
       <div class="arb-analyze__rail-section">
-        <UiEyebrow style="margin-bottom: 10px">Action routing</UiEyebrow>
+        <div class="arb-analyze__routing-header">
+          <UiEyebrow>Confidence routing</UiEyebrow>
+          <NuxtLink to="/guide" class="arb-analyze__routing-guide-link">How it works →</NuxtLink>
+        </div>
+        <p class="arb-analyze__routing-note">Confidence does NOT pick the action — it controls how the chosen action is executed.</p>
         <div class="arb-analyze__routing-list">
-          <div class="arb-analyze__routing-row">
-            <UiActionBadge action="trigger_rebuild" size="sm" />
-            <span class="arb-analyze__routing-label">≥ 80% confidence</span>
+          <div class="arb-analyze__routing-row arb-analyze__routing-row--high">
+            <span class="arb-analyze__routing-badge num">≥ 80%</span>
+            <span class="arb-analyze__routing-label">Auto-execute primary — no side action</span>
           </div>
-          <div class="arb-analyze__routing-row">
-            <UiActionBadge action="trigger_fallback" size="sm" />
-            <span class="arb-analyze__routing-label">50–79% + notify</span>
+          <div class="arb-analyze__routing-row arb-analyze__routing-row--mid">
+            <span class="arb-analyze__routing-badge num">50–79%</span>
+            <span class="arb-analyze__routing-label">Execute primary + force notify_human</span>
           </div>
-          <div class="arb-analyze__routing-row">
-            <UiActionBadge action="notify_human" size="sm" />
-            <span class="arb-analyze__routing-label">&lt; 50% — human review</span>
+          <div class="arb-analyze__routing-row arb-analyze__routing-row--low">
+            <span class="arb-analyze__routing-badge num">&lt; 50%</span>
+            <span class="arb-analyze__routing-label">Override: force notify_human</span>
           </div>
         </div>
       </div>
@@ -306,18 +310,54 @@ onMounted(fetchRecent)
   font-size: 10px;
   color: var(--fg-4);
 }
+.arb-analyze__routing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.arb-analyze__routing-guide-link {
+  font-size: 11px;
+  color: var(--accent);
+  text-decoration: none;
+  font-family: var(--font-mono);
+}
+.arb-analyze__routing-guide-link:hover { text-decoration: underline; }
+.arb-analyze__routing-note {
+  font-size: 11px;
+  color: var(--fg-4);
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
 .arb-analyze__routing-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 .arb-analyze__routing-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-subtle);
 }
+.arb-analyze__routing-row--high { background: rgba(52, 211, 153, 0.05); }
+.arb-analyze__routing-row--mid  { background: rgba(251, 191, 36, 0.05); }
+.arb-analyze__routing-row--low  { background: rgba(248, 113, 113, 0.05); }
+.arb-analyze__routing-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 44px;
+  flex-shrink: 0;
+}
+.arb-analyze__routing-row--high .arb-analyze__routing-badge { color: var(--conf-high); }
+.arb-analyze__routing-row--mid  .arb-analyze__routing-badge { color: var(--conf-mid); }
+.arb-analyze__routing-row--low  .arb-analyze__routing-badge { color: var(--conf-low); }
 .arb-analyze__routing-label {
-  font-size: 11.5px;
-  color: var(--fg-3);
+  font-size: 11px;
+  color: var(--fg-2);
+  line-height: 1.4;
 }
 </style>
