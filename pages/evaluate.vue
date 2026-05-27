@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { EvaluationSummary, PromptVersion } from '~/types/api'
+import type { EvaluationSummary, PromptVersion, EvalRun } from '~/types/api'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -10,7 +10,7 @@ const running = ref(false)
 const result = ref<EvaluationSummary | null>(null)
 const error = ref<string | null>(null)
 const loadingPrompts = ref(true)
-const history = ref<EvaluationSummary[]>([])
+const history = ref<EvalRun[]>([])
 const loadingHistory = ref(true)
 
 async function loadPrompts() {
@@ -29,8 +29,8 @@ async function loadPrompts() {
 async function loadHistory() {
   loadingHistory.value = true
   try {
-    const res = await api.getEvalResults()
-    if (res.status === 'success') history.value = res.data
+    const res = await api.getEvalHistory()
+    if (res.status === 'success') history.value = res.data.runs
   } catch { /* silent */ } finally {
     loadingHistory.value = false
   }
@@ -162,7 +162,10 @@ onMounted(() => {
 
     <!-- History -->
     <div class="arb-eval__history">
-      <UiEyebrow style="margin-bottom: 12px">Past evaluations</UiEyebrow>
+      <div class="arb-eval__history-header">
+        <UiEyebrow>Past evaluations</UiEyebrow>
+        <NuxtLink to="/evaluate/history" class="arb-eval__history-link">View all →</NuxtLink>
+      </div>
       <div v-if="loadingHistory" class="arb-eval__history-empty">
         <UiSpinner size="sm" />
       </div>
@@ -170,27 +173,29 @@ onMounted(() => {
         No past evaluations.
       </div>
       <div v-else class="arb-eval__history-list">
-        <UiCard
-          v-for="(h, i) in history"
-          :key="i"
-          class="arb-eval__history-item"
-          :clickable="true"
-          @click="result = h"
+        <NuxtLink
+          v-for="h in history.slice(0, 5)"
+          :key="h.run_id"
+          :to="`/evaluate/history/${h.run_id}`"
+          class="arb-eval__history-link-card"
         >
-          <div class="arb-eval__history-row">
-            <span class="arb-eval__history-acc num" :style="{ color: accuracyColor(h.accuracy) }">
-              {{ Math.round(h.accuracy * 100) }}%
-            </span>
-            <span class="arb-eval__history-ratio num">{{ h.correct }} / {{ h.total }}</span>
-            <UiChip v-if="h.results.filter(r => r.predicted_action === 'timeout').length > 0" color="var(--conf-low)">
-              {{ h.results.filter(r => r.predicted_action === 'timeout').length }} timeout
-            </UiChip>
-          </div>
-          <div class="arb-eval__history-meta">
-            <span class="arb-eval__history-prompt num">prompt v{{ h.prompt_version_id }}</span>
-            <span v-if="h.created_at" class="arb-eval__history-date num">{{ new Date(h.created_at).toLocaleString() }}</span>
-          </div>
-        </UiCard>
+          <UiCard :clickable="true" class="arb-eval__history-item">
+            <div class="arb-eval__history-row">
+              <span class="arb-eval__history-acc num" :style="{ color: accuracyColor(h.accuracy) }">
+                {{ Math.round(h.accuracy * 100) }}%
+              </span>
+              <span class="arb-eval__history-ratio num">{{ h.correct }} / {{ h.total }}</span>
+              <UiChip v-if="h.timeout_count > 0" color="var(--conf-low)">
+                {{ h.timeout_count }} timeout
+              </UiChip>
+              <span class="arb-eval__history-provider">{{ h.provider }}</span>
+            </div>
+            <div class="arb-eval__history-meta">
+              <span class="arb-eval__history-prompt num">prompt v{{ h.prompt_version_id }}</span>
+              <span class="arb-eval__history-date num">{{ new Date(h.started_at).toLocaleString() }}</span>
+            </div>
+          </UiCard>
+        </NuxtLink>
       </div>
     </div>
   </div>
@@ -281,6 +286,26 @@ onMounted(() => {
 .arb-eval__pass-dot--ok { background: var(--conf-high); }
 .arb-eval__pass-dot--fail { background: var(--conf-low); }
 .arb-eval__history { display: flex; flex-direction: column; }
+.arb-eval__history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.arb-eval__history-link {
+  font-size: 12px;
+  color: var(--fg-4);
+  text-decoration: none;
+  transition: color var(--dur-fast);
+}
+.arb-eval__history-link:hover { color: var(--fg-1); }
+.arb-eval__history-link-card { text-decoration: none; display: block; }
+.arb-eval__history-provider {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-4);
+  margin-left: auto;
+}
 .arb-eval__history-empty {
   display: flex;
   justify-content: center;
