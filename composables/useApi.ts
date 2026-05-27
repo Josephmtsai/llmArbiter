@@ -128,8 +128,20 @@ export function useApi() {
         } satisfies EvaluateRequest,
       }),
 
-    getEvalResults: (params?: GetEvalResultsParams) =>
-      api<ArbiterResponse<EvaluationSummary[]>>('/evaluate/results', { query: params }),
+    getEvalResults: async (params?: GetEvalResultsParams) => {
+      const res = await api<ArbiterResponse<EvaluationSummary[] | { evaluations: EvaluationSummary[] } | { results: EvaluationSummary[] }>>('/evaluate/results', { query: params })
+      let list: EvaluationSummary[]
+      if (Array.isArray(res.data)) {
+        list = res.data
+      } else if ('evaluations' in res.data) {
+        list = res.data.evaluations
+      } else if ('results' in res.data) {
+        list = (res.data as { results: EvaluationSummary[] }).results
+      } else {
+        list = []
+      }
+      return { ...res, data: list }
+    },
 
     healthCheck: () =>
       api<Record<string, unknown>>('/health'),

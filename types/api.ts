@@ -155,5 +155,6 @@ export interface EvaluationSummary {
   timeout_count: number
   accuracy: number
   results: EvalResult[]
+  created_at?: string
 }
 
