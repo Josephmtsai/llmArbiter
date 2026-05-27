@@ -143,9 +143,9 @@ export interface EvalResult {
   test_case_id: number
   description: string
   expected_action: PrimaryAction
-  predicted_action: PrimaryAction
+  predicted_action: PrimaryAction | 'timeout'
   is_correct: boolean
-  latency_ms: number
+  latency_ms: number | null
 }
 
 export interface EvaluationSummary {

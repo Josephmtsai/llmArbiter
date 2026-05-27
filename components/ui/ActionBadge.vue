@@ -2,7 +2,7 @@
 import type { PrimaryAction, SideAction } from '~/types/api'
 
 const props = defineProps<{
-  action: PrimaryAction | SideAction
+  action: PrimaryAction | SideAction | 'timeout'
   size?: 'sm' | 'lg'
 }>()
 
@@ -12,9 +12,11 @@ const ACTION_META: Record<string, { color: string; soft: string }> = {
   trigger_restart: { color: 'var(--action-restart)', soft: 'var(--action-restart-soft)' },
   notify_human: { color: 'var(--action-notify)', soft: 'var(--action-notify-soft)' },
   send_email: { color: 'var(--action-email)', soft: 'var(--action-email-soft)' },
+  timeout: { color: 'var(--fg-3)', soft: 'var(--bg-2)' },
 }
 
-const meta = computed(() => ACTION_META[props.action ?? 'notify_human'] ?? ACTION_META.notify_human)
+const FALLBACK = { color: 'var(--fg-3)', soft: 'var(--bg-2)' }
+const meta = computed(() => ACTION_META[props.action ?? ''] ?? FALLBACK)
 const isLg = computed(() => props.size === 'lg')
 </script>
 
