@@ -64,16 +64,24 @@ async function selectProvider(p: string) {
 // --- Prompts ---
 const prompts = ref<PromptVersion[]>([])
 const loadingPrompts = ref(true)
-const showPromptForm = ref(false)
+const selectedPromptId = ref<number | 'new' | null>(null)
 const promptForm = reactive({ label: '', content: '' })
 const savingPrompt = ref(false)
 const activatingPrompt = ref<number | null>(null)
+
+const selectedPrompt = computed(() =>
+  prompts.value.find(p => p.id === selectedPromptId.value) ?? null
+)
 
 async function loadPrompts() {
   loadingPrompts.value = true
   try {
     const res = await api.getPrompts()
-    if (res.status === 'success') prompts.value = res.data
+    if (res.status === 'success') {
+      prompts.value = res.data
+      const active = res.data.find(p => p.active)
+      selectedPromptId.value = active?.id ?? res.data[0]?.id ?? null
+    }
   } catch { /* silent */ } finally {
     loadingPrompts.value = false
   }
@@ -85,7 +93,7 @@ async function savePrompt() {
     const res = await api.createPrompt(promptForm.label, promptForm.content)
     if (res.status === 'success') {
       prompts.value.unshift(res.data)
-      showPromptForm.value = false
+      selectedPromptId.value = res.data.id
       promptForm.label = ''
       promptForm.content = ''
     }
@@ -204,60 +212,81 @@ watch(activeTab, (tab) => {
 
     <!-- Prompts tab -->
     <div v-if="activeTab === 'prompts'" class="arb-settings__prompts">
-      <div class="arb-settings__prompts-toolbar">
-        <UiButton variant="primary" size="sm" @click="showPromptForm = !showPromptForm">
-          {{ showPromptForm ? 'Cancel' : 'New version' }}
-        </UiButton>
-      </div>
-
-      <UiCard v-if="showPromptForm" class="arb-settings__prompt-form">
-        <UiEyebrow>New prompt version</UiEyebrow>
-        <UiField label="Label">
-          <UiInput v-model="promptForm.label" placeholder="e.g. v3-extended-reasoning" />
-        </UiField>
-        <UiField label="Prompt content">
-          <UiTextarea
-            v-model="promptForm.content"
-            :mono="true"
-            placeholder="Enter system prompt content…"
-            class="arb-settings__prompt-content"
-          />
-        </UiField>
-        <div class="arb-settings__prompt-form-actions">
-          <UiButton variant="primary" size="sm" :loading="savingPrompt" @click="savePrompt">
-            Save version
-          </UiButton>
-        </div>
-      </UiCard>
-
       <div v-if="loadingPrompts" class="arb-settings__loading"><UiSpinner size="sm" /></div>
-      <div v-else-if="prompts.length === 0" class="arb-settings__empty">No prompt versions.</div>
-      <div v-else class="arb-settings__prompt-list">
-        <UiCard v-for="p in prompts" :key="p.id" class="arb-settings__prompt-item">
-          <div class="arb-settings__prompt-header">
-            <div class="arb-settings__prompt-meta">
-              <span class="arb-settings__prompt-label">{{ p.label }}</span>
-              <span v-if="p.active" class="arb-settings__prompt-active-badge">Active</span>
-              <span v-if="p.eval_score != null" class="arb-settings__prompt-score num">
-                {{ Math.round(p.eval_score * 100) }}% eval
+      <template v-else>
+        <!-- Version tab bar -->
+        <div class="arb-settings__pv-bar">
+          <button
+            v-for="p in prompts"
+            :key="p.id"
+            class="arb-settings__pv-tab"
+            :class="{ 'arb-settings__pv-tab--active': selectedPromptId === p.id }"
+            @click="selectedPromptId = p.id"
+          >
+            <span class="arb-settings__pv-tab-label">{{ p.label }}</span>
+            <span v-if="p.active" class="arb-settings__pv-tab-dot" />
+          </button>
+          <button
+            class="arb-settings__pv-tab arb-settings__pv-tab--new"
+            :class="{ 'arb-settings__pv-tab--active': selectedPromptId === 'new' }"
+            @click="selectedPromptId = 'new'"
+          >
+            + New
+          </button>
+        </div>
+
+        <!-- New version form -->
+        <UiCard v-if="selectedPromptId === 'new'" class="arb-settings__prompt-form">
+          <UiEyebrow>New prompt version</UiEyebrow>
+          <UiField label="Label">
+            <UiInput v-model="promptForm.label" placeholder="e.g. v3-extended-reasoning" />
+          </UiField>
+          <UiField label="Prompt content">
+            <UiTextarea
+              v-model="promptForm.content"
+              :mono="true"
+              placeholder="Enter system prompt content…"
+              class="arb-settings__prompt-content"
+            />
+          </UiField>
+          <div class="arb-settings__prompt-form-actions">
+            <UiButton variant="ghost" size="sm" @click="selectedPromptId = prompts[0]?.id ?? null">
+              Cancel
+            </UiButton>
+            <UiButton variant="primary" size="sm" :loading="savingPrompt" @click="savePrompt">
+              Save version
+            </UiButton>
+          </div>
+        </UiCard>
+
+        <!-- Selected version panel -->
+        <UiCard v-else-if="selectedPrompt" class="arb-settings__prompt-panel">
+          <div class="arb-settings__prompt-panel-header">
+            <div class="arb-settings__prompt-panel-meta">
+              <span class="arb-settings__prompt-panel-label">{{ selectedPrompt.label }}</span>
+              <span v-if="selectedPrompt.active" class="arb-settings__prompt-active-badge">Active</span>
+              <span v-if="selectedPrompt.eval_score != null" class="arb-settings__prompt-score num">
+                {{ Math.round(selectedPrompt.eval_score * 100) }}% eval
               </span>
             </div>
-            <div class="arb-settings__prompt-actions">
+            <div class="arb-settings__prompt-panel-actions">
               <UiButton
-                v-if="!p.active"
-                variant="ghost"
+                v-if="!selectedPrompt.active"
+                variant="primary"
                 size="sm"
-                :loading="activatingPrompt === p.id"
-                @click="activatePrompt(p.id)"
+                :loading="activatingPrompt === selectedPrompt.id"
+                @click="activatePrompt(selectedPrompt.id)"
               >
                 Activate
               </UiButton>
             </div>
           </div>
-          <pre class="arb-settings__prompt-preview">{{ p.content }}</pre>
-          <span class="arb-settings__prompt-ts num">{{ new Date(p.created).toLocaleString() }}</span>
+          <pre class="arb-settings__prompt-full">{{ selectedPrompt.content }}</pre>
+          <span class="arb-settings__prompt-ts num">{{ new Date(selectedPrompt.created).toLocaleString() }}</span>
         </UiCard>
-      </div>
+
+        <div v-else class="arb-settings__empty">No prompt versions. Click "+ New" to create one.</div>
+      </template>
     </div>
   </div>
 </template>
@@ -396,19 +425,70 @@ watch(activeTab, (tab) => {
   border: 1px solid var(--accent-ring);
 }
 .arb-settings__prompts { display: flex; flex-direction: column; gap: 16px; }
-.arb-settings__prompts-toolbar { display: flex; justify-content: flex-end; }
+
+/* Version tab bar */
+.arb-settings__pv-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 0;
+}
+.arb-settings__pv-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--fg-3);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: color var(--dur-fast);
+  margin-bottom: -1px;
+  white-space: nowrap;
+}
+.arb-settings__pv-tab:hover { color: var(--fg-1); }
+.arb-settings__pv-tab--active {
+  color: var(--fg-0);
+  border-bottom-color: var(--accent);
+  font-weight: 500;
+}
+.arb-settings__pv-tab--new {
+  font-family: var(--font-sans, inherit);
+  font-size: 12px;
+  color: var(--fg-4);
+  margin-left: 4px;
+}
+.arb-settings__pv-tab--new:hover { color: var(--accent); }
+.arb-settings__pv-tab--new.arb-settings__pv-tab--active { color: var(--accent); border-bottom-color: var(--accent); }
+.arb-settings__pv-tab-label { flex: 1; }
+.arb-settings__pv-tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--conf-high);
+  flex-shrink: 0;
+}
+
+/* New version form */
 .arb-settings__prompt-form { display: flex; flex-direction: column; gap: 14px; }
-.arb-settings__prompt-content { min-height: 180px; }
-.arb-settings__prompt-form-actions { display: flex; justify-content: flex-end; }
-.arb-settings__prompt-list { display: flex; flex-direction: column; gap: 10px; }
-.arb-settings__prompt-item { display: flex; flex-direction: column; gap: 10px; }
-.arb-settings__prompt-header {
+.arb-settings__prompt-content { min-height: 240px; }
+.arb-settings__prompt-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Version content panel */
+.arb-settings__prompt-panel { display: flex; flex-direction: column; gap: 14px; }
+.arb-settings__prompt-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-.arb-settings__prompt-meta { display: flex; align-items: center; gap: 10px; }
-.arb-settings__prompt-label { font-size: 13.5px; font-weight: 500; color: var(--fg-0); }
+.arb-settings__prompt-panel-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.arb-settings__prompt-panel-label { font-size: 14px; font-weight: 600; color: var(--fg-0); }
+.arb-settings__prompt-panel-actions { display: flex; align-items: center; gap: 6px; }
 .arb-settings__prompt-active-badge {
   font-size: 11px;
   font-family: var(--font-mono);
@@ -422,19 +502,19 @@ watch(activeTab, (tab) => {
   font-size: 11px;
   color: var(--fg-4);
 }
-.arb-settings__prompt-actions { display: flex; align-items: center; gap: 6px; }
-.arb-settings__prompt-preview {
+.arb-settings__prompt-full {
   font-family: var(--font-mono);
-  font-size: 11.5px;
-  color: var(--fg-3);
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--fg-2);
   background: var(--bg-inset);
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-sm);
-  padding: 10px 12px;
+  padding: 14px 16px;
   white-space: pre-wrap;
   margin: 0;
-  max-height: 320px;
   overflow-y: auto;
+  max-height: 60vh;
 }
 .arb-settings__prompt-ts {
   font-family: var(--font-mono);
