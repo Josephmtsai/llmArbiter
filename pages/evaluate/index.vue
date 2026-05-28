@@ -84,9 +84,11 @@ async function runEval() {
   running.value = true
   error.value = null
   result.value = null
+  priorAccuracy.value = null  // clear previous delta while new run is in progress
   try {
     const res = await api.runEvaluation(selectedPromptId.value, effectiveModel.value || undefined)
     if (res.status === 'success') {
+      priorAccuracy.value = history.value[0]?.accuracy ?? null  // snapshot before refresh
       result.value = res.data
       await loadHistory()
     } else {
@@ -105,9 +107,30 @@ function accuracyColor(v: number): string {
   return 'var(--conf-low)'
 }
 
+const priorAccuracy = ref<number | null>(null)
+
 const scoreColor = computed(() => {
   if (!result.value) return 'var(--fg-3)'
   return accuracyColor(result.value.accuracy)
+})
+
+const accuracyDelta = computed<number | null>(() => {
+  if (!result.value || priorAccuracy.value === null) return null
+  return Math.round((result.value.accuracy - priorAccuracy.value) * 1000) / 10
+})
+
+const deltaLabel = computed(() => {
+  if (accuracyDelta.value === null) return ''
+  if (accuracyDelta.value > 0) return `▲ +${accuracyDelta.value.toFixed(1)}%`
+  if (accuracyDelta.value < 0) return `▼ ${accuracyDelta.value.toFixed(1)}%`
+  return `→ 0.0%`
+})
+
+const deltaColor = computed(() => {
+  if (accuracyDelta.value === null) return 'var(--fg-4)'
+  if (accuracyDelta.value > 0) return 'var(--action-rebuild)'
+  if (accuracyDelta.value < 0) return 'var(--action-notify)'
+  return 'var(--fg-4)'
 })
 
 const discardMessage = computed(() => {
@@ -201,9 +224,16 @@ onMounted(() => {
       <div class="arb-eval__summary">
         <UiCard class="arb-eval__summary-stat">
           <UiEyebrow>Accuracy</UiEyebrow>
-          <span class="arb-eval__score-val num" :style="{ color: scoreColor }">
-            {{ Math.round(result.accuracy * 100) }}%
-          </span>
+          <div class="arb-eval__accuracy-row">
+            <span class="arb-eval__score-val num" :style="{ color: scoreColor }">
+              {{ Math.round(result.accuracy * 100) }}%
+            </span>
+            <span
+              v-if="accuracyDelta !== null"
+              class="arb-eval__delta-badge num"
+              :style="{ color: deltaColor }"
+            >{{ deltaLabel }}</span>
+          </div>
         </UiCard>
         <UiCard class="arb-eval__summary-stat">
           <UiEyebrow>Correct / Total</UiEyebrow>
@@ -276,6 +306,7 @@ onMounted(() => {
                 {{ h.timeout_count }} timeout
               </UiChip>
               <span class="arb-eval__history-provider">{{ h.provider }}</span>
+              <span v-if="h.model" class="arb-eval__history-model num">{{ h.model }}</span>
             </div>
             <div class="arb-eval__history-meta">
               <span class="arb-eval__history-prompt num">prompt v{{ h.prompt_version_id }}</span>
@@ -401,6 +432,17 @@ onMounted(() => {
   gap: 6px;
   min-width: 140px;
 }
+.arb-eval__accuracy-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.arb-eval__delta-badge {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
 .arb-eval__score-val {
   font-family: var(--font-mono);
   font-size: 28px;
@@ -462,6 +504,15 @@ onMounted(() => {
 }
 .arb-eval__history-link:hover { color: var(--fg-1); }
 .arb-eval__history-link-card { text-decoration: none; display: block; }
+.arb-eval__history-model {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-4);
+  background: var(--bg-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 1px 6px;
+}
 .arb-eval__history-provider {
   font-family: var(--font-mono);
   font-size: 11px;
