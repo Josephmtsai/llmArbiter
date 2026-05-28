@@ -28,19 +28,27 @@ const customModel = ref('')
 const effectiveModel = computed(() => customModel.value.trim() || selectedQuickModel.value || '')
 
 function pickQuickModel(val: string) {
-  selectedQuickModel.value = selectedQuickModel.value === val ? null : val
-  customModel.value = ''
-  syncActiveModel()
+  const isDeselect = selectedQuickModel.value === val
+  selectedQuickModel.value = isDeselect ? null : val
+  if (!isDeselect) customModel.value = ''  // only clear on selection, not on deselect
 }
 
 function onCustomModelInput() {
   selectedQuickModel.value = null
-  syncActiveModel()
 }
 
-function syncActiveModel() {
-  activeModel.value = effectiveModel.value || null
-}
+// Keep activeModel shared state in sync with the computed
+watch(effectiveModel, (val) => {
+  activeModel.value = val || null
+})
+
+// Clear model selection when provider changes away from openrouter
+watch(activeProvider, (val) => {
+  if (val !== 'openrouter') {
+    selectedQuickModel.value = null
+    customModel.value = ''
+  }
+})
 
 async function loadPrompts() {
   try {
@@ -103,7 +111,10 @@ const scoreColor = computed(() => {
 })
 
 const discardMessage = computed(() => {
-  if (!result.value || result.value.persisted !== false) return null
+  if (!result.value) return null
+  const p = result.value.persisted
+  // undefined = old API (field absent) → no warning; true = persisted normally → no warning
+  if (p !== false && p !== null) return null
   if (result.value.discard_reason === 'timeout_ratio_exceeded')
     return 'Result not saved — timeout rate exceeded 50%. Run again to retry.'
   return 'Result not saved.'
@@ -200,7 +211,7 @@ onMounted(() => {
         </UiCard>
         <UiCard class="arb-eval__summary-stat">
           <UiEyebrow>Timeouts</UiEyebrow>
-          <span class="arb-eval__score-val num">{{ result.results.filter(r => r.predicted_action === 'timeout').length }}</span>
+          <span class="arb-eval__score-val num">{{ (result.results ?? []).filter(r => r.predicted_action === 'timeout').length }}</span>
         </UiCard>
       </div>
 
@@ -218,7 +229,7 @@ onMounted(() => {
           </thead>
           <tbody>
             <tr
-              v-for="r in result.results"
+              v-for="r in (result.results ?? [])"
               :key="r.test_case_id"
               :class="r.is_correct ? 'arb-eval__row--pass' : 'arb-eval__row--fail'"
             >

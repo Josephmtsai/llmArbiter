@@ -94,6 +94,7 @@ onMounted(fetchRecent)
           <UiActionBadge :action="result.primary_action" size="lg" />
           <div class="arb-analyze__result-meta">
             <UiProviderChip :provider="result.provider" />
+            <span v-if="result.model" class="arb-analyze__model-chip num">{{ result.model }}</span>
             <UiChip v-if="result.duration_ms">{{ result.duration_ms }}ms</UiChip>
           </div>
         </div>
@@ -219,6 +220,15 @@ onMounted(fetchRecent)
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.arb-analyze__model-chip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-4);
+  background: var(--bg-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 1px 6px;
 }
 .arb-analyze__result-section {
   display: flex;
