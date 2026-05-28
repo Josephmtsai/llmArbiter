@@ -12,8 +12,27 @@ const selectedDecision = ref<DecisionRecord | null>(null)
 const filterAction = ref<PrimaryAction | null>(null)
 const page = ref(0)
 const PAGE_SIZE = 20
+let loadSeq = 0
+
+type WindowKey = '1h' | '6h' | '24h' | '7d' | null
+const activeWindow = ref<WindowKey>(null)
+
+const WINDOW_PRESETS: { label: string; key: WindowKey; ms: number }[] = [
+  { label: '1h',  key: '1h',  ms: 3_600_000 },
+  { label: '6h',  key: '6h',  ms: 21_600_000 },
+  { label: '24h', key: '24h', ms: 86_400_000 },
+  { label: '7d',  key: '7d',  ms: 604_800_000 },
+  { label: 'All', key: null,  ms: 0 },
+]
+
+function getSinceParam(): string | null {
+  const preset = WINDOW_PRESETS.find(p => p.key === activeWindow.value)
+  if (!preset || preset.key === null) return null
+  return new Date(Date.now() - preset.ms).toISOString()
+}
 
 async function load() {
+  const seq = ++loadSeq
   loading.value = true
   error.value = null
   try {
@@ -21,13 +40,22 @@ async function load() {
       limit: PAGE_SIZE,
       offset: page.value * PAGE_SIZE,
       action: filterAction.value,
+      since: getSinceParam(),
     })
+    if (seq !== loadSeq) return  // stale response — a newer load() has started
     if (res.status === 'success') decisions.value = res.data.decisions
   } catch (e) {
+    if (seq !== loadSeq) return
     error.value = e instanceof Error ? e.message : 'Load failed'
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
+}
+
+function selectWindow(key: WindowKey) {
+  activeWindow.value = key
+  page.value = 0
+  load()
 }
 
 watch(filterAction, () => { page.value = 0; load() })
@@ -99,6 +127,19 @@ const stats = computed(() => {
           @click="filterAction = action"
         >
           {{ action.replace(/_/g, ' ') }}
+        </button>
+      </div>
+
+      <!-- Time-window pills -->
+      <div class="arb-decisions__time-pills">
+        <button
+          v-for="preset in WINDOW_PRESETS"
+          :key="String(preset.key)"
+          class="arb-decisions__time-pill"
+          :class="{ 'arb-decisions__time-pill--active': activeWindow === preset.key }"
+          @click="selectWindow(preset.key)"
+        >
+          {{ preset.label }}
         </button>
       </div>
     </div>
@@ -228,6 +269,8 @@ const stats = computed(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 .arb-decisions__filters {
   display: flex;
@@ -250,6 +293,29 @@ const stats = computed(() => {
   background: var(--bg-3);
   border-color: var(--border);
   color: var(--fg-0);
+}
+
+/* Time-window pills */
+.arb-decisions__time-pills {
+  display: flex;
+  gap: 3px;
+}
+.arb-decisions__time-pill {
+  padding: 4px 9px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--fg-4);
+  cursor: pointer;
+  transition: all var(--dur-fast);
+}
+.arb-decisions__time-pill:hover { background: var(--bg-2); color: var(--fg-1); }
+.arb-decisions__time-pill--active {
+  border-color: var(--action-rebuild);
+  color: var(--action-rebuild);
+  background: var(--action-rebuild-soft);
 }
 .arb-decisions__table-wrap {
   border: 1px solid var(--border-subtle);

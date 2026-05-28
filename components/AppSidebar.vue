@@ -27,6 +27,12 @@ const apiOnline = ref(false)
 const latencyMs = ref<number | null>(null)
 const activeProvider = useState<string | null>('sidebar:activeProvider', () => null)
 const activeModel = useState<string | null>('sidebar:activeModel', () => null)
+const availableProviders = ref<string[]>([])
+
+const providerDropdownOpen = ref(false)
+const switchingProvider = ref(false)
+const switchError = ref<string | null>(null)
+const statusRef = ref<HTMLElement | null>(null)
 
 async function pollStatus() {
   try {
@@ -41,12 +47,59 @@ async function pollStatus() {
   try {
     const res = await api.getProviders()
     activeProvider.value = res.active_provider ?? null
+    availableProviders.value = res.available_providers ?? []
   } catch {
     activeProvider.value = null
+    availableProviders.value = []
   }
 }
 
-onMounted(pollStatus)
+function toggleProviderDropdown() {
+  if (switchingProvider.value) return
+  providerDropdownOpen.value = !providerDropdownOpen.value
+  switchError.value = null
+}
+
+async function selectProvider(p: string) {
+  if (p === activeProvider.value || switchingProvider.value) return
+  const prev = activeProvider.value
+  activeProvider.value = p
+  providerDropdownOpen.value = false
+  switchingProvider.value = true
+  switchError.value = null
+  const timer = setTimeout(() => {
+    if (switchingProvider.value) {
+      activeProvider.value = prev
+      switchingProvider.value = false
+      switchError.value = 'Switch timed out'
+    }
+  }, 10_000)
+  try {
+    const res = await api.setProvider(p)
+    activeProvider.value = res.active_provider ?? p
+    availableProviders.value = res.available_providers ?? availableProviders.value
+  } catch {
+    activeProvider.value = prev
+    switchError.value = 'Switch failed'
+  } finally {
+    clearTimeout(timer)
+    switchingProvider.value = false
+  }
+}
+
+function onDocumentMousedown(e: MouseEvent) {
+  if (!statusRef.value?.contains(e.target as Node)) {
+    providerDropdownOpen.value = false
+  }
+}
+
+onMounted(() => {
+  pollStatus()
+  document.addEventListener('mousedown', onDocumentMousedown)
+})
+onUnmounted(() => {
+  document.removeEventListener('mousedown', onDocumentMousedown)
+})
 watch(() => route.path, pollStatus)
 
 function isActive(href: string): boolean {
@@ -100,7 +153,8 @@ function isActive(href: string): boolean {
     <div class="arb-sidebar__spacer" />
 
     <!-- Status footer -->
-    <div class="arb-sidebar__status">
+    <div ref="statusRef" class="arb-sidebar__status">
+      <!-- API status -->
       <div class="arb-sidebar__status-row">
         <span
           class="arb-sidebar__status-dot"
@@ -109,13 +163,40 @@ function isActive(href: string): boolean {
         <span class="arb-sidebar__status-text">{{ apiOnline ? 'API online' : 'API offline' }}</span>
         <span v-if="latencyMs !== null" class="arb-sidebar__status-latency num">{{ latencyMs }}ms</span>
       </div>
-      <div class="arb-sidebar__status-row">
+
+      <!-- Provider quick-switch button -->
+      <button
+        class="arb-sidebar__provider-btn"
+        :class="{ 'arb-sidebar__provider-btn--open': providerDropdownOpen, 'arb-sidebar__provider-btn--switching': switchingProvider }"
+        :disabled="switchingProvider"
+        @click="toggleProviderDropdown"
+      >
         <span
           class="arb-sidebar__status-dot"
           :class="activeProvider ? 'arb-sidebar__status-dot--online' : 'arb-sidebar__status-dot--offline'"
         />
         <span class="arb-sidebar__status-text">{{ activeProvider ?? '—' }}</span>
+        <span class="arb-sidebar__provider-chevron">{{ providerDropdownOpen ? '▴' : '▾' }}</span>
+      </button>
+
+      <!-- Provider dropdown -->
+      <div v-if="providerDropdownOpen" class="arb-sidebar__provider-dropdown">
+        <button
+          v-for="p in availableProviders"
+          :key="p"
+          class="arb-sidebar__provider-option"
+          :class="{ 'arb-sidebar__provider-option--active': p === activeProvider }"
+          @click="selectProvider(p)"
+        >
+          <span class="arb-sidebar__provider-option-check">{{ p === activeProvider ? '✓' : '' }}</span>
+          <span class="num">{{ p }}</span>
+        </button>
       </div>
+
+      <!-- Switch error -->
+      <div v-if="switchError" class="arb-sidebar__switch-error">{{ switchError }}</div>
+
+      <!-- OpenRouter model label -->
       <div v-if="activeProvider === 'openrouter'" class="arb-sidebar__status-row arb-sidebar__status-row--model">
         <span class="arb-sidebar__status-model num">{{ activeModel ?? 'default' }}</span>
       </div>
@@ -135,7 +216,7 @@ function isActive(href: string): boolean {
   display: flex;
   flex-direction: column;
   padding: 20px 14px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .arb-sidebar__brand {
@@ -266,6 +347,7 @@ function isActive(href: string): boolean {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  position: relative;
 }
 .arb-sidebar__spacer { flex: 1; }
 .arb-sidebar__status-row {
@@ -292,5 +374,73 @@ function isActive(href: string): boolean {
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--fg-4);
+}
+
+/* Provider quick-switch */
+.arb-sidebar__provider-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-sm);
+  padding: 2px 0;
+  cursor: pointer;
+  transition: background var(--dur-fast);
+  text-align: left;
+}
+.arb-sidebar__provider-btn:hover:not(:disabled) { background: var(--bg-2); }
+.arb-sidebar__provider-btn--open { background: var(--bg-2); }
+.arb-sidebar__provider-btn--switching { opacity: 0.5; cursor: default; }
+.arb-sidebar__provider-chevron {
+  font-size: 9px;
+  color: var(--fg-4);
+  margin-left: auto;
+  line-height: 1;
+}
+.arb-sidebar__provider-dropdown {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  z-index: 100;
+}
+.arb-sidebar__provider-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-sm);
+  padding: 6px 8px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-2);
+  text-align: left;
+  transition: background var(--dur-fast);
+}
+.arb-sidebar__provider-option:hover { background: var(--bg-2); }
+.arb-sidebar__provider-option--active { color: var(--fg-0); font-weight: 600; }
+.arb-sidebar__provider-option-check {
+  width: 12px;
+  font-size: 10px;
+  color: var(--action-rebuild);
+  flex-shrink: 0;
+}
+.arb-sidebar__switch-error {
+  font-size: 10px;
+  color: var(--action-notify);
+  padding: 0 2px;
 }
 </style>
