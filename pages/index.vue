@@ -13,6 +13,41 @@ const error = ref<string | null>(null)
 const recentDecisions = ref<DecisionRecord[]>([])
 const loadingRecent = ref(false)
 
+const activeProvider = useState<string | null>('sidebar:activeProvider', () => null)
+const activeModel = useState<string | null>('sidebar:activeModel', () => null)
+
+const QUICK_MODELS = [
+  { label: 'DeepSeek Flash', value: 'deepseek-flash' },
+  { label: 'Qwen Plus', value: 'qwen-plus' },
+  { label: 'HY3', value: 'hy3' },
+] as const
+
+const selectedQuickModel = ref<string | null>(null)
+const customModel = ref('')
+
+const effectiveModel = computed(() => customModel.value.trim() || selectedQuickModel.value || '')
+
+function pickQuickModel(val: string) {
+  const isDeselect = selectedQuickModel.value === val
+  selectedQuickModel.value = isDeselect ? null : val
+  if (!isDeselect) customModel.value = ''
+}
+
+function onCustomModelInput() {
+  selectedQuickModel.value = null
+}
+
+watch(effectiveModel, (val) => {
+  activeModel.value = val || null
+})
+
+watch(activeProvider, (val) => {
+  if (val !== 'openrouter') {
+    selectedQuickModel.value = null
+    customModel.value = ''
+  }
+})
+
 async function analyze() {
   if (!logSnippet.value.trim()) return
   analyzing.value = true
@@ -22,6 +57,7 @@ async function analyze() {
     const res = await api.analyze({
       log_snippet: logSnippet.value,
       fail_count_24h: failCount.value,
+      ...(effectiveModel.value ? { model: effectiveModel.value } : {}),
     })
     if (res.status === 'success') {
       result.value = res.data
@@ -63,6 +99,28 @@ onMounted(fetchRecent)
           placeholder="Paste build log, error output, or system event here…"
           style="min-height: 220px; margin-top: 10px"
         />
+        <!-- OpenRouter model selector -->
+        <div v-if="activeProvider === 'openrouter'" class="arb-analyze__model-section">
+          <UiEyebrow>Model</UiEyebrow>
+          <div class="arb-analyze__model-picker">
+            <button
+              v-for="m in QUICK_MODELS"
+              :key="m.value"
+              class="arb-analyze__model-btn"
+              :class="{ 'arb-analyze__model-btn--active': selectedQuickModel === m.value }"
+              @click="pickQuickModel(m.value)"
+            >
+              {{ m.label }}
+            </button>
+          </div>
+          <input
+            v-model="customModel"
+            class="arb-analyze__model-input"
+            placeholder="Or enter any OpenRouter model ID…"
+            @input="onCustomModelInput"
+          />
+        </div>
+
         <div class="arb-analyze__input-row">
           <UiField label="Failures in last 24h" style="width: 160px">
             <UiInput
@@ -72,14 +130,19 @@ onMounted(fetchRecent)
               :mono="true"
             />
           </UiField>
-          <UiButton
-            variant="primary"
-            :loading="analyzing"
-            :disabled="!logSnippet.trim()"
-            @click="analyze"
-          >
-            Analyze
-          </UiButton>
+          <div class="arb-analyze__run-col">
+            <span v-if="activeProvider === 'openrouter'" class="arb-analyze__model-chip num">
+              openrouter · {{ effectiveModel || 'default' }}
+            </span>
+            <UiButton
+              variant="primary"
+              :loading="analyzing"
+              :disabled="!logSnippet.trim()"
+              @click="analyze"
+            >
+              Analyze
+            </UiButton>
+          </div>
         </div>
       </UiCard>
 
@@ -229,6 +292,58 @@ onMounted(fetchRecent)
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-sm);
   padding: 1px 6px;
+}
+.arb-analyze__model-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-subtle);
+}
+.arb-analyze__model-picker {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.arb-analyze__model-btn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg-3);
+  cursor: pointer;
+  transition: all var(--dur-fast);
+}
+.arb-analyze__model-btn:hover {
+  border-color: var(--fg-3);
+  color: var(--fg-1);
+}
+.arb-analyze__model-btn--active {
+  border-color: var(--action-rebuild);
+  color: var(--action-rebuild);
+  background: var(--action-rebuild-soft);
+}
+.arb-analyze__model-input {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-0);
+  color: var(--fg-1);
+  width: 100%;
+  outline: none;
+  transition: border-color var(--dur-fast);
+}
+.arb-analyze__model-input:focus { border-color: var(--fg-3); }
+.arb-analyze__model-input::placeholder { color: var(--fg-4); }
+.arb-analyze__run-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
 }
 .arb-analyze__result-section {
   display: flex;

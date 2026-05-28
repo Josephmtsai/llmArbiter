@@ -25,6 +25,7 @@ export interface AnalyzeRequest {
   hardware_info?: Record<string, unknown>
   fail_count_24h?: number
   source?: string
+  model?: string
 }
 
 export interface DecisionData {
