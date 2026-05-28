@@ -12,6 +12,8 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const notFound = ref(false)
 const failuresOnly = ref(false)
+const deleting = ref(false)
+const deleteError = ref<string | null>(null)
 
 const runId = computed(() => Number(route.params.run_id))
 
@@ -63,6 +65,20 @@ async function load() {
   }
 }
 
+async function deleteRun() {
+  if (!window.confirm(`Delete run #${runId.value}? This cannot be undone.`)) return
+  deleting.value = true
+  deleteError.value = null
+  try {
+    await api.deleteEvalRun(runId.value)
+    await navigateTo('/evaluate/history')
+  } catch (e) {
+    deleteError.value = e instanceof Error ? e.message : 'Delete failed'
+  } finally {
+    deleting.value = false
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -70,8 +86,19 @@ onMounted(load)
   <AppTopBar :title="`Run #${runId}`" subtitle="Evaluation detail">
     <template #actions>
       <NuxtLink to="/evaluate/history" class="arb-detail__back">← History</NuxtLink>
+      <UiButton
+        variant="ghost"
+        size="sm"
+        class="arb-detail__delete-btn"
+        :disabled="loading || deleting"
+        :loading="deleting"
+        @click="deleteRun"
+      >
+        Delete run
+      </UiButton>
     </template>
   </AppTopBar>
+  <div v-if="deleteError" class="arb-detail__delete-err">{{ deleteError }}</div>
 
   <div class="arb-detail">
     <div v-if="loading" class="arb-detail__loading"><UiSpinner size="sm" /></div>
@@ -192,6 +219,12 @@ onMounted(load)
   transition: color var(--dur-fast);
 }
 .arb-detail__back:hover { color: var(--fg-1); }
+.arb-detail__delete-btn { color: var(--action-notify) !important; }
+.arb-detail__delete-err {
+  padding: 8px 32px;
+  font-size: 12px;
+  color: var(--action-notify);
+}
 
 .arb-detail__loading { padding: 40px; text-align: center; }
 .arb-detail__not-found,

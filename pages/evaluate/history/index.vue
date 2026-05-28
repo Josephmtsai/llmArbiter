@@ -7,6 +7,7 @@ const api = useApi()
 const runs = ref<EvalRun[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
+const deleteErrors = ref<Record<number, string>>({})
 
 function accuracyColor(acc: number): string {
   if (acc >= 0.8) return 'var(--action-rebuild)'
@@ -38,6 +39,18 @@ async function load() {
     error.value = e instanceof Error ? e.message : 'Load failed'
   } finally {
     loading.value = false
+  }
+}
+
+async function deleteRun(run: EvalRun) {
+  if (!window.confirm(`Delete run #${run.run_id}? This cannot be undone.`)) return
+  deleteErrors.value = { ...deleteErrors.value }
+  delete deleteErrors.value[run.run_id]
+  try {
+    await api.deleteEvalRun(run.run_id)
+    runs.value = runs.value.filter(r => r.run_id !== run.run_id)
+  } catch (e) {
+    deleteErrors.value[run.run_id] = e instanceof Error ? e.message : 'Delete failed'
   }
 }
 
@@ -73,6 +86,7 @@ onMounted(load)
             <th>Timeouts</th>
             <th>Duration</th>
             <th>Started</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -95,6 +109,19 @@ onMounted(load)
             <td class="num">{{ run.timeout_count }}</td>
             <td class="num">{{ durationSecs(run) }}</td>
             <td class="arb-history__date">{{ formatDate(run.started_at) }}</td>
+            <td class="arb-history__actions" @click.stop>
+              <UiButton
+                variant="ghost"
+                size="sm"
+                class="arb-history__delete-btn"
+                @click.stop="deleteRun(run)"
+              >
+                Delete
+              </UiButton>
+              <span v-if="deleteErrors[run.run_id]" class="arb-history__delete-err">
+                {{ deleteErrors[run.run_id] }}
+              </span>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -161,4 +188,21 @@ onMounted(load)
 .arb-history__date { color: var(--fg-4); }
 .num { font-family: var(--font-mono); font-size: 12px; }
 .mono { font-family: var(--font-mono); font-size: 12px; }
+.arb-history__actions {
+  text-align: right;
+  white-space: nowrap;
+  padding-right: 8px;
+}
+.arb-history__delete-btn {
+  color: var(--action-notify) !important;
+  opacity: 0;
+  transition: opacity var(--dur-fast);
+}
+.arb-history__row:hover .arb-history__delete-btn { opacity: 1; }
+.arb-history__delete-err {
+  display: block;
+  font-size: 11px;
+  color: var(--action-notify);
+  margin-top: 2px;
+}
 </style>

@@ -155,6 +155,17 @@ export function useApi() {
     getEvalCompare: (by: 'provider' | 'prompt_version') =>
       api<ArbiterResponse<EvalCompareResponse>>('/evaluate/history/compare', { query: { by } }),
 
+    deleteEvalRun: async (runId: number) => {
+      try {
+        return await api<ArbiterResponse<null>>(`/evaluate/history/${runId}`, { method: 'DELETE' })
+      } catch (e: unknown) {
+        if (e && typeof e === 'object' && 'status' in e && (e as { status: number }).status === 404) {
+          return { status: 'success', data: null, message: '' } as ArbiterResponse<null>
+        }
+        throw e
+      }
+    },
+
     healthCheck: () =>
       api<Record<string, unknown>>('/health'),
   }
