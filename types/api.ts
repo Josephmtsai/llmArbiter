@@ -35,6 +35,7 @@ export interface DecisionData {
   thinking: string | null
   source: Source
   provider: string
+  model?: string
   decision_id: number
   duration_ms?: number
 }
@@ -72,6 +73,7 @@ export interface PromptCreateRequest {
 
 export interface EvaluateRequest {
   prompt_version_id: number | 'active'
+  model?: string
 }
 
 export interface GetEvalResultsParams {
@@ -92,6 +94,7 @@ export interface DecisionRecord {
   confidence: number
   source: Source
   provider: string
+  model?: string
   created_at: string
   reason: string
   log_snippet: string
@@ -156,6 +159,8 @@ export interface EvaluationSummary {
   accuracy: number
   results: EvalResult[]
   created_at?: string
+  persisted?: boolean
+  discard_reason?: 'timeout_ratio_exceeded' | null
 }
 
 export interface EvalRun {

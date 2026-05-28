@@ -123,11 +123,12 @@ export function useApi() {
     seedCases: () =>
       api<ArbiterResponse<Record<string, unknown>>>('/cases/seed', { method: 'POST' }),
 
-    runEvaluation: (promptId?: number) =>
+    runEvaluation: (promptId?: number, model?: string) =>
       api<ArbiterResponse<EvaluationSummary>>('/evaluate', {
         method: 'POST',
         body: {
           prompt_version_id: promptId ?? 'active',
+          ...(model ? { model } : {}),
         } satisfies EvaluateRequest,
       }),
 

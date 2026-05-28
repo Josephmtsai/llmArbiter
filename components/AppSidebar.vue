@@ -26,6 +26,7 @@ const NAV_ITEMS = [
 const apiOnline = ref(false)
 const latencyMs = ref<number | null>(null)
 const activeProvider = useState<string | null>('sidebar:activeProvider', () => null)
+const activeModel = useState<string | null>('sidebar:activeModel', () => null)
 
 async function pollStatus() {
   try {
@@ -114,6 +115,9 @@ function isActive(href: string): boolean {
           :class="activeProvider ? 'arb-sidebar__status-dot--online' : 'arb-sidebar__status-dot--offline'"
         />
         <span class="arb-sidebar__status-text">{{ activeProvider ?? '—' }}</span>
+      </div>
+      <div v-if="activeProvider === 'openrouter'" class="arb-sidebar__status-row arb-sidebar__status-row--model">
+        <span class="arb-sidebar__status-model num">{{ activeModel ?? 'default' }}</span>
       </div>
     </div>
   </aside>
@@ -279,6 +283,12 @@ function isActive(href: string): boolean {
 .arb-sidebar__status-dot--offline { background: var(--conf-low); }
 .arb-sidebar__status-text { font-size: 11px; color: var(--fg-2); flex: 1; }
 .arb-sidebar__status-latency {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-4);
+}
+.arb-sidebar__status-row--model { padding-left: 12px; }
+.arb-sidebar__status-model {
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--fg-4);

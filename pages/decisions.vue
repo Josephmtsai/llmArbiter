@@ -134,7 +134,10 @@ const stats = computed(() => {
             <td><UiActionBadge :action="d.primary_action" size="sm" /></td>
             <td><UiSmallMeter :value="d.confidence" /></td>
             <td><UiSourceBadge :source="d.source" /></td>
-            <td><UiProviderChip :provider="d.provider" /></td>
+            <td>
+              <UiProviderChip :provider="d.provider" />
+              <span v-if="d.model" class="arb-decisions__model-chip num">{{ d.model }}</span>
+            </td>
             <td class="num arb-decisions__td-time">{{ new Date(d.created_at).toLocaleString() }}</td>
           </tr>
         </tbody>
@@ -166,6 +169,7 @@ const stats = computed(() => {
             <UiActionBadge :action="selectedDecision.primary_action" size="lg" />
             <UiSourceBadge :source="selectedDecision.source" />
             <UiProviderChip :provider="selectedDecision.provider" />
+            <span v-if="selectedDecision.model" class="arb-decisions__model-chip num">{{ selectedDecision.model }}</span>
           </div>
           <UiSmallMeter :value="selectedDecision.confidence" />
           <div class="arb-drawer__section">
@@ -292,6 +296,18 @@ const stats = computed(() => {
 .arb-decisions__row:hover td { background: var(--bg-2); }
 .arb-decisions__row:last-child td { border-bottom: none; }
 .arb-decisions__td-time { font-size: 11px; color: var(--fg-4); }
+.arb-decisions__model-chip {
+  display: inline-block;
+  margin-left: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-4);
+  background: var(--bg-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 1px 6px;
+  vertical-align: middle;
+}
 .arb-decisions__pagination {
   display: flex;
   align-items: center;

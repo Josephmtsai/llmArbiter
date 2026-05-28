@@ -13,6 +13,35 @@ const loadingPrompts = ref(true)
 const history = ref<EvalRun[]>([])
 const loadingHistory = ref(true)
 
+const activeProvider = useState<string | null>('sidebar:activeProvider', () => null)
+const activeModel = useState<string | null>('sidebar:activeModel', () => null)
+
+const QUICK_MODELS = [
+  { label: 'DeepSeek Flash', value: 'deepseek-flash' },
+  { label: 'Qwen Plus', value: 'qwen-plus' },
+  { label: 'HY3', value: 'hy3' },
+] as const
+
+const selectedQuickModel = ref<string | null>(null)
+const customModel = ref('')
+
+const effectiveModel = computed(() => customModel.value.trim() || selectedQuickModel.value || '')
+
+function pickQuickModel(val: string) {
+  selectedQuickModel.value = selectedQuickModel.value === val ? null : val
+  customModel.value = ''
+  syncActiveModel()
+}
+
+function onCustomModelInput() {
+  selectedQuickModel.value = null
+  syncActiveModel()
+}
+
+function syncActiveModel() {
+  activeModel.value = effectiveModel.value || null
+}
+
 async function loadPrompts() {
   try {
     const res = await api.getPrompts()
@@ -24,6 +53,13 @@ async function loadPrompts() {
   } catch { /* silent */ } finally {
     loadingPrompts.value = false
   }
+}
+
+async function loadProvider() {
+  try {
+    const res = await api.getProviders()
+    activeProvider.value = res.active_provider ?? null
+  } catch { /* silent */ }
 }
 
 async function loadHistory() {
@@ -41,7 +77,7 @@ async function runEval() {
   error.value = null
   result.value = null
   try {
-    const res = await api.runEvaluation(selectedPromptId.value)
+    const res = await api.runEvaluation(selectedPromptId.value, effectiveModel.value || undefined)
     if (res.status === 'success') {
       result.value = res.data
       await loadHistory()
@@ -66,9 +102,17 @@ const scoreColor = computed(() => {
   return accuracyColor(result.value.accuracy)
 })
 
+const discardMessage = computed(() => {
+  if (!result.value || result.value.persisted !== false) return null
+  if (result.value.discard_reason === 'timeout_ratio_exceeded')
+    return 'Result not saved — timeout rate exceeded 50%. Run again to retry.'
+  return 'Result not saved.'
+})
+
 onMounted(() => {
   loadPrompts()
   loadHistory()
+  loadProvider()
 })
 </script>
 
@@ -86,16 +130,43 @@ onMounted(() => {
               </option>
             </UiSelect>
           </UiField>
-          <UiButton
-            variant="primary"
-            :loading="running"
-            :disabled="prompts.length === 0"
-            style="margin-top: 20px"
-            @click="runEval"
-          >
-            Run evaluation
-          </UiButton>
+          <div class="arb-eval__run-col">
+            <span v-if="activeProvider === 'openrouter'" class="arb-eval__model-chip num">
+              openrouter · {{ effectiveModel || 'default' }}
+            </span>
+            <UiButton
+              variant="primary"
+              :loading="running"
+              :disabled="prompts.length === 0"
+              @click="runEval"
+            >
+              Run evaluation
+            </UiButton>
+          </div>
         </div>
+
+        <!-- OpenRouter model selector -->
+        <div v-if="activeProvider === 'openrouter'" class="arb-eval__model-section">
+          <UiEyebrow>Model</UiEyebrow>
+          <div class="arb-eval__model-picker">
+            <button
+              v-for="m in QUICK_MODELS"
+              :key="m.value"
+              class="arb-eval__model-btn"
+              :class="{ 'arb-eval__model-btn--active': selectedQuickModel === m.value }"
+              @click="pickQuickModel(m.value)"
+            >
+              {{ m.label }}
+            </button>
+          </div>
+          <input
+            v-model="customModel"
+            class="arb-eval__model-input"
+            placeholder="Or enter any OpenRouter model ID…"
+            @input="onCustomModelInput"
+          />
+        </div>
+
         <p class="arb-eval__hint">
           Runs all test cases through the selected prompt and scores pass/fail against expected actions.
         </p>
@@ -107,6 +178,11 @@ onMounted(() => {
     <div v-if="running" class="arb-eval__running">
       <UiSpinner size="sm" />
       <span>Running evaluation…</span>
+    </div>
+
+    <!-- Discard warning -->
+    <div v-if="discardMessage" class="arb-eval__discard-warn">
+      ⚠ {{ discardMessage }}
     </div>
 
     <!-- Summary -->
@@ -213,6 +289,81 @@ onMounted(() => {
 .arb-eval__control-card { display: flex; flex-direction: column; gap: 12px; }
 .arb-eval__control-row { display: flex; align-items: flex-end; gap: 16px; }
 .arb-eval__hint { font-size: 12px; color: var(--fg-4); margin: 0; }
+
+.arb-eval__run-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  padding-bottom: 1px;
+}
+.arb-eval__model-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-3);
+  background: var(--bg-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.arb-eval__model-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-subtle);
+}
+.arb-eval__model-picker {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.arb-eval__model-btn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg-3);
+  cursor: pointer;
+  transition: all var(--dur-fast);
+}
+.arb-eval__model-btn:hover {
+  border-color: var(--fg-3);
+  color: var(--fg-1);
+}
+.arb-eval__model-btn--active {
+  border-color: var(--action-rebuild);
+  color: var(--action-rebuild);
+  background: var(--action-rebuild-soft);
+}
+.arb-eval__model-input {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-0);
+  color: var(--fg-1);
+  width: 100%;
+  outline: none;
+  transition: border-color var(--dur-fast);
+}
+.arb-eval__model-input:focus { border-color: var(--fg-3); }
+.arb-eval__model-input::placeholder { color: var(--fg-4); }
+
+.arb-eval__discard-warn {
+  padding: 10px 14px;
+  border-radius: var(--r-sm);
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  font-size: 13px;
+  color: var(--action-fallback);
+}
+
 .arb-eval__error {
   padding: 12px 14px;
   border-radius: var(--r-sm);
