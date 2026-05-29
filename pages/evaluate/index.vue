@@ -1,17 +1,22 @@
 <script setup lang="ts">
-import type { EvaluationSummary, PromptVersion, EvalRun } from '~/types/api'
+import type { EvaluationSummary, PromptVersion, EvalRun, EvalJob } from '~/types/api'
 
 definePageMeta({ middleware: 'auth' })
 
 const api = useApi()
 const prompts = ref<PromptVersion[]>([])
 const selectedPromptId = ref<number | undefined>(undefined)
-const running = ref(false)
 const result = ref<EvaluationSummary | null>(null)
 const error = ref<string | null>(null)
 const loadingPrompts = ref(true)
 const history = ref<EvalRun[]>([])
 const loadingHistory = ref(true)
+
+const activeJob = ref<EvalJob | null>(null)
+const pollInterval = ref<ReturnType<typeof setInterval> | null>(null)
+const cancelling = ref(false)
+const cancelMessage = ref<string | null>(null)
+let finishing = false
 
 const activeProvider = useState<string | null>('sidebar:activeProvider', () => null)
 const activeModel = useState<string | null>('sidebar:activeModel', () => null)
@@ -80,24 +85,105 @@ async function loadHistory() {
   }
 }
 
+function stopPolling() {
+  if (pollInterval.value) {
+    clearInterval(pollInterval.value)
+    pollInterval.value = null
+  }
+}
+
+async function finishJob(runId: number) {
+  if (finishing) return
+  finishing = true
+  stopPolling()
+  priorAccuracy.value = history.value[0]?.accuracy ?? null
+  try {
+    const res = await api.getEvalRunDetail(runId)
+    if (res.status === 'success') {
+      if (res.data.run.status === 'completed') {
+        result.value = {
+          prompt_version_id: res.data.run.prompt_version_id,
+          total: res.data.run.total,
+          correct: res.data.run.correct,
+          timeout_count: res.data.run.timeout_count,
+          accuracy: res.data.run.accuracy,
+          results: res.data.results,
+          persisted: res.data.run.persisted,
+          discard_reason: res.data.run.discard_reason,
+        }
+        await loadHistory()
+      } else {
+        error.value = `Evaluation ${res.data.run.status} — no results saved`
+      }
+    } else {
+      error.value = res.message || 'Failed to load evaluation result'
+    }
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Failed to fetch result'
+  } finally {
+    activeJob.value = null
+    finishing = false
+  }
+}
+
+function startPolling(runId: number) {
+  stopPolling()
+  pollInterval.value = setInterval(async () => {
+    try {
+      const res = await api.getEvalJobs()
+      if (res.status !== 'success') return
+      const job = res.data.jobs.find(j => j.run_id === runId)
+      if (job) {
+        activeJob.value = job
+      } else {
+        await finishJob(runId)
+      }
+    } catch { /* silent — keep polling */ }
+  }, 2500)
+}
+
 async function runEval() {
-  running.value = true
   error.value = null
   result.value = null
-  priorAccuracy.value = null  // clear previous delta while new run is in progress
+  priorAccuracy.value = null
+  cancelMessage.value = null
+  finishing = false
   try {
-    const res = await api.runEvaluation(selectedPromptId.value, effectiveModel.value || undefined)
+    const res = await api.startEvaluation(selectedPromptId.value, effectiveModel.value || undefined)
     if (res.status === 'success') {
-      priorAccuracy.value = history.value[0]?.accuracy ?? null  // snapshot before refresh
-      result.value = res.data
-      await loadHistory()
+      const { run_id } = res.data
+      activeJob.value = { run_id, status: 'running', completed: 0, total: 0, provider: activeProvider.value ?? '', model: effectiveModel.value, started_at: new Date().toISOString() }
+      startPolling(run_id)
     } else {
       error.value = res.message
     }
+  } catch (e: unknown) {
+    const status = e && typeof e === 'object' && 'status' in e ? (e as { status: number }).status : 0
+    if (status === 429) error.value = 'Max concurrent evaluations reached. Wait for a running job to finish.'
+    else if (status === 404) error.value = 'Prompt not found. Please select a valid prompt version.'
+    else error.value = e instanceof Error ? e.message : 'Failed to start evaluation'
+  }
+}
+
+async function cancelJob() {
+  if (!activeJob.value) return
+  cancelling.value = true
+  const runId = activeJob.value.run_id
+  try {
+    const outcome = await api.cancelEvalJob(runId)
+    if (outcome === 'cancelled') {
+      stopPolling()
+      activeJob.value = null
+      cancelMessage.value = 'Evaluation cancelled'
+    } else if (outcome === 'already-ended') {
+      await finishJob(runId)
+    } else {
+      cancelMessage.value = 'Cancellation timed out — job may still complete'
+    }
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Evaluation failed'
+    error.value = e instanceof Error ? e.message : 'Cancel failed'
   } finally {
-    running.value = false
+    cancelling.value = false
   }
 }
 
@@ -143,10 +229,19 @@ const discardMessage = computed(() => {
   return 'Result not saved.'
 })
 
-onMounted(() => {
-  loadPrompts()
-  loadHistory()
-  loadProvider()
+onMounted(async () => {
+  await Promise.all([loadPrompts(), loadHistory(), loadProvider()])
+  try {
+    const res = await api.getEvalJobs()
+    if (res.status === 'success' && res.data.jobs.length > 0) {
+      activeJob.value = res.data.jobs[0]
+      startPolling(res.data.jobs[0].run_id)
+    }
+  } catch { /* silent */ }
+})
+
+onUnmounted(() => {
+  stopPolling()
 })
 </script>
 
@@ -170,8 +265,7 @@ onMounted(() => {
             </span>
             <UiButton
               variant="primary"
-              :loading="running"
-              :disabled="prompts.length === 0"
+              :disabled="prompts.length === 0 || !!activeJob"
               @click="runEval"
             >
               Run evaluation
@@ -209,10 +303,33 @@ onMounted(() => {
 
     <div v-if="error" class="arb-eval__error">{{ error }}</div>
 
-    <div v-if="running" class="arb-eval__running">
-      <UiSpinner size="sm" />
-      <span>Running evaluation…</span>
+    <!-- Active job progress -->
+    <div v-if="activeJob" class="arb-eval__progress-section">
+      <div class="arb-eval__progress-bar-wrap">
+        <div
+          class="arb-eval__progress-bar-fill"
+          :style="{ width: activeJob.total > 0 ? `${Math.round(activeJob.completed / activeJob.total * 100)}%` : '2%' }"
+        />
+      </div>
+      <div class="arb-eval__progress-meta">
+        <span class="num">{{ activeJob.completed }}&thinsp;/&thinsp;{{ activeJob.total || '…' }}</span>
+        <span v-if="activeJob.total > 0" class="num">{{ Math.round(activeJob.completed / activeJob.total * 100) }}%</span>
+        <span>{{ activeJob.provider }}<template v-if="activeJob.model"> · {{ activeJob.model }}</template></span>
+      </div>
+      <div class="arb-eval__progress-actions">
+        <UiButton
+          variant="ghost"
+          size="sm"
+          class="arb-eval__cancel-btn"
+          :disabled="cancelling"
+          :loading="cancelling"
+          @click="cancelJob"
+        >
+          Cancel
+        </UiButton>
+      </div>
     </div>
+    <div v-if="cancelMessage" class="arb-eval__cancel-msg">{{ cancelMessage }}</div>
 
     <!-- Discard warning -->
     <div v-if="discardMessage" class="arb-eval__discard-warn">
@@ -413,6 +530,47 @@ onMounted(() => {
   border: 1px solid rgba(248, 113, 113, 0.2);
   font-size: 13px;
   color: var(--action-notify);
+}
+.arb-eval__progress-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  background: var(--bg-1);
+}
+.arb-eval__progress-bar-wrap {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-2);
+  overflow: hidden;
+}
+.arb-eval__progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--action-rebuild);
+  transition: width 0.5s ease;
+  min-width: 4px;
+}
+.arb-eval__progress-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--fg-3);
+}
+.arb-eval__progress-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.arb-eval__cancel-btn { color: var(--action-notify) !important; }
+.arb-eval__cancel-msg {
+  font-size: 12px;
+  color: var(--fg-4);
+  font-family: var(--font-mono);
 }
 .arb-eval__running {
   display: flex;

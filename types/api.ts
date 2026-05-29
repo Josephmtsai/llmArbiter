@@ -77,6 +77,25 @@ export interface EvaluateRequest {
   model?: string
 }
 
+export interface AsyncEvalStartResponse {
+  run_id: number
+  status: 'running'
+}
+
+export interface EvalJob {
+  run_id: number
+  status: string
+  completed: number
+  total: number
+  provider: string
+  model: string
+  started_at: string
+}
+
+export interface EvalJobsResponse {
+  jobs: EvalJob[]
+}
+
 export interface GetEvalResultsParams {
   prompt_version_id?: number
 }
@@ -175,6 +194,9 @@ export interface EvalRun {
   correct: number
   timeout_count: number
   accuracy: number
+  status?: string
+  persisted?: boolean
+  discard_reason?: 'timeout_ratio_exceeded' | null
 }
 
 export interface EvalRunResult {

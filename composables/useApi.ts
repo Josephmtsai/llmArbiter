@@ -22,6 +22,8 @@ import type {
   EvalRun,
   EvalRunDetail,
   EvalCompareResponse,
+  AsyncEvalStartResponse,
+  EvalJobsResponse,
 } from '~/types/api'
 
 interface GetCasesParams {
@@ -123,14 +125,29 @@ export function useApi() {
     seedCases: () =>
       api<ArbiterResponse<Record<string, unknown>>>('/cases/seed', { method: 'POST' }),
 
-    runEvaluation: (promptId?: number, model?: string) =>
-      api<ArbiterResponse<EvaluationSummary>>('/evaluate', {
+    startEvaluation: (promptId?: number, model?: string) =>
+      api<ArbiterResponse<AsyncEvalStartResponse>>('/evaluate', {
         method: 'POST',
         body: {
           prompt_version_id: promptId ?? 'active',
           ...(model ? { model } : {}),
         } satisfies EvaluateRequest,
       }),
+
+    getEvalJobs: () =>
+      api<ArbiterResponse<EvalJobsResponse>>('/evaluate/jobs'),
+
+    cancelEvalJob: async (runId: number): Promise<'cancelled' | 'already-ended' | 'timeout'> => {
+      try {
+        await api<void>(`/evaluate/jobs/${runId}`, { method: 'DELETE' })
+        return 'cancelled'
+      } catch (e: unknown) {
+        const status = e && typeof e === 'object' && 'status' in e ? (e as { status: number }).status : 0
+        if (status === 409) return 'already-ended'
+        if (status === 503) return 'timeout'
+        throw e
+      }
+    },
 
     getEvalResults: async (params?: GetEvalResultsParams) => {
       const res = await api<ArbiterResponse<EvaluationSummary[] | { evaluations: EvaluationSummary[] } | { results: EvaluationSummary[] }>>('/evaluate/results', { query: params })
