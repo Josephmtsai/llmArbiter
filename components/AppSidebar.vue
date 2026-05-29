@@ -5,6 +5,7 @@ import {
   FlaskConical,
   Gauge,
   History,
+  Bot,
   SlidersHorizontal,
   BookOpen,
   ChevronsUpDown,
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { id: 'cases', label: 'Test cases', icon: FlaskConical, href: '/cases', count: null as number | null },
   { id: 'evaluate', label: 'Evaluate', icon: Gauge, href: '/evaluate' },
   { id: 'eval-history', label: 'Eval history', icon: History, href: '/evaluate/history', count: null as number | null },
+  { id: 'optimizer', label: 'Auto optimizer', icon: Bot, href: '/optimizer' },
   { id: 'settings', label: 'Settings', icon: SlidersHorizontal, href: '/settings' },
   { id: 'guide', label: 'How it works', icon: BookOpen, href: '/guide' },
 ]

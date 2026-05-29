@@ -5,6 +5,7 @@ export type PrimaryAction =
   | 'notify_human'
   | 'send_email'
 
+export type ArbiterAction = PrimaryAction
 export type SideAction = 'notify_human' | 'send_email' | null
 export type Source = 'manual' | 'jenkins' | 'redfish'
 export type RuleValue = number | string | boolean
@@ -74,6 +75,7 @@ export interface PromptCreateRequest {
 
 export interface EvaluateRequest {
   prompt_version_id: number | 'active'
+  source?: 'pool'
   model?: string
 }
 
@@ -234,5 +236,77 @@ export type EvalCompareGroup = EvalCompareGroupByProvider | EvalCompareGroupByPr
 export interface EvalCompareResponse {
   dimension: 'provider' | 'prompt_version'
   groups: EvalCompareGroup[]
+}
+
+export interface EvalPoolStats {
+  total: number
+  by_action: Partial<Record<ArbiterAction | string, number>>
+}
+
+export interface ReviewQueueEntry {
+  id: string
+  description: string
+  log_snippet: string
+  hardware_info: Record<string, unknown>
+  expected_action: ArbiterAction | string
+  confidence: number
+  reasoning?: string
+  source_dataset: string
+  status: 'pending' | string
+}
+
+export interface ReviewQueueResponse {
+  items: ReviewQueueEntry[]
+  total: number
+}
+
+export type ReviewQueueMutationRequest =
+  | { action: 'confirm' }
+  | { action: 'correct'; expected_action: ArbiterAction }
+  | { action: 'reject' }
+
+export type OptimizerRunStatus =
+  | 'running'
+  | 'completed'
+  | 'completed_max_rounds'
+  | 'failed'
+  | 'cancelled'
+  | 'cancelling'
+
+export interface OptimizerRound {
+  round_number: number
+  accuracy: number
+  prompt_version_id: number
+  failed_case_count: number
+  kept?: boolean
+}
+
+export interface OptimizerRun {
+  optimizer_run_id: number
+  status: OptimizerRunStatus
+  max_rounds: number
+  target_accuracy: number
+  started_at: string
+  finished_at: string | null
+  rounds: OptimizerRound[]
+}
+
+export interface OptimizerHistoryResponse {
+  runs: OptimizerRun[]
+}
+
+export interface OptimizerRunStartRequest {
+  max_rounds: number
+  target_accuracy: number
+}
+
+export interface OptimizerRunStartResponse {
+  optimizer_run_id: number
+  status: 'running'
+}
+
+export interface OptimizerCancelResponse {
+  optimizer_run_id: number
+  status: 'cancelling' | OptimizerRunStatus
 }
 

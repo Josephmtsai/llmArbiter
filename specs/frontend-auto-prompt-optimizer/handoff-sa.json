@@ -1,0 +1,25 @@
+{
+  "from": "sa",
+  "to": "developer",
+  "feature": "frontend-auto-prompt-optimizer",
+  "status": "ready",
+  "summary": "Designed the OpenSpec change for the Auto Prompt Optimizer frontend workflow with server-side proxy security, optimizer overview, review queue, pool evaluation, and optimizer history.",
+  "artifacts": [
+    "openspec/changes/frontend-auto-prompt-optimizer/proposal.md",
+    "openspec/changes/frontend-auto-prompt-optimizer/design.md",
+    "openspec/changes/frontend-auto-prompt-optimizer/tasks.md",
+    "openspec/changes/frontend-auto-prompt-optimizer/specs/optimizer-api-proxy/spec.md",
+    "openspec/changes/frontend-auto-prompt-optimizer/specs/optimizer-overview/spec.md",
+    "openspec/changes/frontend-auto-prompt-optimizer/specs/optimizer-review-queue/spec.md",
+    "openspec/changes/frontend-auto-prompt-optimizer/specs/optimizer-pool-evaluation/spec.md",
+    "openspec/changes/frontend-auto-prompt-optimizer/specs/optimizer-history/spec.md",
+    "docs/frontend-auto-prompt-optimizer-spec.md"
+  ],
+  "assumptions": [
+    "The first implementation may combine optimizer subroutes into one authenticated /optimizer page with tabs.",
+    "Optimizer workflow API calls should use Nuxt server proxy routes with private runtime config, scoped to this feature rather than migrating all existing API calls.",
+    "Generated prompt versions remain inactive and are activated only through the existing prompt management workflow.",
+    "Graphify impact query could not run because graphify-out/graph.json is absent in this workspace.",
+    "Backend readiness items in tasks section 7 must be confirmed before frontend QA."
+  ]
+}

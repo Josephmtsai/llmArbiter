@@ -1,0 +1,47 @@
+{
+  "from": "developer",
+  "to": "qa",
+  "feature": "frontend-auto-prompt-optimizer",
+  "status": "ready",
+  "summary": "Implemented the Auto Prompt Optimizer frontend workflow with typed server proxy routes, local proxy API methods, authenticated /optimizer tabs, review queue actions, pool evaluation launch, optimizer history, and focused tests.",
+  "changed_files": [
+    ".env.example",
+    "components/AppSidebar.vue",
+    "composables/useApi.ts",
+    "nuxt.config.ts",
+    "types/api.ts",
+    "composables/useOptimizerWorkflow.ts",
+    "utils/optimizerState.ts",
+    "server/utils/arbiterProxy.ts",
+    "server/api/arbiter/eval-pool/stats.get.ts",
+    "server/api/arbiter/review-queue/index.get.ts",
+    "server/api/arbiter/review-queue/[id].patch.ts",
+    "server/api/arbiter/evaluate.post.ts",
+    "server/api/arbiter/optimizer/history.get.ts",
+    "server/api/arbiter/optimizer/run.post.ts",
+    "server/api/arbiter/optimizer/runs/[id].delete.ts",
+    "pages/optimizer.vue",
+    "components/optimizer/OptimizerOverview.vue",
+    "components/optimizer/OptimizerReviewQueue.vue",
+    "components/optimizer/OptimizerPoolEvaluation.vue",
+    "components/optimizer/OptimizerHistory.vue",
+    "tests/arbiterProxy.test.ts",
+    "tests/optimizerState.test.ts",
+    "openspec/changes/frontend-auto-prompt-optimizer/tasks.md"
+  ],
+  "ac_ref": "openspec/changes/frontend-auto-prompt-optimizer/tasks.md",
+  "verification": [
+    "node_modules\\.bin\\vitest.CMD run tests\\arbiterProxy.test.ts tests\\optimizerState.test.ts",
+    "corepack.cmd pnpm vue-tsc --noEmit",
+    "corepack.cmd pnpm build",
+    "HTTP smoke: GET /api/arbiter/eval-pool/stats returned 200 with empty pool",
+    "HTTP smoke: GET /api/arbiter/optimizer/history returned 200 with empty runs",
+    "HTTP smoke: GET /api/arbiter/review-queue returned 200 with empty items"
+  ],
+  "known_gaps": [
+    "In-app Browser was unavailable (`iab` not available), so desktop/mobile visual smoke remains pending.",
+    "Authenticated HTTP smoke reached login and session cookie was issued, but /api/auth/check returned false with PowerShell session cookies; verify via real browser in QA.",
+    "Backend pool evaluation readiness could not be confirmed because the remote POST /evaluate proxy check returned fetch failure.",
+    "Backend active-run history behavior, review queue sorted pending data, and non-empty eval pool fixture availability still require QA/backend environment confirmation."
+  ]
+}
