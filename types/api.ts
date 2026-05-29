@@ -164,7 +164,7 @@ export interface TestCase {
 
 export interface EvalResult {
   test_case_id: number
-  description: string
+  description?: string
   expected_action: PrimaryAction
   predicted_action: PrimaryAction | 'timeout'
   is_correct: boolean
