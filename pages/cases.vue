@@ -220,7 +220,7 @@ onMounted(load)
 
 <style scoped>
 .arb-cases {
-  padding: 28px 32px;
+  padding: var(--page-pad);
   display: flex;
   flex-direction: column;
   gap: 20px;

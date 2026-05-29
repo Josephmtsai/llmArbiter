@@ -260,7 +260,7 @@ onMounted(fetchCompare)
 
 <style scoped>
 .arb-compare {
-  padding: 28px 32px;
+  padding: var(--page-pad);
   flex: 1;
   display: flex;
   flex-direction: column;

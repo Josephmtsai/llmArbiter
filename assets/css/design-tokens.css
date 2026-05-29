@@ -228,3 +228,15 @@ body {
   from { transform: translateX(100%); }
   to { transform: translateX(0); }
 }
+
+
+/* ── Responsive layout ────────────────────────────────── */
+:root {
+  --page-pad: 28px 32px;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --page-pad: 16px;
+  }
+}

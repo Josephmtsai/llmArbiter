@@ -12,6 +12,9 @@ import {
 
 const route = useRoute()
 const api = useApi()
+const sidebarOpen = useState('mobile:sidebarOpen', () => false)
+
+watch(() => route.path, () => { sidebarOpen.value = false })
 
 const NAV_ITEMS = [
   { id: 'analyze', label: 'Analyze', icon: Zap, href: '/' },
@@ -96,6 +99,11 @@ function onDocumentMousedown(e: MouseEvent) {
 onMounted(() => {
   pollStatus()
   document.addEventListener('mousedown', onDocumentMousedown)
+  // Close drawer when viewport widens past mobile breakpoint
+  const mq = window.matchMedia('(min-width: 768px)')
+  const onResize = (e: MediaQueryListEvent) => { if (e.matches) sidebarOpen.value = false }
+  mq.addEventListener('change', onResize)
+  onUnmounted(() => mq.removeEventListener('change', onResize))
 })
 onUnmounted(() => {
   document.removeEventListener('mousedown', onDocumentMousedown)
@@ -110,7 +118,10 @@ function isActive(href: string): boolean {
 </script>
 
 <template>
-  <aside class="arb-sidebar">
+  <aside class="arb-sidebar" :class="{ 'arb-sidebar--open': sidebarOpen }">
+    <!-- Mobile close button -->
+    <button class="arb-sidebar__close-btn" aria-label="Close menu" @click="sidebarOpen = false">✕</button>
+
     <!-- Brand -->
     <div class="arb-sidebar__brand">
       <div class="arb-sidebar__logo">
@@ -442,5 +453,42 @@ function isActive(href: string): boolean {
   font-size: 10px;
   color: var(--action-notify);
   padding: 0 2px;
+}
+
+/* Mobile drawer */
+.arb-sidebar__close-btn {
+  display: none;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: transparent;
+  border: none;
+  color: var(--fg-3);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--r-sm);
+  line-height: 1;
+}
+.arb-sidebar__close-btn:hover { color: var(--fg-1); background: var(--bg-2); }
+
+@media (max-width: 767px) {
+  .arb-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100dvh;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 250ms ease;
+  }
+  .arb-sidebar--open {
+    transform: translateX(0);
+  }
+  .arb-sidebar__close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 </style>

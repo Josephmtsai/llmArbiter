@@ -233,7 +233,7 @@ const stats = computed(() => {
 
 <style scoped>
 .arb-decisions {
-  padding: 28px 32px;
+  padding: var(--page-pad);
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -320,7 +320,9 @@ const stats = computed(() => {
 .arb-decisions__table-wrap {
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-md);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 .arb-decisions__loading,
 .arb-decisions__empty {
@@ -391,7 +393,7 @@ const stats = computed(() => {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.55);
-  z-index: 100;
+  z-index: 210;
   display: flex;
   justify-content: flex-end;
 }

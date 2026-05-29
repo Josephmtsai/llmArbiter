@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { Sun, Moon, LogOut } from 'lucide-vue-next'
+import { Sun, Moon, LogOut, Menu } from 'lucide-vue-next'
 
 defineProps<{ title: string; subtitle?: string }>()
 
 const { theme, toggle } = useTheme()
 const authStore = useAuthStore()
+const sidebarOpen = useState('mobile:sidebarOpen', () => false)
 
 async function handleLogout() {
   await authStore.logout()
@@ -14,6 +15,9 @@ async function handleLogout() {
 
 <template>
   <header class="arb-topbar">
+    <button class="arb-topbar__hamburger" aria-label="Open menu" @click="sidebarOpen = !sidebarOpen">
+      <Menu :size="20" color="var(--fg-2)" :stroke-width="1.75" />
+    </button>
     <div class="arb-topbar__title-block">
       <h1 class="arb-topbar__title">{{ title }}</h1>
       <p v-if="subtitle" class="arb-topbar__subtitle">{{ subtitle }}</p>
@@ -82,5 +86,25 @@ async function handleLogout() {
 }
 .arb-topbar__icon-btn:hover {
   background: var(--bg-2);
+}
+.arb-topbar__hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-sm);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--dur-fast);
+}
+.arb-topbar__hamburger:hover { background: var(--bg-2); }
+
+@media (max-width: 767px) {
+  .arb-topbar__hamburger { display: flex; }
+  .arb-topbar { padding: 12px 16px; z-index: 201; }
+  .arb-topbar__title { font-size: 18px; }
 }
 </style>

@@ -131,7 +131,7 @@ onMounted(load)
 
 <style scoped>
 .arb-history {
-  padding: 28px 32px;
+  padding: var(--page-pad);
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -148,6 +148,7 @@ onMounted(load)
 
 .arb-history__table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
 }

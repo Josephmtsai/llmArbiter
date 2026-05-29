@@ -240,7 +240,7 @@ onMounted(fetchRecent)
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
   gap: 24px;
-  padding: 28px 32px;
+  padding: var(--page-pad);
   flex: 1;
   align-items: start;
 }

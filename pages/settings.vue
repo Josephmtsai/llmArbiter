@@ -293,7 +293,7 @@ watch(activeTab, (tab) => {
 
 <style scoped>
 .arb-settings {
-  padding: 28px 32px;
+  padding: var(--page-pad);
   display: flex;
   flex-direction: column;
   gap: 20px;

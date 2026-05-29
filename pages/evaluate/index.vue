@@ -438,7 +438,7 @@ onUnmounted(() => {
 
 <style scoped>
 .arb-eval {
-  padding: 28px 32px;
+  padding: var(--page-pad);
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -611,7 +611,8 @@ onUnmounted(() => {
 .arb-eval__table-wrap {
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-md);
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .arb-eval__table {
   width: 100%;

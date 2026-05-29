@@ -206,7 +206,7 @@ onMounted(load)
 
 <style scoped>
 .arb-detail {
-  padding: 28px 32px;
+  padding: var(--page-pad);
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -295,6 +295,7 @@ onMounted(load)
 /* Table */
 .arb-detail__table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
 }
