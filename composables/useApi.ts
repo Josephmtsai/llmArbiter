@@ -46,7 +46,6 @@ export function useApi() {
     baseURL: config.public.apiBase as string,
     headers: { 'X-API-Key': apiKey },
   })
-  const arbiterProxy = $fetch.create({ baseURL: '/api/arbiter' })
 
   function normalizePrompt(prompt: PromptVersion): PromptVersion {
     const isActive = prompt.is_active ?? prompt.active
@@ -182,19 +181,19 @@ export function useApi() {
       api<ArbiterResponse<EvalCompareResponse>>('/evaluate/history/compare', { query: { by } }),
 
     getEvalPoolStats: () =>
-      arbiterProxy<ArbiterResponse<EvalPoolStats>>('/eval-pool/stats'),
+      api<ArbiterResponse<EvalPoolStats>>('/eval-pool/stats'),
 
     getReviewQueue: () =>
-      arbiterProxy<ArbiterResponse<ReviewQueueResponse>>('/review-queue'),
+      api<ArbiterResponse<ReviewQueueResponse>>('/review-queue'),
 
     updateReviewQueueEntry: (id: string, body: ReviewQueueMutationRequest) =>
-      arbiterProxy<ArbiterResponse<Record<string, never>>>(
+      api<ArbiterResponse<Record<string, never>>>(
         `/review-queue/${encodeURIComponent(id)}`,
         { method: 'PATCH', body },
       ),
 
     startPoolEvaluation: (promptId?: number, model?: string) =>
-      arbiterProxy<ArbiterResponse<AsyncEvalStartResponse>>('/evaluate', {
+      api<ArbiterResponse<AsyncEvalStartResponse>>('/evaluate', {
         method: 'POST',
         body: {
           prompt_version_id: promptId ?? 'active',
@@ -204,16 +203,16 @@ export function useApi() {
       }),
 
     getOptimizerHistory: () =>
-      arbiterProxy<ArbiterResponse<OptimizerHistoryResponse>>('/optimizer/history'),
+      api<ArbiterResponse<OptimizerHistoryResponse>>('/optimizer/history'),
 
     startOptimizerRun: (body: OptimizerRunStartRequest) =>
-      arbiterProxy<ArbiterResponse<OptimizerRunStartResponse>>('/optimizer/run', {
+      api<ArbiterResponse<OptimizerRunStartResponse>>('/optimizer/run', {
         method: 'POST',
         body,
       }),
 
     cancelOptimizerRun: (runId: number) =>
-      arbiterProxy<ArbiterResponse<OptimizerCancelResponse>>(`/optimizer/runs/${runId}`, {
+      api<ArbiterResponse<OptimizerCancelResponse>>(`/optimizer/runs/${runId}`, {
         method: 'DELETE',
       }),
 
