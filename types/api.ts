@@ -279,6 +279,7 @@ export interface OptimizerRound {
   prompt_version_id: number
   failed_case_count: number
   kept?: boolean
+  eval_run_id: number | null
 }
 
 export interface OptimizerRun {
@@ -289,6 +290,7 @@ export interface OptimizerRun {
   started_at: string
   finished_at: string | null
   rounds: OptimizerRound[]
+  baseline_eval_run_id: number | null
 }
 
 export interface OptimizerHistoryResponse {
