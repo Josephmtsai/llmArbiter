@@ -69,6 +69,13 @@ function formatPercent(value: number | null | undefined): string {
           <span>Target {{ formatPercent(selectedRun.target_accuracy) }}</span>
           <span>Best {{ formatPercent(bestOptimizerAccuracy(selectedRun)) }}</span>
           <span>{{ selectedRun.rounds.length }} rounds</span>
+          <NuxtLink
+            v-if="selectedRun.baseline_eval_run_id != null"
+            :to="`/evaluate/history/${selectedRun.baseline_eval_run_id}`"
+            class="optimizer-history__stats-link"
+          >
+            Baseline eval ↗
+          </NuxtLink>
         </div>
 
         <div class="optimizer-history__trend">
@@ -122,6 +129,8 @@ function formatPercent(value: number | null | undefined): string {
 .optimizer-history__status-chip { border: 1px solid var(--border); border-radius: var(--r-pill); padding: 3px 9px; color: var(--fg-2); font-family: var(--font-mono); font-size: 11px; }
 .optimizer-history__stats { display: flex; flex-wrap: wrap; gap: 8px; }
 .optimizer-history__stats span { border: 1px solid var(--border-subtle); border-radius: var(--r-sm); padding: 5px 8px; color: var(--fg-3); font-family: var(--font-mono); font-size: 11px; }
+.optimizer-history__stats-link { border: 1px solid var(--border-subtle); border-radius: var(--r-sm); padding: 5px 8px; color: var(--accent); font-family: var(--font-mono); font-size: 11px; text-decoration: none; }
+.optimizer-history__stats-link:hover { text-decoration: underline; }
 .optimizer-history__trend { height: 116px; border: 1px solid var(--border-subtle); border-radius: var(--r-md); padding: 12px; background: var(--bg-inset); }
 .optimizer-history__trend svg { width: 100%; height: 100%; }
 .optimizer-history__table { width: 100%; border-collapse: collapse; }
