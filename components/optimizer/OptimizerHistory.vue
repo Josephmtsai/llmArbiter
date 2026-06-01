@@ -93,6 +93,7 @@ function formatPercent(value: number | null | undefined): string {
               <th>Failed</th>
               <th>Prompt</th>
               <th>Kept</th>
+              <th>Eval</th>
             </tr>
           </thead>
           <tbody>
@@ -105,6 +106,16 @@ function formatPercent(value: number | null | undefined): string {
               <td class="num">{{ round.failed_case_count }}</td>
               <td><NuxtLink to="/settings" class="optimizer-history__link">v{{ round.prompt_version_id }}</NuxtLink></td>
               <td>{{ round.kept ? 'Yes' : 'No' }}</td>
+              <td>
+                <NuxtLink
+                  v-if="round.eval_run_id != null"
+                  :to="`/evaluate/history/${round.eval_run_id}`"
+                  class="optimizer-history__link"
+                >
+                  ↗ {{ round.eval_run_id }}
+                </NuxtLink>
+                <span v-else class="optimizer-history__muted">—</span>
+              </td>
             </tr>
           </tbody>
         </table>
