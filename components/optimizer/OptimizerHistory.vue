@@ -109,6 +109,7 @@ function formatPercent(value: number | null | undefined): string {
               <th>Prompt</th>
               <th>Eval</th>
               <th>Kept</th>
+              <th>Eval</th>
             </tr>
           </thead>
           <tbody>
