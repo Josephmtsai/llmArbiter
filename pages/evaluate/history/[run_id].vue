@@ -1,5 +1,11 @@
 <script setup lang="ts">
 import type { EvalRun, EvalRunResult } from '~/types/api'
+import {
+  averageLatencyMs,
+  countFailedResults,
+  getRunAccuracyDisplay,
+  hasMeaningfulAccuracy,
+} from '~/utils/evalDisplay'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -16,32 +22,27 @@ const deleting = ref(false)
 const deleteError = ref<string | null>(null)
 
 const runId = computed(() => Number(route.params.run_id))
-
 const displayedResults = computed(() =>
-  failuresOnly.value ? results.value.filter(r => !r.is_correct) : results.value,
+  failuresOnly.value ? results.value.filter(result => !result.is_correct) : results.value,
 )
-
-function accuracyColor(acc: number): string {
-  if (acc >= 0.8) return 'var(--action-rebuild)'
-  if (acc >= 0.5) return 'var(--action-fallback)'
-  return 'var(--action-notify)'
-}
-
-function formatAccuracy(acc: number): string {
-  return (acc * 100).toFixed(1) + '%'
-}
+const failedCount = computed(() => countFailedResults(results.value))
+const averageLatency = computed(() => averageLatencyMs(results.value))
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString()
 }
 
-function duration(r: EvalRun): string {
-  const ms = new Date(r.finished_at).getTime() - new Date(r.started_at).getTime()
-  return (ms / 1000).toFixed(1) + 's'
+function duration(currentRun: EvalRun): string {
+  const ms = new Date(currentRun.finished_at).getTime() - new Date(currentRun.started_at).getTime()
+  return Number.isFinite(ms) ? `${(ms / 1000).toFixed(1)}s` : '--'
 }
 
 function formatLatency(ms: number | null): string {
-  return ms != null ? `${ms} ms` : '—'
+  return ms != null ? `${ms} ms` : '--'
+}
+
+function statusLabel(status: string | undefined): string {
+  return status ?? 'completed'
 }
 
 async function load() {
@@ -85,7 +86,7 @@ onMounted(load)
 <template>
   <AppTopBar :title="`Run #${runId}`" subtitle="Evaluation detail">
     <template #actions>
-      <NuxtLink to="/evaluate/history" class="arb-detail__back">← History</NuxtLink>
+      <NuxtLink to="/evaluate/history" class="arb-detail__back">History</NuxtLink>
       <UiButton
         variant="ghost"
         size="sm"
@@ -110,12 +111,15 @@ onMounted(load)
     <div v-else-if="error" class="arb-detail__error">{{ error }}</div>
 
     <template v-else-if="run">
-      <!-- Summary card -->
       <UiCard class="arb-detail__summary">
         <div class="arb-detail__summary-grid">
           <div class="arb-detail__stat">
             <span class="arb-detail__stat-label">Run ID</span>
             <span class="arb-detail__stat-val num">#{{ run.run_id }}</span>
+          </div>
+          <div class="arb-detail__stat">
+            <span class="arb-detail__stat-label">Status</span>
+            <span class="arb-detail__stat-val mono">{{ statusLabel(run.status) }}</span>
           </div>
           <div class="arb-detail__stat">
             <span class="arb-detail__stat-label">Provider</span>
@@ -129,8 +133,11 @@ onMounted(load)
             <span class="arb-detail__stat-label">Accuracy</span>
             <span
               class="arb-detail__stat-val arb-detail__acc"
-              :style="{ color: accuracyColor(run.accuracy) }"
-            >{{ formatAccuracy(run.accuracy) }}</span>
+              :style="{ color: getRunAccuracyDisplay(run).color }"
+            >
+              {{ getRunAccuracyDisplay(run).label }}
+            </span>
+            <span v-if="!hasMeaningfulAccuracy(run)" class="arb-detail__stat-note">Not final</span>
           </div>
           <div class="arb-detail__stat">
             <span class="arb-detail__stat-label">Correct / Total</span>
@@ -144,6 +151,12 @@ onMounted(load)
             <span class="arb-detail__stat-label">Duration</span>
             <span class="arb-detail__stat-val num">{{ duration(run) }}</span>
           </div>
+          <div class="arb-detail__stat">
+            <span class="arb-detail__stat-label">Avg latency</span>
+            <span class="arb-detail__stat-val num">
+              {{ averageLatency != null ? `${averageLatency} ms` : '--' }}
+            </span>
+          </div>
           <div class="arb-detail__stat arb-detail__stat--wide">
             <span class="arb-detail__stat-label">Started</span>
             <span class="arb-detail__stat-val">{{ formatDate(run.started_at) }}</span>
@@ -151,9 +164,11 @@ onMounted(load)
         </div>
       </UiCard>
 
-      <!-- Results table -->
       <div class="arb-detail__results-header">
-        <span class="arb-detail__results-title">Per-question results</span>
+        <span class="arb-detail__results-title">
+          Per-question results
+          <span class="arb-detail__failed-count num">{{ failedCount }} failed</span>
+        </span>
         <button
           class="arb-detail__toggle"
           :class="{ 'arb-detail__toggle--active': failuresOnly }"
@@ -176,23 +191,23 @@ onMounted(load)
           </thead>
           <tbody>
             <tr
-              v-for="r in displayedResults"
-              :key="r.test_case_id"
+              v-for="result in displayedResults"
+              :key="result.test_case_id"
               class="arb-detail__result-row"
-              :class="{ 'arb-detail__result-row--fail': !r.is_correct }"
+              :class="{ 'arb-detail__result-row--fail': !result.is_correct }"
             >
-              <td class="num">#{{ r.test_case_id }}</td>
-              <td><UiActionBadge :action="r.expected_action" size="sm" /></td>
-              <td><UiActionBadge :action="r.predicted_action" size="sm" /></td>
+              <td class="num">#{{ result.test_case_id }}</td>
+              <td><UiActionBadge :action="result.expected_action" size="sm" /></td>
+              <td><UiActionBadge :action="result.predicted_action" size="sm" /></td>
               <td>
                 <span
                   class="arb-detail__verdict"
-                  :class="r.is_correct ? 'arb-detail__verdict--pass' : 'arb-detail__verdict--fail'"
+                  :class="result.is_correct ? 'arb-detail__verdict--pass' : 'arb-detail__verdict--fail'"
                 >
-                  {{ r.is_correct ? 'PASS' : 'FAIL' }}
+                  {{ result.is_correct ? 'PASS' : 'FAIL' }}
                 </span>
               </td>
-              <td class="num arb-detail__latency">{{ formatLatency(r.latency_ms) }}</td>
+              <td class="num arb-detail__latency">{{ formatLatency(result.latency_ms) }}</td>
             </tr>
             <tr v-if="displayedResults.length === 0">
               <td colspan="5" class="arb-detail__empty-row">No results match the current filter.</td>
@@ -225,7 +240,6 @@ onMounted(load)
   font-size: 12px;
   color: var(--action-notify);
 }
-
 .arb-detail__loading { padding: 40px; text-align: center; }
 .arb-detail__not-found,
 .arb-detail__error {
@@ -235,8 +249,6 @@ onMounted(load)
   font-size: 13px;
 }
 .arb-detail__error { color: var(--action-notify); }
-
-/* Summary card */
 .arb-detail__summary { display: flex; flex-direction: column; }
 .arb-detail__summary-grid {
   display: flex;
@@ -262,8 +274,10 @@ onMounted(load)
   color: var(--fg-1);
 }
 .arb-detail__acc { font-family: var(--font-mono); font-size: 18px; }
-
-/* Results header */
+.arb-detail__stat-note {
+  font-size: 11px;
+  color: var(--fg-4);
+}
 .arb-detail__results-header {
   display: flex;
   align-items: center;
@@ -273,6 +287,11 @@ onMounted(load)
   font-size: 13px;
   font-weight: 600;
   color: var(--fg-2);
+}
+.arb-detail__failed-count {
+  margin-left: 8px;
+  color: var(--action-notify);
+  font-size: 11px;
 }
 .arb-detail__toggle {
   font-size: 12px;
@@ -291,8 +310,6 @@ onMounted(load)
   color: var(--action-notify);
   background: var(--action-notify-soft);
 }
-
-/* Table */
 .arb-detail__table-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -329,7 +346,6 @@ onMounted(load)
   border-left: 2px solid var(--action-notify);
 }
 .arb-detail__result-row--fail td:not(:first-child) { border-left: none; }
-
 .arb-detail__verdict {
   font-family: var(--font-mono);
   font-size: 11px;

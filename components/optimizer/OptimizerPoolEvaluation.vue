@@ -22,7 +22,8 @@ defineEmits<{ start: [] }>()
     <UiCard class="optimizer-pool__panel">
       <UiEyebrow>Pool evaluation</UiEyebrow>
       <p class="optimizer-pool__muted">
-        Runs the active prompt against dynamic eval pool cases using source=pool.
+        Runs the active prompt against aggregate eval pool samples using source=pool.
+        Raw pool cases stay out of this view; inspect saved run results from history.
       </p>
       <UiField label="Prompt version">
         <UiSelect v-model.number="promptId" :disabled="loadingPrompts">
@@ -49,6 +50,7 @@ defineEmits<{ start: [] }>()
         <NuxtLink :to="`/evaluate/history/${acceptedRunId}`" class="optimizer-pool__link">
           run #{{ acceptedRunId }}
         </NuxtLink>
+        <span class="optimizer-pool__notice-extra">opens after the run is saved.</span>
       </div>
     </UiCard>
   </section>
@@ -80,4 +82,10 @@ defineEmits<{ start: [] }>()
   text-decoration: none;
 }
 .optimizer-pool__link:hover { text-decoration: underline; }
+.optimizer-pool__notice-extra {
+  display: block;
+  margin-top: 4px;
+  color: var(--fg-4);
+  font-size: 12px;
+}
 </style>

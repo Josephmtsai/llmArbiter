@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { OptimizerRun } from '~/types/api'
 import { bestOptimizerAccuracy } from '~/utils/optimizerState'
 
@@ -23,6 +24,9 @@ const trendPolyline = computed(() => {
     })
     .join(' ')
 })
+const isBaselinePassedDirectly = computed(() =>
+  props.selectedRun?.status === 'completed' && props.selectedRun.rounds.length === 0,
+)
 
 function formatPercent(value: number | null | undefined): string {
   if (value == null) return 'n/a'
@@ -78,6 +82,17 @@ function formatPercent(value: number | null | undefined): string {
           </NuxtLink>
         </div>
 
+        <div v-if="isBaselinePassedDirectly" class="optimizer-history__baseline-pass">
+          Baseline already met the target. No optimization rounds were needed.
+          <NuxtLink
+            v-if="selectedRun.baseline_eval_run_id != null"
+            :to="`/evaluate/history/${selectedRun.baseline_eval_run_id}`"
+            class="optimizer-history__link"
+          >
+            View baseline eval
+          </NuxtLink>
+        </div>
+
         <div class="optimizer-history__trend">
           <svg v-if="trendPolyline" viewBox="0 0 100 48" preserveAspectRatio="none" aria-hidden="true">
             <polyline :points="trendPolyline" fill="none" stroke="var(--accent)" stroke-width="2" />
@@ -92,6 +107,7 @@ function formatPercent(value: number | null | undefined): string {
               <th>Accuracy</th>
               <th>Failed</th>
               <th>Prompt</th>
+              <th>Eval</th>
               <th>Kept</th>
             </tr>
           </thead>
@@ -104,7 +120,17 @@ function formatPercent(value: number | null | undefined): string {
               <td class="num">{{ formatPercent(round.accuracy) }}</td>
               <td class="num">{{ round.failed_case_count }}</td>
               <td><NuxtLink to="/settings" class="optimizer-history__link">v{{ round.prompt_version_id }}</NuxtLink></td>
-              <td>{{ round.kept ? 'Yes' : 'No' }}</td>
+              <td>
+                <NuxtLink
+                  v-if="round.eval_run_id != null"
+                  :to="`/evaluate/history/${round.eval_run_id}`"
+                  class="optimizer-history__link"
+                >
+                  #{{ round.eval_run_id }}
+                </NuxtLink>
+                <span v-else class="optimizer-history__muted">n/a</span>
+              </td>
+              <td>{{ round.kept ? 'Kept' : 'Reverted' }}</td>
             </tr>
           </tbody>
         </table>
@@ -131,6 +157,7 @@ function formatPercent(value: number | null | undefined): string {
 .optimizer-history__stats span { border: 1px solid var(--border-subtle); border-radius: var(--r-sm); padding: 5px 8px; color: var(--fg-3); font-family: var(--font-mono); font-size: 11px; }
 .optimizer-history__stats-link { border: 1px solid var(--border-subtle); border-radius: var(--r-sm); padding: 5px 8px; color: var(--accent); font-family: var(--font-mono); font-size: 11px; text-decoration: none; }
 .optimizer-history__stats-link:hover { text-decoration: underline; }
+.optimizer-history__baseline-pass { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; border: 1px solid var(--border-subtle); border-radius: var(--r-md); padding: 10px 12px; background: var(--bg-2); color: var(--fg-3); font-size: 13px; }
 .optimizer-history__trend { height: 116px; border: 1px solid var(--border-subtle); border-radius: var(--r-md); padding: 12px; background: var(--bg-inset); }
 .optimizer-history__trend svg { width: 100%; height: 100%; }
 .optimizer-history__table { width: 100%; border-collapse: collapse; }

@@ -1,0 +1,40 @@
+{
+  "from": "developer",
+  "to": "qa",
+  "feature": "eval-json-testcase-display",
+  "status": "ready",
+  "summary": "Implemented guide-backed eval display changes: manual vs optimizer source tagging, status-aware eval accuracy, run detail status/latency/failure summary, optimizer baseline and round eval links, and aggregate-only pool evaluation copy. eval_json was not changed or guessed.",
+  "changed_files": [
+    "utils/evalDisplay.ts",
+    "tests/evalDisplay.test.ts",
+    "tests/optimizerHistory.test.ts",
+    "vitest.config.ts",
+    "pages/evaluate/history/index.vue",
+    "pages/evaluate/history/[run_id].vue",
+    "components/optimizer/OptimizerHistory.vue",
+    "components/optimizer/OptimizerPoolEvaluation.vue",
+    "docs/frontend-eval-display-guide.md",
+    "docs/frontend-optimizer-eval-link.md",
+    "openspec/changes/eval-json-testcase-display/tasks.md",
+    "package.json",
+    "pnpm-lock.yaml"
+  ],
+  "ac_ref": "openspec/changes/eval-json-testcase-display/tasks.md",
+  "verification": [
+    "corepack.cmd pnpm install --frozen-lockfile --reporter=append-only",
+    "node_modules\\.bin\\vitest.CMD run tests\\evalDisplay.test.ts tests\\optimizerState.test.ts tests\\optimizerHistory.test.ts",
+    "corepack.cmd pnpm vue-tsc --noEmit",
+    "corepack.cmd pnpm build",
+    "openspec.cmd validate eval-json-testcase-display --strict",
+    "git diff --check",
+    "HTTP smoke: GET http://127.0.0.1:3107/evaluate/history returned 200",
+    "HTTP smoke: GET http://127.0.0.1:3107/evaluate/history/1 returned 200",
+    "HTTP smoke: GET http://127.0.0.1:3107/optimizer returned 200"
+  ],
+  "known_gaps": [
+    "Verification ran under Node v22.19.0 while package engines request Node 20.19.x; pnpm emitted an unsupported engine warning but tests, type-check, and build completed.",
+    "In-app Browser navigation tool was not exposed in this session, so smoke testing used HTTP route probes rather than visual browser screenshots.",
+    "HTTP smoke verifies SSR route availability only; authenticated interactive UI behavior still needs QA browser validation.",
+    "No eval_json typing or display was added because the user explicitly instructed not to guess eval_json behavior."
+  ]
+}
