@@ -5,6 +5,80 @@ Optimizer 診斷 UI 詳細規格請見 `docs/frontend-optimizer-diagnostics-spec
 
 ---
 
+## 0. Optimizer History — API 拆分（高優先，破壞性變更）
+
+### 0.1 背景
+
+`GET /optimizer/history` 原本在每個 round 裡回傳完整 failures 清單，單次呼叫超過 300 KB。
+現已拆分為兩個 endpoint：
+
+| Endpoint | 用途 | 大小 |
+|---|---|---|
+| `GET /optimizer/history` | 列表頁，只回傳摘要 | < 5 KB |
+| `GET /optimizer/history/{run_id}` | 詳細頁，回傳完整 failures | 依 run 大小 |
+
+### 0.2 `GET /optimizer/history` 的 round 欄位變化
+
+**移除（list endpoint 不再回傳）：**
+- `failures` — 每筆失敗案例的完整資料
+- `val_snapshot_ids` — 200 個 pool entry ID 的陣列
+
+**保留：**
+```json
+{
+  "round_number": 1,
+  "accuracy": 0.535,
+  "previous_best_accuracy": 0.48,
+  "accuracy_delta": 0.055,
+  "prompt_version_id": 4,
+  "failed_case_count": 93,
+  "kept": false,
+  "eval_run_id": 35,
+  "optimizer_model": "deepseek/deepseek-v3",
+  "failure_analysis": "The prompt fails to distinguish...",
+  "confusion_matrix": { "trigger_restart": { "notify_human": 22 } }
+}
+```
+
+### 0.3 `GET /optimizer/history/{run_id}` — 新 endpoint
+
+回傳單一 run 的完整資料，包含 `failures` 和 `val_snapshot_ids`：
+
+```
+GET /optimizer/history/42
+→ 200  { "status": "success", "data": { "optimizer_run_id": 42, ... "rounds": [...] } }
+→ 404  { "detail": "optimizer-run-not-found" }
+```
+
+每個 round 包含：
+```json
+{
+  "round_number": 1,
+  "failures": [
+    {
+      "source_case_id": "pool-abc",
+      "expected_action": "trigger_restart",
+      "predicted_action": "notify_human",
+      "confidence": 0.62,
+      "log_snippet": "service timeout...",
+      "hardware_info": {},
+      "raw_output": "...",
+      "parsed_output": {}
+    }
+  ]
+}
+```
+
+### 0.4 前端需要做的事
+
+1. **History 列表頁**：無需改動（摘要欄位都保留）
+2. **History 詳細頁** (`/optimizer/history/[id]`)：
+   - 改為在頁面 mount 時呼叫 `GET /optimizer/history/{id}`，用 route param 的 `id` 帶入
+   - **不要**再從列表 response 裡 filter，因為 failures 已不在列表中
+3. 詳細頁可顯示 failures 清單：expected / predicted / confidence / log snippet
+
+---
+
 ## 1. Optimizer History（高優先，破壞性變更）
 
 ### 1.1 Endpoint
@@ -227,6 +301,6 @@ NVIDIA_MODEL=deepseek-ai/deepseek-v4-flash
 ## 注意事項
 
 - Optimizer history response 結構已破壞性更新（從 JSON file → DB），舊欄位全部保留，只有新增。
-- `val_snapshot_ids` 陣列可能有 200 個元素，前端不需要顯示完整清單，只顯示 `count` 即可。
+- `val_snapshot_ids` 已從 list endpoint 移除，只在 `GET /optimizer/history/{run_id}` detail endpoint 回傳。列表頁不需要處理這個欄位。
 - `analysis_text` 可能很長（500~2000 字），折疊預設收起。
 - Confusion matrix 的 action key 可能包含：`trigger_rebuild` / `trigger_restart` / `trigger_fallback` / `notify_human` / `send_email`。
