@@ -171,13 +171,8 @@ export function useApi() {
       return { ...res, data: list }
     },
 
-    getEvalHistory: async () => {
-      const res = await api<ArbiterResponse<{ runs: EvalRun[] }>>('/evaluate/history')
-      if (res.status === 'success') {
-        res.data.runs = res.data.runs.filter(r => r.source !== 'optimizer')
-      }
-      return res
-    },
+    getEvalHistory: () =>
+      api<ArbiterResponse<{ runs: EvalRun[] }>>('/evaluate/history'),
 
     getEvalRunDetail: (runId: number) =>
       api<ArbiterResponse<EvalRunDetail>>(`/evaluate/history/${runId}`),
