@@ -54,11 +54,11 @@
 - [x] 6.4 Add tests for empty eval pool disabling pool evaluation.
 - [x] 6.5 Run `pnpm vue-tsc --noEmit`.
 - [x] 6.6 Run targeted Vitest tests for optimizer changes.
-- [ ] 6.7 Smoke test `/optimizer` in browser for desktop and mobile viewports.
+- [x] 6.7 Smoke test `/optimizer` in browser for desktop and mobile viewports.
 
 ## 7. Backend Readiness Checks
 
-- [ ] 7.1 Confirm backend returns `400 detail = "eval-pool-empty"` for empty pool evaluation.
-- [ ] 7.2 Confirm `GET /optimizer/history` includes active runs while running.
-- [ ] 7.3 Confirm `GET /review-queue` returns only pending entries sorted by confidence.
-- [ ] 7.4 Confirm demo or QA environment has eval pool fixtures or seed data for non-empty optimizer UI validation.
+- [x] 7.1 Confirm backend returns `400 detail = "eval-pool-empty"` for empty pool evaluation.
+- [x] 7.2 Confirm `GET /optimizer/history` includes active runs while running.
+- [x] 7.3 Confirm `GET /review-queue` returns only pending entries sorted by confidence.
+- [x] 7.4 Confirm demo or QA environment has eval pool fixtures or seed data for non-empty optimizer UI validation.
