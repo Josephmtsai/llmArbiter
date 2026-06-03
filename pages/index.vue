@@ -485,4 +485,35 @@ onMounted(fetchRecent)
   color: var(--fg-2);
   line-height: 1.4;
 }
+
+/* ── Mobile breakpoints ──────────────────────────────── */
+@media (max-width: 768px) {
+  /* 1.1 Stack two columns → single column */
+  .arb-analyze {
+    grid-template-columns: 1fr;
+  }
+
+  /* 1.2 Input row: button on top, field below, both full-width */
+  .arb-analyze__input-row {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  /* 1.3 Run column: stretch children (button) to full width */
+  .arb-analyze__run-col {
+    align-items: stretch;
+  }
+
+  /* 1.4 Result header: stack ActionBadge + meta vertically */
+  .arb-analyze__result-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  /* 1.5 Right rail flows full-width automatically in single-column grid */
+  .arb-analyze__right {
+    width: 100%;
+  }
+}
 </style>
