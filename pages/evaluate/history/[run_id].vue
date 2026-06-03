@@ -20,6 +20,7 @@ const notFound = ref(false)
 const failuresOnly = ref(false)
 const deleting = ref(false)
 const deleteError = ref<string | null>(null)
+const expandedId = ref<number | null>(null)
 const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
 let loadSeq = 0
 
@@ -44,8 +45,29 @@ function formatLatency(ms: number | null): string {
   return ms != null ? `${ms} ms` : '--'
 }
 
+function formatConfidence(c: number | null | undefined): string {
+  if (c == null) return '--'
+  return `${(c * 100).toFixed(0)}%`
+}
+
+function confidenceColor(c: number | null | undefined): string {
+  if (c == null) return 'var(--fg-4)'
+  if (c >= 0.8) return 'var(--fg-1)'
+  if (c >= 0.5) return 'var(--action-fallback)'
+  return 'var(--action-notify)'
+}
+
+function sourcePath(result: EvalRunResult): string | null {
+  const p = result.hardware_info?.source_path
+  return typeof p === 'string' ? p : null
+}
+
 function statusLabel(status: string | undefined): string {
   return status ?? 'completed'
+}
+
+function toggleExpand(id: number) {
+  expandedId.value = expandedId.value === id ? null : id
 }
 
 function stopPolling() {
@@ -216,31 +238,87 @@ onUnmounted(stopPolling)
               <th>Expected</th>
               <th>Predicted</th>
               <th>Result</th>
+              <th>Confidence</th>
               <th>Latency</th>
+              <th class="arb-detail__th-expand" />
             </tr>
           </thead>
           <tbody>
-            <tr
+            <template
               v-for="result in displayedResults"
               :key="result.test_case_id"
-              class="arb-detail__result-row"
-              :class="{ 'arb-detail__result-row--fail': !result.is_correct }"
             >
-              <td class="num">#{{ result.test_case_id }}</td>
-              <td><UiActionBadge :action="result.expected_action" size="sm" /></td>
-              <td><UiActionBadge :action="result.predicted_action" size="sm" /></td>
-              <td>
-                <span
-                  class="arb-detail__verdict"
-                  :class="result.is_correct ? 'arb-detail__verdict--pass' : 'arb-detail__verdict--fail'"
+              <!-- Main row -->
+              <tr
+                class="arb-detail__result-row"
+                :class="{
+                  'arb-detail__result-row--fail': !result.is_correct,
+                  'arb-detail__result-row--expanded': expandedId === result.test_case_id,
+                }"
+                @click="toggleExpand(result.test_case_id)"
+              >
+                <td class="num">#{{ result.test_case_id }}</td>
+                <td><UiActionBadge :action="result.expected_action" size="sm" /></td>
+                <td><UiActionBadge :action="result.predicted_action" size="sm" /></td>
+                <td>
+                  <span
+                    class="arb-detail__verdict"
+                    :class="result.is_correct ? 'arb-detail__verdict--pass' : 'arb-detail__verdict--fail'"
+                  >
+                    {{ result.is_correct ? 'PASS' : 'FAIL' }}
+                  </span>
+                </td>
+                <td
+                  class="num arb-detail__confidence"
+                  :style="{ color: confidenceColor(result.confidence) }"
                 >
-                  {{ result.is_correct ? 'PASS' : 'FAIL' }}
-                </span>
-              </td>
-              <td class="num arb-detail__latency">{{ formatLatency(result.latency_ms) }}</td>
-            </tr>
+                  {{ formatConfidence(result.confidence) }}
+                </td>
+                <td class="num arb-detail__latency">{{ formatLatency(result.latency_ms) }}</td>
+                <td class="arb-detail__expand-chevron">
+                  {{ expandedId === result.test_case_id ? '▲' : '▼' }}
+                </td>
+              </tr>
+
+              <!-- Detail panel row -->
+              <tr
+                v-if="expandedId === result.test_case_id"
+                class="arb-detail__panel-row"
+                :class="{ 'arb-detail__panel-row--fail': !result.is_correct }"
+              >
+                <td colspan="7" class="arb-detail__panel-cell">
+                  <div class="arb-detail__panel">
+                    <!-- Reason -->
+                    <div v-if="result.reason" class="arb-detail__panel-section">
+                      <div class="arb-detail__panel-label">Reason</div>
+                      <p class="arb-detail__panel-text">{{ result.reason }}</p>
+                    </div>
+
+                    <!-- Log Snippet -->
+                    <div v-if="result.log_snippet" class="arb-detail__panel-section">
+                      <div class="arb-detail__panel-label">Log Snippet</div>
+                      <pre class="arb-detail__panel-pre">{{ result.log_snippet }}</pre>
+                    </div>
+
+                    <!-- Source Path -->
+                    <div v-if="sourcePath(result)" class="arb-detail__panel-section">
+                      <div class="arb-detail__panel-label">Source Path</div>
+                      <code class="arb-detail__panel-code">{{ sourcePath(result) }}</code>
+                    </div>
+
+                    <div
+                      v-if="!result.reason && !result.log_snippet && !sourcePath(result)"
+                      class="arb-detail__panel-empty"
+                    >
+                      No additional detail available.
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </template>
+
             <tr v-if="displayedResults.length === 0">
-              <td colspan="5" class="arb-detail__empty-row">No results match the current filter.</td>
+              <td colspan="7" class="arb-detail__empty-row">No results match the current filter.</td>
             </tr>
           </tbody>
         </table>
@@ -345,6 +423,8 @@ onUnmounted(stopPolling)
   color: var(--action-notify);
   background: var(--action-notify-soft);
 }
+
+/* Table */
 .arb-detail__table-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -368,6 +448,7 @@ onUnmounted(stopPolling)
   background: var(--bg-1);
   white-space: nowrap;
 }
+.arb-detail__th-expand { width: 28px; }
 .arb-detail__table td {
   padding: 10px 14px;
   color: var(--fg-2);
@@ -375,12 +456,29 @@ onUnmounted(stopPolling)
   white-space: nowrap;
   vertical-align: middle;
 }
-.arb-detail__result-row:last-child td { border-bottom: none; }
+
+/* Main result rows */
+.arb-detail__result-row {
+  cursor: pointer;
+  transition: background var(--dur-fast);
+}
+.arb-detail__result-row:hover td { background: var(--bg-2); }
 .arb-detail__result-row--fail td {
   background: rgba(239, 68, 68, 0.04);
   border-left: 2px solid var(--action-notify);
 }
 .arb-detail__result-row--fail td:not(:first-child) { border-left: none; }
+.arb-detail__result-row--expanded td { border-bottom: none; }
+
+/* Chevron */
+.arb-detail__expand-chevron {
+  text-align: center;
+  color: var(--fg-4);
+  font-size: 9px;
+  width: 28px;
+}
+
+/* Verdict */
 .arb-detail__verdict {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -396,7 +494,65 @@ onUnmounted(stopPolling)
   background: var(--action-notify-soft);
   color: var(--action-notify);
 }
+
+.arb-detail__confidence { font-weight: 600; }
 .arb-detail__latency { color: var(--fg-4); }
+
+/* Detail panel */
+.arb-detail__panel-row td { padding: 0; border-bottom: 1px solid var(--border-subtle); }
+.arb-detail__panel-row--fail td {
+  border-left: 2px solid var(--action-notify);
+}
+.arb-detail__panel-cell { padding: 0 !important; }
+.arb-detail__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-1);
+  border-top: 1px solid var(--border-subtle);
+}
+.arb-detail__panel-section { display: flex; flex-direction: column; gap: 4px; }
+.arb-detail__panel-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-4);
+}
+.arb-detail__panel-text {
+  font-size: 13px;
+  color: var(--fg-2);
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+}
+.arb-detail__panel-pre {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--bg-0);
+  border: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg-2);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.arb-detail__panel-code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-3);
+  word-break: break-all;
+}
+.arb-detail__panel-empty {
+  font-size: 12px;
+  color: var(--fg-4);
+  font-style: italic;
+}
+
 .arb-detail__empty-row {
   text-align: center;
   color: var(--fg-4);

@@ -191,7 +191,7 @@ export interface EvalRun {
   provider: string
   model: string
   started_at: string
-  finished_at: string
+  finished_at: string | null
   total: number
   correct: number
   timeout_count: number
@@ -208,6 +208,10 @@ export interface EvalRunResult {
   predicted_action: PrimaryAction | 'timeout'
   is_correct: boolean
   latency_ms: number | null
+  confidence?: number | null
+  reason?: string | null
+  log_snippet?: string | null
+  hardware_info?: Record<string, unknown> | null
 }
 
 export interface EvalRunDetail {

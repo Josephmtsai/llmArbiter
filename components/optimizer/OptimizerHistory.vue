@@ -244,7 +244,7 @@ function modelComparisonDecisionClass(comparison: OptimizerModelComparison): str
           </NuxtLink>
         </div>
 
-        <div v-if="selectedRun.current_eval_run_id != null" class="optimizer-history__evaluating">
+        <div v-if="selectedRun.current_eval_run_id != null && selectedRun.status === 'running'" class="optimizer-history__evaluating">
           <UiSpinner size="sm" />
           <span>Evaluating</span>
           <NuxtLink :to="`/evaluate/history/${selectedRun.current_eval_run_id}`" class="optimizer-history__link">
@@ -321,7 +321,11 @@ function modelComparisonDecisionClass(comparison: OptimizerModelComparison): str
               >
                 eval #{{ round.eval_run_id }}
               </NuxtLink>
-              <NuxtLink :to="`/settings`" class="optimizer-history__link" @click.stop>
+              <NuxtLink
+                :to="`/settings?tab=prompts&prompt=${round.prompt_version_id}`"
+                class="optimizer-history__link"
+                @click.stop
+              >
                 pv{{ round.prompt_version_id }}
               </NuxtLink>
               <span v-if="round.optimizer_model" class="optimizer-history__badge optimizer-history__badge--opt">

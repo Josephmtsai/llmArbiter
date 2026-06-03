@@ -1,24 +1,17 @@
 <script setup lang="ts">
 import type { EvalRun } from '~/types/api'
-import {
-  collectOptimizerEvalRunIds,
-  getEvalRunSource,
-  getRunAccuracyDisplay,
-} from '~/utils/evalDisplay'
+import { getRunAccuracyDisplay } from '~/utils/evalDisplay'
 
 definePageMeta({ middleware: 'auth' })
 
 const api = useApi()
 const runs = ref<EvalRun[]>([])
-const optimizerEvalRunIds = ref<Set<number>>(new Set())
 const loading = ref(true)
 const error = ref<string | null>(null)
-const sourceWarning = ref<string | null>(null)
 const deleteErrors = ref<Record<number, string>>({})
 
 function resolvedSource(run: EvalRun): 'db' | 'pool' | 'optimizer' | 'manual' {
-  if (run.source) return run.source
-  return getEvalRunSource(run, optimizerEvalRunIds.value) === 'optimizer' ? 'optimizer' : 'manual'
+  return run.source ?? 'manual'
 }
 
 function sourceLabel(run: EvalRun): string {
@@ -44,6 +37,7 @@ function formatDate(iso: string): string {
 }
 
 function durationSecs(run: EvalRun): string {
+  if (!run.finished_at) return '--'
   const ms = new Date(run.finished_at).getTime() - new Date(run.started_at).getTime()
   return (ms / 1000).toFixed(1) + 's'
 }
@@ -51,29 +45,12 @@ function durationSecs(run: EvalRun): string {
 async function load() {
   loading.value = true
   error.value = null
-  sourceWarning.value = null
   try {
-    const [historyResult, optimizerResult] = await Promise.allSettled([
-      api.getEvalHistory(),
-      api.getOptimizerHistory(),
-    ])
-    if (optimizerResult.status === 'fulfilled' && optimizerResult.value.status === 'success') {
-      optimizerEvalRunIds.value = collectOptimizerEvalRunIds(optimizerResult.value.data.runs)
+    const res = await api.getEvalHistory()
+    if (res.status === 'success') {
+      runs.value = res.data.runs
     } else {
-      optimizerEvalRunIds.value = new Set()
-      sourceWarning.value = 'Optimizer source tags unavailable.'
-    }
-    if (historyResult.status === 'fulfilled' && historyResult.value.status === 'success') {
-      runs.value = historyResult.value.data.runs.filter(
-        r => getEvalRunSource(r, optimizerEvalRunIds.value) === 'manual',
-      )
-    } else {
-      error.value =
-        historyResult.status === 'fulfilled'
-          ? historyResult.value.message
-          : historyResult.reason instanceof Error
-            ? historyResult.reason.message
-            : 'Load failed'
+      error.value = res.message || 'Load failed'
     }
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Load failed'
@@ -175,7 +152,6 @@ onMounted(load)
           </tr>
         </tbody>
       </table>
-      <div v-if="sourceWarning" class="arb-history__source-warning">{{ sourceWarning }}</div>
     </div>
   </div>
 </template>
