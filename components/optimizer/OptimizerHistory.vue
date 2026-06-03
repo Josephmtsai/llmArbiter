@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { OptimizerRun, ConfusionMatrix } from '~/types/api'
 import { bestOptimizerAccuracy } from '~/utils/optimizerState'
 
