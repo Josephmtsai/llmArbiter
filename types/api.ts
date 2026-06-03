@@ -268,6 +268,27 @@ export type ReviewQueueMutationRequest =
 
 export type ConfusionMatrix = Record<string, Record<string, number>>
 
+export interface OptimizerRoundFailure {
+  expected_action: ArbiterAction | string
+  predicted_action: ArbiterAction | 'timeout' | string
+  confidence?: number | null
+  log_snippet: string
+  hardware_info?: Record<string, unknown>
+  parsed_output?: unknown
+  raw_output?: string | null
+}
+
+export interface OptimizerModelComparison {
+  model_name?: string
+  model?: string
+  baseline_accuracy?: number | null
+  candidate_accuracy?: number | null
+  accuracy_delta?: number | null
+  failure_count?: number | null
+  generated_prompt_version_id?: number | null
+  would_keep?: boolean | null
+}
+
 export type OptimizerRunStatus =
   | 'running'
   | 'completed'
@@ -286,8 +307,10 @@ export interface OptimizerRound {
   kept?: boolean
   eval_run_id: number | null
   optimizer_model?: string
+  failure_analysis?: string | null
   analysis_text?: string | null
   confusion_matrix?: ConfusionMatrix | null
+  failures?: OptimizerRoundFailure[]
 }
 
 export interface OptimizerRun {
@@ -307,6 +330,7 @@ export interface OptimizerRun {
   evaluator_provider?: string
   evaluator_model?: string
   error_message?: string | null
+  model_comparisons?: OptimizerModelComparison[]
 }
 
 export interface OptimizerHistoryResponse {

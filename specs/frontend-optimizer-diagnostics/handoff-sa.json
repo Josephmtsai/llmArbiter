@@ -1,0 +1,21 @@
+{
+  "from": "sa",
+  "to": "developer",
+  "feature": "frontend-optimizer-diagnostics",
+  "status": "ready",
+  "summary": "Create an active OpenSpec change from docs/frontend-optimizer-diagnostics-spec.md to complete optimizer diagnostics UI coverage for failure samples, safe raw output handling, and optional model comparison results.",
+  "artifacts": [
+    "docs/frontend-optimizer-diagnostics-spec.md",
+    "openspec/changes/frontend-optimizer-diagnostics/proposal.md",
+    "openspec/changes/frontend-optimizer-diagnostics/design.md",
+    "openspec/changes/frontend-optimizer-diagnostics/specs/optimizer-diagnostics/spec.md",
+    "openspec/changes/frontend-optimizer-diagnostics/tasks.md"
+  ],
+  "assumptions": [
+    "Existing baseline optimizer diagnostics already cover model badges, baseline/best/test accuracy, kept/rejected state, accuracy delta, current eval link, failure analysis via analysis_text, and confusion matrix.",
+    "This change should focus on the remaining requirements from the clean diagnostics MD: failed case inspection, safe raw/long text handling, and optional model comparison results.",
+    "Backend diagnostic fields are optional; frontend implementation must tolerate missing failures and missing model comparison data.",
+    "Use failure_analysis when provided and fall back to existing analysis_text for compatibility.",
+    "Do not display secrets, authorization headers, API keys, tokens, passwords, or full raw prompt bodies by default."
+  ]
+}

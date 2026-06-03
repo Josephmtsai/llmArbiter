@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { OptimizerRun, ConfusionMatrix } from '~/types/api'
+import type {
+  ConfusionMatrix,
+  OptimizerModelComparison,
+  OptimizerRound,
+  OptimizerRoundFailure,
+  OptimizerRun,
+} from '~/types/api'
 import { bestOptimizerAccuracy } from '~/utils/optimizerState'
 
 const props = defineProps<{
@@ -18,36 +24,45 @@ const sortedRounds = computed(() =>
 )
 
 const expandedRounds = ref<Set<number>>(new Set())
+const failureFilters = ref<Record<number, { expected: string; predicted: string }>>({})
 
 function toggleRound(n: number) {
   if (expandedRounds.value.has(n)) expandedRounds.value.delete(n)
   else expandedRounds.value.add(n)
 }
 
-watch(() => props.selectedRun?.optimizer_run_id, () => {
-  expandedRounds.value = new Set()
-})
+watch(
+  () => props.selectedRun?.optimizer_run_id,
+  () => {
+    expandedRounds.value = new Set()
+    failureFilters.value = {}
+  },
+)
 
 function formatPercent(value: number | null | undefined): string {
   if (value == null) return 'n/a'
   return `${(value * 100).toFixed(1)}%`
 }
 
-function deltaColor(delta: number | null | undefined): string {
-  if (delta == null) return 'var(--fg-4)'
-  return delta >= 0 ? 'var(--action-rebuild)' : 'var(--action-notify)'
+function formatConfidence(value: number | null | undefined): string {
+  return value == null ? 'n/a' : formatPercent(value)
 }
 
 function deltaLabel(delta: number | null | undefined): string {
-  if (delta == null) return '—'
+  if (delta == null) return '--'
   const pct = (delta * 100).toFixed(1)
   return delta >= 0 ? `+${pct}%` : `${pct}%`
+}
+
+function deltaToneClass(delta: number | null | undefined): string {
+  if (delta == null) return 'optimizer-history__delta--neutral'
+  return delta >= 0 ? 'optimizer-history__delta--positive' : 'optimizer-history__delta--negative'
 }
 
 function confusionPredictedActions(matrix: ConfusionMatrix): string[] {
   const cols = new Set<string>()
   for (const predicted of Object.values(matrix)) {
-    for (const k of Object.keys(predicted)) cols.add(k)
+    for (const key of Object.keys(predicted)) cols.add(key)
   }
   return [...cols].sort()
 }
@@ -57,18 +72,104 @@ function shortAction(action: string): string {
 }
 
 function bestRoundAccuracy(run: OptimizerRun): number | null {
-  const acc = bestOptimizerAccuracy(run)
-  return acc ?? null
+  return bestOptimizerAccuracy(run) ?? null
+}
+
+function roundAnalysis(round: OptimizerRound): string | null {
+  return round.failure_analysis ?? round.analysis_text ?? null
+}
+
+function failureFilter(roundNumber: number): { expected: string; predicted: string } {
+  return failureFilters.value[roundNumber] ?? { expected: '', predicted: '' }
+}
+
+function updateFailureFilter(roundNumber: number, key: 'expected' | 'predicted', event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  const current = failureFilter(roundNumber)
+  failureFilters.value = {
+    ...failureFilters.value,
+    [roundNumber]: {
+      ...current,
+      [key]: value,
+    },
+  }
+}
+
+function uniqueFailureActions(
+  failures: OptimizerRoundFailure[] | undefined,
+  key: 'expected_action' | 'predicted_action',
+): string[] {
+  if (!failures) return []
+  return [...new Set(failures.map((failure) => String(failure[key])))].sort()
+}
+
+function filteredFailures(round: OptimizerRound): OptimizerRoundFailure[] {
+  const failures = round.failures ?? []
+  const filter = failureFilter(round.round_number)
+  return failures.filter((failure) => {
+    const expectedMatches = !filter.expected || failure.expected_action === filter.expected
+    const predictedMatches = !filter.predicted || failure.predicted_action === filter.predicted
+    return expectedMatches && predictedMatches
+  })
+}
+
+function metadataEntries(metadata: Record<string, unknown> | undefined): Array<[string, string]> {
+  if (!metadata) return []
+  return Object.entries(metadata)
+    .filter(([key]) => !isSecretLikeKey(key))
+    .map(([key, value]) => [key, stringifyValue(sanitizeMetadataValue(value))])
+}
+
+function isSecretLikeKey(key: string): boolean {
+  return /(authorization|api[_-]?key|token|password|secret|x-api-key)/i.test(key)
+}
+
+function sanitizeMetadataValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((item) => sanitizeMetadataValue(item))
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => !isSecretLikeKey(key))
+      .map(([key, nestedValue]) => [key, sanitizeMetadataValue(nestedValue)]),
+  )
+}
+
+function stringifyValue(value: unknown): string {
+  if (value == null) return 'n/a'
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return JSON.stringify(value)
+}
+
+function formatStructured(value: unknown): string {
+  if (value == null) return ''
+  if (typeof value === 'string') return value
+  return JSON.stringify(value, null, 2)
+}
+
+function modelComparisonName(comparison: OptimizerModelComparison): string {
+  return comparison.model_name ?? comparison.model ?? 'Unknown model'
+}
+
+function modelComparisonDecisionLabel(comparison: OptimizerModelComparison): string {
+  if (comparison.would_keep == null) return 'n/a'
+  return comparison.would_keep ? 'Would keep' : 'Reject'
+}
+
+function modelComparisonDecisionClass(comparison: OptimizerModelComparison): string {
+  if (comparison.would_keep == null) return 'optimizer-history__kept-badge--neutral'
+  return comparison.would_keep
+    ? 'optimizer-history__kept-badge--kept'
+    : 'optimizer-history__kept-badge--rejected'
 }
 </script>
 
 <template>
   <section class="optimizer-history">
-    <!-- ── Run list ── -->
     <UiCard class="optimizer-history__list-card">
       <div class="optimizer-history__panel-head">
         <UiEyebrow>Runs</UiEyebrow>
-        <span v-if="loading" class="optimizer-history__muted">Loading…</span>
+        <span v-if="loading" class="optimizer-history__muted">Loading</span>
       </div>
       <div v-if="runs.length === 0" class="optimizer-history__empty">
         No optimizer runs yet.
@@ -84,9 +185,10 @@ function bestRoundAccuracy(run: OptimizerRun): number | null {
       >
         <div class="optimizer-history__run-item-head">
           <span class="num">#{{ run.optimizer_run_id }}</span>
-          <span class="optimizer-history__status-chip" :class="`optimizer-history__status-chip--${run.status}`">{{ run.status }}</span>
+          <span class="optimizer-history__status-chip" :class="`optimizer-history__status-chip--${run.status}`">
+            {{ run.status }}
+          </span>
         </div>
-        <!-- Model badges -->
         <div v-if="run.optimizer_model || run.evaluator_model" class="optimizer-history__model-badges">
           <span v-if="run.optimizer_model" class="optimizer-history__badge optimizer-history__badge--opt">
             opt: {{ run.optimizer_model.split('/').pop() }}
@@ -95,21 +197,18 @@ function bestRoundAccuracy(run: OptimizerRun): number | null {
             eval: {{ run.evaluator_model.split('/').pop() }}
           </span>
         </div>
-        <!-- Accuracy flow: baseline → best → test -->
         <div class="optimizer-history__acc-flow">
           <span class="num">{{ formatPercent(run.baseline_accuracy) }}</span>
-          <span class="optimizer-history__acc-arrow">→</span>
-          <span class="num" :style="{ color: 'var(--action-rebuild)' }">{{ formatPercent(bestRoundAccuracy(run)) }}</span>
-          <span class="optimizer-history__acc-arrow">→</span>
+          <span class="optimizer-history__acc-arrow">to</span>
+          <span class="num optimizer-history__best-accuracy">{{ formatPercent(bestRoundAccuracy(run)) }}</span>
+          <span class="optimizer-history__acc-arrow">to</span>
           <span class="num">{{ formatPercent(run.test_accuracy) }}</span>
         </div>
       </button>
     </UiCard>
 
-    <!-- ── Run detail ── -->
     <UiCard class="optimizer-history__detail">
       <template v-if="selectedRun">
-        <!-- Header -->
         <div class="optimizer-history__panel-head">
           <div>
             <UiEyebrow>Run detail</UiEyebrow>
@@ -118,17 +217,18 @@ function bestRoundAccuracy(run: OptimizerRun): number | null {
           <span class="optimizer-history__status-chip">{{ selectedRun.status }}</span>
         </div>
 
-        <!-- Model badges -->
         <div class="optimizer-history__model-badges optimizer-history__model-badges--large">
           <span v-if="selectedRun.optimizer_model" class="optimizer-history__badge optimizer-history__badge--opt">
             optimizer: {{ selectedRun.optimizer_model }}
           </span>
-          <span v-if="selectedRun.evaluator_provider || selectedRun.evaluator_model" class="optimizer-history__badge optimizer-history__badge--eval">
+          <span
+            v-if="selectedRun.evaluator_provider || selectedRun.evaluator_model"
+            class="optimizer-history__badge optimizer-history__badge--eval"
+          >
             eval: {{ [selectedRun.evaluator_provider, selectedRun.evaluator_model].filter(Boolean).join(' / ') }}
           </span>
         </div>
 
-        <!-- Stats row -->
         <div class="optimizer-history__stats">
           <span>Target {{ formatPercent(selectedRun.target_accuracy) }}</span>
           <span>Baseline {{ formatPercent(selectedRun.baseline_accuracy) }}</span>
@@ -140,37 +240,67 @@ function bestRoundAccuracy(run: OptimizerRun): number | null {
             :to="`/evaluate/history/${selectedRun.baseline_eval_run_id}`"
             class="optimizer-history__stats-link"
           >
-            Baseline eval ↗
+            Baseline eval
           </NuxtLink>
         </div>
 
-        <!-- Currently evaluating -->
         <div v-if="selectedRun.current_eval_run_id != null" class="optimizer-history__evaluating">
           <UiSpinner size="sm" />
-          <span>Evaluating…</span>
+          <span>Evaluating</span>
           <NuxtLink :to="`/evaluate/history/${selectedRun.current_eval_run_id}`" class="optimizer-history__link">
-            View eval #{{ selectedRun.current_eval_run_id }} ↗
+            View eval #{{ selectedRun.current_eval_run_id }}
           </NuxtLink>
         </div>
 
-        <!-- Error message -->
         <div v-if="selectedRun.error_message" class="optimizer-history__error-msg">
           {{ selectedRun.error_message }}
         </div>
 
-        <!-- Rounds -->
+        <div
+          v-if="selectedRun.model_comparisons && selectedRun.model_comparisons.length > 0"
+          class="optimizer-history__comparison"
+        >
+          <div class="optimizer-history__section-label">Model comparison</div>
+          <div class="optimizer-history__table-wrap">
+            <table class="optimizer-history__data-table">
+              <thead>
+                <tr>
+                  <th>Model</th>
+                  <th>Baseline</th>
+                  <th>Candidate</th>
+                  <th>Delta</th>
+                  <th>Failed</th>
+                  <th>Prompt</th>
+                  <th>Decision</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="comparison in selectedRun.model_comparisons" :key="modelComparisonName(comparison)">
+                  <td>{{ modelComparisonName(comparison) }}</td>
+                  <td class="num">{{ formatPercent(comparison.baseline_accuracy) }}</td>
+                  <td class="num">{{ formatPercent(comparison.candidate_accuracy) }}</td>
+                  <td class="num" :class="deltaToneClass(comparison.accuracy_delta)">
+                    {{ deltaLabel(comparison.accuracy_delta) }}
+                  </td>
+                  <td class="num">{{ comparison.failure_count ?? 'n/a' }}</td>
+                  <td class="num">{{ comparison.generated_prompt_version_id ?? 'n/a' }}</td>
+                  <td>
+                    <span
+                      class="optimizer-history__kept-badge"
+                      :class="modelComparisonDecisionClass(comparison)"
+                    >
+                      {{ modelComparisonDecisionLabel(comparison) }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <div v-if="sortedRounds.length > 0" class="optimizer-history__rounds">
-          <div
-            v-for="round in sortedRounds"
-            :key="round.round_number"
-            class="optimizer-history__round"
-          >
-            <!-- Round header row -->
-            <button
-              class="optimizer-history__round-head"
-              type="button"
-              @click="toggleRound(round.round_number)"
-            >
+          <div v-for="round in sortedRounds" :key="round.round_number" class="optimizer-history__round">
+            <button class="optimizer-history__round-head" type="button" @click="toggleRound(round.round_number)">
               <span class="num">R{{ round.round_number }}</span>
               <span
                 class="optimizer-history__kept-badge"
@@ -178,7 +308,7 @@ function bestRoundAccuracy(run: OptimizerRun): number | null {
               >
                 {{ round.kept ? 'Kept' : 'Rejected' }}
               </span>
-              <span class="num" :style="{ color: deltaColor(round.accuracy_delta) }">
+              <span class="num" :class="deltaToneClass(round.accuracy_delta)">
                 {{ deltaLabel(round.accuracy_delta) }}
               </span>
               <span class="num">{{ formatPercent(round.accuracy) }}</span>
@@ -191,46 +321,37 @@ function bestRoundAccuracy(run: OptimizerRun): number | null {
               >
                 eval #{{ round.eval_run_id }}
               </NuxtLink>
-              <NuxtLink
-                :to="`/settings`"
-                class="optimizer-history__link"
-                @click.stop
-              >
+              <NuxtLink :to="`/settings`" class="optimizer-history__link" @click.stop>
                 pv{{ round.prompt_version_id }}
               </NuxtLink>
               <span v-if="round.optimizer_model" class="optimizer-history__badge optimizer-history__badge--opt">
                 {{ round.optimizer_model.split('/').pop() }}
               </span>
-              <span class="optimizer-history__round-toggle">{{ expandedRounds.has(round.round_number) ? '▲' : '▼' }}</span>
+              <span class="optimizer-history__round-toggle">
+                {{ expandedRounds.has(round.round_number) ? 'Collapse' : 'Expand' }}
+              </span>
             </button>
 
-            <!-- Round expanded detail -->
             <div v-if="expandedRounds.has(round.round_number)" class="optimizer-history__round-detail">
-              <!-- Failure analysis -->
-              <details v-if="round.analysis_text" class="optimizer-history__analysis">
+              <details v-if="roundAnalysis(round)" class="optimizer-history__analysis">
                 <summary class="optimizer-history__analysis-summary">Failure analysis</summary>
-                <p class="optimizer-history__analysis-body">{{ round.analysis_text }}</p>
+                <p class="optimizer-history__analysis-body">{{ roundAnalysis(round) }}</p>
               </details>
 
-              <!-- Confusion matrix -->
               <div v-if="round.confusion_matrix && Object.keys(round.confusion_matrix).length > 0" class="optimizer-history__matrix">
-                <div class="optimizer-history__matrix-label">Confusion matrix</div>
+                <div class="optimizer-history__section-label">Confusion matrix</div>
                 <div class="optimizer-history__matrix-wrap">
                   <table class="optimizer-history__matrix-table">
                     <thead>
                       <tr>
-                        <th class="optimizer-history__matrix-corner">expected ↓ / predicted →</th>
-                        <th
-                          v-for="col in confusionPredictedActions(round.confusion_matrix)"
-                          :key="col"
-                        >{{ shortAction(col) }}</th>
+                        <th class="optimizer-history__matrix-corner">expected / predicted</th>
+                        <th v-for="col in confusionPredictedActions(round.confusion_matrix)" :key="col">
+                          {{ shortAction(col) }}
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr
-                        v-for="(predicted, expected) in round.confusion_matrix"
-                        :key="expected"
-                      >
+                      <tr v-for="(predicted, expected) in round.confusion_matrix" :key="expected">
                         <td class="optimizer-history__matrix-row-label">{{ shortAction(String(expected)) }}</td>
                         <td
                           v-for="col in confusionPredictedActions(round.confusion_matrix)"
@@ -243,6 +364,81 @@ function bestRoundAccuracy(run: OptimizerRun): number | null {
                       </tr>
                     </tbody>
                   </table>
+                </div>
+              </div>
+
+              <div v-if="round.failures && round.failures.length > 0" class="optimizer-history__failures">
+                <div class="optimizer-history__section-label">Failure samples</div>
+                <div class="optimizer-history__failure-filters">
+                  <label>
+                    Expected
+                    <select
+                      :value="failureFilter(round.round_number).expected"
+                      @change="updateFailureFilter(round.round_number, 'expected', $event)"
+                    >
+                      <option value="">All</option>
+                      <option
+                        v-for="action in uniqueFailureActions(round.failures, 'expected_action')"
+                        :key="action"
+                        :value="action"
+                      >
+                        {{ shortAction(action) }}
+                      </option>
+                    </select>
+                  </label>
+                  <label>
+                    Predicted
+                    <select
+                      :value="failureFilter(round.round_number).predicted"
+                      @change="updateFailureFilter(round.round_number, 'predicted', $event)"
+                    >
+                      <option value="">All</option>
+                      <option
+                        v-for="action in uniqueFailureActions(round.failures, 'predicted_action')"
+                        :key="action"
+                        :value="action"
+                      >
+                        {{ shortAction(action) }}
+                      </option>
+                    </select>
+                  </label>
+                </div>
+
+                <div class="optimizer-history__failure-list">
+                  <details
+                    v-for="(failure, index) in filteredFailures(round)"
+                    :key="`${failure.expected_action}-${failure.predicted_action}-${index}`"
+                    class="optimizer-history__failure"
+                  >
+                    <summary class="optimizer-history__failure-summary">
+                      <span>{{ shortAction(String(failure.expected_action)) }}</span>
+                      <span class="optimizer-history__acc-arrow">to</span>
+                      <span>{{ shortAction(String(failure.predicted_action)) }}</span>
+                      <span class="num">{{ formatConfidence(failure.confidence) }}</span>
+                    </summary>
+                    <div class="optimizer-history__failure-detail">
+                      <div class="optimizer-history__log-preview">{{ failure.log_snippet }}</div>
+                      <div v-if="metadataEntries(failure.hardware_info).length > 0" class="optimizer-history__metadata">
+                        <span
+                          v-for="[key, value] in metadataEntries(failure.hardware_info)"
+                          :key="key"
+                          class="optimizer-history__metadata-item"
+                        >
+                          <strong>{{ key }}</strong>: {{ value }}
+                        </span>
+                      </div>
+                      <pre v-if="failure.parsed_output != null" class="optimizer-history__structured-output">{{
+                        formatStructured(failure.parsed_output)
+                      }}</pre>
+                      <details v-if="failure.raw_output" class="optimizer-history__raw-output">
+                        <summary>Raw evaluator output</summary>
+                        <pre>{{ failure.raw_output }}</pre>
+                      </details>
+                    </div>
+                  </details>
+                  <div v-if="filteredFailures(round).length === 0" class="optimizer-history__empty optimizer-history__empty--compact">
+                    No failure samples match the selected filters.
+                  </div>
                 </div>
               </div>
             </div>
@@ -267,133 +463,435 @@ function bestRoundAccuracy(run: OptimizerRun): number | null {
   gap: 14px;
   align-items: start;
 }
-@media (max-width: 900px) { .optimizer-history { grid-template-columns: 1fr; } }
 
-.optimizer-history__list-card { display: flex; flex-direction: column; gap: 0; padding: 0; overflow: hidden; }
-.optimizer-history__panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; }
-.optimizer-history__muted { color: var(--fg-4); font-size: 12px; }
-.optimizer-history__empty {
-  display: flex; justify-content: center; border: 1px dashed var(--border-subtle);
-  border-radius: var(--r-md); padding: 22px; color: var(--fg-4); font-size: 13px; text-align: center; margin: 12px;
+@media (max-width: 900px) {
+  .optimizer-history {
+    grid-template-columns: 1fr;
+  }
 }
-.optimizer-history__empty--compact { min-height: 48px; align-items: center; margin: 0; }
 
-/* Run list items */
+.optimizer-history__list-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.optimizer-history__panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.optimizer-history__muted {
+  color: var(--fg-4);
+  font-size: 12px;
+}
+
+.optimizer-history__empty {
+  display: flex;
+  justify-content: center;
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--r-md);
+  margin: 12px;
+  padding: 22px;
+  color: var(--fg-4);
+  font-size: 13px;
+  text-align: center;
+}
+
+.optimizer-history__empty--compact {
+  min-height: 48px;
+  align-items: center;
+  margin: 0;
+}
+
 .optimizer-history__run-item {
-  display: flex; flex-direction: column; gap: 6px;
-  width: 100%; border: 0; border-bottom: 1px solid var(--border-subtle);
-  padding: 10px 14px; background: transparent; color: var(--fg-2); cursor: pointer; text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 10px 14px;
+  background: transparent;
+  color: var(--fg-2);
+  cursor: pointer;
+  text-align: left;
   transition: background var(--dur-fast);
 }
+
 .optimizer-history__run-item:hover,
-.optimizer-history__run-item--active { background: var(--bg-2); color: var(--fg-0); }
-.optimizer-history__run-item:last-child { border-bottom: none; }
+.optimizer-history__run-item--active {
+  background: var(--bg-2);
+  color: var(--fg-0);
+}
 
-.optimizer-history__run-item-head { display: flex; align-items: center; gap: 8px; }
+.optimizer-history__run-item:last-child {
+  border-bottom: none;
+}
+
+.optimizer-history__run-item-head,
+.optimizer-history__acc-flow,
+.optimizer-history__model-badges,
+.optimizer-history__stats,
+.optimizer-history__evaluating,
+.optimizer-history__round-head,
+.optimizer-history__failure-summary,
+.optimizer-history__failure-filters {
+  display: flex;
+  align-items: center;
+}
+
+.optimizer-history__run-item-head,
+.optimizer-history__evaluating,
+.optimizer-history__failure-summary {
+  gap: 8px;
+}
+
+.optimizer-history__acc-flow,
+.optimizer-history__model-badges,
+.optimizer-history__stats,
+.optimizer-history__failure-filters {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .optimizer-history__acc-flow {
-  display: flex; align-items: center; gap: 6px;
-  font-family: var(--font-mono); font-size: 11px; color: var(--fg-3);
+  color: var(--fg-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
 }
-.optimizer-history__acc-arrow { color: var(--fg-4); }
 
-/* Status chip */
+.optimizer-history__acc-arrow {
+  color: var(--fg-4);
+}
+
+.optimizer-history__best-accuracy,
+.optimizer-history__delta--positive {
+  color: var(--action-rebuild);
+}
+
+.optimizer-history__delta--negative {
+  color: var(--action-notify);
+}
+
+.optimizer-history__delta--neutral {
+  color: var(--fg-4);
+}
+
 .optimizer-history__status-chip {
-  border: 1px solid var(--border); border-radius: var(--r-pill);
-  padding: 2px 8px; font-family: var(--font-mono); font-size: 10px; color: var(--fg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 2px 8px;
+  color: var(--fg-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
 }
 
-/* Model badges */
-.optimizer-history__model-badges { display: flex; flex-wrap: wrap; gap: 4px; }
-.optimizer-history__model-badges--large { margin-bottom: 4px; }
+.optimizer-history__model-badges--large {
+  margin-bottom: 4px;
+}
+
 .optimizer-history__badge {
-  font-family: var(--font-mono); font-size: 10px;
-  border-radius: var(--r-sm); padding: 2px 7px; white-space: nowrap;
+  border-radius: var(--r-sm);
+  padding: 2px 7px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  white-space: nowrap;
 }
-.optimizer-history__badge--opt { color: #a78bfa; background: rgba(167,139,250,0.12); }
-.optimizer-history__badge--eval { color: #60a5fa; background: rgba(96,165,250,0.12); }
 
-/* Detail panel */
-.optimizer-history__detail { display: flex; flex-direction: column; gap: 14px; }
-.optimizer-history__title { margin: 4px 0 0; color: var(--fg-0); font-size: 18px; font-weight: 600; }
+.optimizer-history__badge--opt {
+  background: rgba(167, 139, 250, 0.12);
+  color: #a78bfa;
+}
 
-.optimizer-history__stats {
-  display: flex; flex-wrap: wrap; gap: 6px;
+.optimizer-history__badge--eval {
+  background: rgba(96, 165, 250, 0.12);
+  color: #60a5fa;
 }
-.optimizer-history__stats span {
-  border: 1px solid var(--border-subtle); border-radius: var(--r-sm);
-  padding: 4px 8px; color: var(--fg-3); font-family: var(--font-mono); font-size: 11px;
+
+.optimizer-history__detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
+
+.optimizer-history__title {
+  margin: 4px 0 0;
+  color: var(--fg-0);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.optimizer-history__stats span,
 .optimizer-history__stats-link {
-  border: 1px solid var(--border-subtle); border-radius: var(--r-sm);
-  padding: 4px 8px; color: var(--accent); font-family: var(--font-mono); font-size: 11px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 4px 8px;
+  color: var(--fg-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.optimizer-history__stats-link,
+.optimizer-history__link {
+  color: var(--accent);
   text-decoration: none;
 }
-.optimizer-history__stats-link:hover { text-decoration: underline; }
+
+.optimizer-history__stats-link:hover,
+.optimizer-history__link:hover {
+  text-decoration: underline;
+}
 
 .optimizer-history__evaluating {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 12px; border-radius: var(--r-md);
-  background: var(--bg-2); border: 1px solid var(--border-subtle);
-  font-size: 13px; color: var(--fg-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+  background: var(--bg-2);
+  color: var(--fg-3);
+  font-size: 13px;
 }
+
 .optimizer-history__error-msg {
-  padding: 8px 12px; border-radius: var(--r-md);
-  background: var(--action-notify-soft); border: 1px solid rgba(239,68,68,0.2);
-  font-size: 12px; color: var(--action-notify); font-family: var(--font-mono);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+  background: var(--action-notify-soft);
+  color: var(--action-notify);
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 
-.optimizer-history__link { color: var(--accent); text-decoration: none; font-size: 11px; font-family: var(--font-mono); }
-.optimizer-history__link:hover { text-decoration: underline; }
+.optimizer-history__link {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
 
-/* Rounds */
-.optimizer-history__rounds { display: flex; flex-direction: column; gap: 4px; }
+.optimizer-history__rounds,
+.optimizer-history__round-detail,
+.optimizer-history__failure-list,
+.optimizer-history__failure-detail {
+  display: flex;
+  flex-direction: column;
+}
+
+.optimizer-history__rounds {
+  gap: 4px;
+}
+
 .optimizer-history__round {
-  border: 1px solid var(--border-subtle); border-radius: var(--r-md); overflow: hidden;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
 }
+
 .optimizer-history__round-head {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  width: 100%; padding: 10px 12px; background: transparent; border: none;
-  cursor: pointer; text-align: left; font-size: 12px; color: var(--fg-2);
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  padding: 10px 12px;
+  background: transparent;
+  color: var(--fg-2);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
   transition: background var(--dur-fast);
 }
-.optimizer-history__round-head:hover { background: var(--bg-2); }
-.optimizer-history__round-toggle { margin-left: auto; color: var(--fg-4); font-size: 10px; }
+
+.optimizer-history__round-head:hover {
+  background: var(--bg-2);
+}
+
+.optimizer-history__round-toggle {
+  margin-left: auto;
+  color: var(--fg-4);
+  font-size: 10px;
+}
 
 .optimizer-history__kept-badge {
-  border-radius: var(--r-pill); padding: 2px 8px; font-size: 10px; font-weight: 600;
+  border-radius: var(--r-pill);
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
 }
-.optimizer-history__kept-badge--kept { color: var(--action-rebuild); background: var(--action-rebuild-soft); }
-.optimizer-history__kept-badge--rejected { color: var(--action-notify); background: var(--action-notify-soft); }
 
-/* Round detail */
+.optimizer-history__kept-badge--kept {
+  background: var(--action-rebuild-soft);
+  color: var(--action-rebuild);
+}
+
+.optimizer-history__kept-badge--rejected {
+  background: var(--action-notify-soft);
+  color: var(--action-notify);
+}
+
+.optimizer-history__kept-badge--neutral {
+  background: var(--bg-2);
+  color: var(--fg-4);
+}
+
 .optimizer-history__round-detail {
-  display: flex; flex-direction: column; gap: 12px;
-  padding: 12px; border-top: 1px solid var(--border-subtle); background: var(--bg-1);
-}
-
-/* Failure analysis */
-.optimizer-history__analysis { border: 1px solid var(--border-subtle); border-radius: var(--r-sm); }
-.optimizer-history__analysis-summary {
-  padding: 8px 12px; cursor: pointer; font-size: 12px; font-weight: 600;
-  color: var(--fg-3); list-style: none; user-select: none;
-}
-.optimizer-history__analysis-summary::-webkit-details-marker { display: none; }
-.optimizer-history__analysis-body {
-  padding: 8px 12px 12px; font-size: 12px; color: var(--fg-2); line-height: 1.6;
-  white-space: pre-wrap; max-height: 300px; overflow-y: auto; margin: 0;
+  gap: 12px;
   border-top: 1px solid var(--border-subtle);
+  padding: 12px;
+  background: var(--bg-1);
 }
 
-/* Confusion matrix */
-.optimizer-history__matrix-label { font-size: 11px; font-weight: 600; color: var(--fg-4); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
-.optimizer-history__matrix-wrap { overflow-x: auto; border: 1px solid var(--border-subtle); border-radius: var(--r-sm); }
-.optimizer-history__matrix-table { border-collapse: collapse; font-size: 11px; font-family: var(--font-mono); }
-.optimizer-history__matrix-table th, .optimizer-history__matrix-table td {
-  border: 1px solid var(--border-subtle); padding: 5px 10px; text-align: center;
+.optimizer-history__analysis,
+.optimizer-history__failure,
+.optimizer-history__raw-output {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
 }
-.optimizer-history__matrix-table th { background: var(--bg-2); color: var(--fg-4); font-weight: 500; }
-.optimizer-history__matrix-corner { text-align: left; font-size: 10px; min-width: 100px; }
-.optimizer-history__matrix-row-label { background: var(--bg-2); color: var(--fg-3); text-align: left; font-weight: 500; }
-.optimizer-history__matrix-cell { color: var(--fg-4); }
-.optimizer-history__matrix-cell--nonzero { color: var(--action-notify); font-weight: 700; background: var(--action-notify-soft); }
+
+.optimizer-history__analysis-summary,
+.optimizer-history__failure-summary,
+.optimizer-history__raw-output summary {
+  padding: 8px 12px;
+  color: var(--fg-3);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  user-select: none;
+}
+
+.optimizer-history__analysis-body,
+.optimizer-history__log-preview,
+.optimizer-history__structured-output,
+.optimizer-history__raw-output pre {
+  max-height: 220px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.optimizer-history__analysis-body {
+  border-top: 1px solid var(--border-subtle);
+  margin: 0;
+  padding: 8px 12px 12px;
+  color: var(--fg-2);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.optimizer-history__section-label {
+  margin-bottom: 6px;
+  color: var(--fg-4);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.optimizer-history__matrix-wrap,
+.optimizer-history__table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+}
+
+.optimizer-history__matrix-table,
+.optimizer-history__data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.optimizer-history__matrix-table th,
+.optimizer-history__matrix-table td,
+.optimizer-history__data-table th,
+.optimizer-history__data-table td {
+  border: 1px solid var(--border-subtle);
+  padding: 5px 10px;
+  text-align: left;
+}
+
+.optimizer-history__matrix-table th,
+.optimizer-history__data-table th {
+  background: var(--bg-2);
+  color: var(--fg-4);
+  font-weight: 500;
+}
+
+.optimizer-history__matrix-cell {
+  color: var(--fg-4);
+  text-align: center;
+}
+
+.optimizer-history__matrix-cell--nonzero {
+  background: var(--action-notify-soft);
+  color: var(--action-notify);
+  font-weight: 700;
+}
+
+.optimizer-history__matrix-row-label {
+  background: var(--bg-2);
+  color: var(--fg-3);
+  font-weight: 500;
+}
+
+.optimizer-history__matrix-corner {
+  min-width: 120px;
+  font-size: 10px;
+}
+
+.optimizer-history__failure-filters label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-4);
+  font-size: 11px;
+}
+
+.optimizer-history__failure-filters select {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 4px 8px;
+  background: var(--bg-2);
+  color: var(--fg-2);
+  font-size: 11px;
+}
+
+.optimizer-history__failure-list {
+  gap: 8px;
+}
+
+.optimizer-history__failure-detail {
+  gap: 8px;
+  border-top: 1px solid var(--border-subtle);
+  padding: 10px 12px;
+}
+
+.optimizer-history__log-preview,
+.optimizer-history__structured-output,
+.optimizer-history__raw-output pre {
+  border-radius: var(--r-sm);
+  margin: 0;
+  padding: 8px;
+  background: var(--bg-inset);
+  color: var(--fg-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.optimizer-history__metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.optimizer-history__metadata-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 3px 6px;
+  color: var(--fg-3);
+  font-size: 11px;
+}
 </style>

@@ -1,0 +1,29 @@
+{
+  "from": "developer",
+  "to": "qa",
+  "feature": "frontend-optimizer-diagnostics",
+  "status": "ready",
+  "summary": "Implemented optimizer diagnostics UI additions for optional failed case samples, failure_analysis fallback, safe metadata/raw-output handling, and optional model comparison results while preserving existing optimizer history diagnostics.",
+  "changed_files": [
+    "types/api.ts",
+    "components/optimizer/OptimizerHistory.vue",
+    "tests/optimizerHistory.test.ts",
+    "openspec/changes/frontend-optimizer-diagnostics/tasks.md",
+    "specs/frontend-optimizer-diagnostics/handoff-dev.json"
+  ],
+  "ac_ref": "openspec/changes/frontend-optimizer-diagnostics/tasks.md",
+  "verification": [
+    "node_modules\\.bin\\vitest.CMD run tests\\optimizerHistory.test.ts --reporter=verbose",
+    "node_modules\\.bin\\vitest.CMD run tests\\optimizerHistory.test.ts tests\\optimizerState.test.ts",
+    "corepack.cmd pnpm vue-tsc --noEmit",
+    "corepack pnpm build",
+    "openspec.cmd validate frontend-optimizer-diagnostics --strict",
+    "Select-String -Path components\\optimizer\\OptimizerHistory.vue -Pattern ':style=|style='",
+    "Reviewer FAIL fix: nested hardware_info secret-like keys are recursively sanitized; targeted Vitest/vue-tsc/OpenSpec/diff-check reran successfully."
+  ],
+  "known_gaps": [
+    "Verification ran under Node v22.19.0 while package engines request Node 20.19.x; pnpm emitted an unsupported engine warning but tests, type-check, and build completed.",
+    "Implementation assumes model comparison rows arrive on OptimizerRun.model_comparisons; the backend spec describes the display contract but does not show an exact JSON example for comparison rows.",
+    "No new endpoint was added; diagnostics are read from the existing optimizer history payload as optional fields."
+  ]
+}
