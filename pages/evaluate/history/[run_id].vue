@@ -35,8 +35,9 @@ function formatDate(iso: string): string {
 }
 
 function duration(currentRun: EvalRun): string {
+  if (!currentRun.finished_at) return '--'
   const ms = new Date(currentRun.finished_at).getTime() - new Date(currentRun.started_at).getTime()
-  return Number.isFinite(ms) ? `${(ms / 1000).toFixed(1)}s` : '--'
+  return Number.isFinite(ms) && ms >= 0 ? `${(ms / 1000).toFixed(1)}s` : '--'
 }
 
 function formatLatency(ms: number | null): string {
