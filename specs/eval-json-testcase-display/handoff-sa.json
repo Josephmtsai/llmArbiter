@@ -1,0 +1,25 @@
+{
+  "from": "sa",
+  "to": "developer",
+  "feature": "eval-json-testcase-display",
+  "status": "ready",
+  "summary": "Reworked the eval display OpenSpec change to follow docs/frontend-eval-display-guide.md from main: classify manual vs optimizer eval runs, add status-aware history display, link optimizer baseline/round eval runs, and keep eval pool display aggregate-only.",
+  "artifacts": [
+    "openspec/changes/eval-json-testcase-display/proposal.md",
+    "openspec/changes/eval-json-testcase-display/design.md",
+    "openspec/changes/eval-json-testcase-display/tasks.md",
+    "openspec/changes/eval-json-testcase-display/specs/eval-run-source-tagging/spec.md",
+    "openspec/changes/eval-json-testcase-display/specs/optimizer-eval-link-display/spec.md",
+    "openspec/changes/eval-json-testcase-display/specs/eval-history-list/spec.md",
+    "openspec/changes/eval-json-testcase-display/specs/eval-run-detail/spec.md",
+    "openspec/changes/eval-json-testcase-display/specs/optimizer-pool-evaluation/spec.md"
+  ],
+  "assumptions": [
+    "The guide exists on main at docs/frontend-eval-display-guide.md in commit b9a8a17, but this detached worktree at 9f180bb does not currently contain that file.",
+    "docs/frontend-optimizer-eval-link.md also exists on main and reinforces baseline_eval_run_id and rounds[].eval_run_id display behavior.",
+    "GET /evaluate/history does not expose source, so frontend source classification must cross-reference optimizer history until backend adds source: db | pool.",
+    "The guide recommends displaying eval pool aggregate stats, not raw eval_pool.json cases or raw test case logs as the main optimizer UI.",
+    "The original eval_json raw test-case-display assumption was replaced by the committed guide's actual requirements.",
+    "Graphify impact query was attempted but graphify-out/graph.json is absent in this workspace."
+  ]
+}

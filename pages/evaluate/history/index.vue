@@ -1,22 +1,33 @@
 <script setup lang="ts">
 import type { EvalRun } from '~/types/api'
+import {
+  collectOptimizerEvalRunIds,
+  getEvalRunSource,
+  getRunAccuracyDisplay,
+} from '~/utils/evalDisplay'
 
 definePageMeta({ middleware: 'auth' })
 
 const api = useApi()
 const runs = ref<EvalRun[]>([])
+const optimizerEvalRunIds = ref<Set<number>>(new Set())
 const loading = ref(true)
 const error = ref<string | null>(null)
+const sourceWarning = ref<string | null>(null)
 const deleteErrors = ref<Record<number, string>>({})
 
-function accuracyColor(acc: number): string {
-  if (acc >= 0.8) return 'var(--action-rebuild)'
-  if (acc >= 0.5) return 'var(--action-fallback)'
-  return 'var(--action-notify)'
+function sourceLabel(run: EvalRun): string {
+  return getEvalRunSource(run, optimizerEvalRunIds.value) === 'optimizer' ? 'Opt' : 'Manual'
 }
 
-function formatAccuracy(acc: number): string {
-  return (acc * 100).toFixed(1) + '%'
+function sourceClass(run: EvalRun): string {
+  return getEvalRunSource(run, optimizerEvalRunIds.value) === 'optimizer'
+    ? 'arb-history__source--optimizer'
+    : 'arb-history__source--manual'
+}
+
+function statusLabel(status: string | undefined): string {
+  return status ?? 'completed'
 }
 
 function formatDate(iso: string): string {
@@ -31,10 +42,28 @@ function durationSecs(run: EvalRun): string {
 async function load() {
   loading.value = true
   error.value = null
+  sourceWarning.value = null
   try {
-    const res = await api.getEvalHistory()
-    if (res.status === 'success') runs.value = res.data.runs
-    else error.value = res.message
+    const [historyResult, optimizerResult] = await Promise.allSettled([
+      api.getEvalHistory(),
+      api.getOptimizerHistory(),
+    ])
+    if (historyResult.status === 'fulfilled' && historyResult.value.status === 'success') {
+      runs.value = historyResult.value.data.runs
+    } else {
+      error.value =
+        historyResult.status === 'fulfilled'
+          ? historyResult.value.message
+          : historyResult.reason instanceof Error
+            ? historyResult.reason.message
+            : 'Load failed'
+    }
+    if (optimizerResult.status === 'fulfilled' && optimizerResult.value.status === 'success') {
+      optimizerEvalRunIds.value = collectOptimizerEvalRunIds(optimizerResult.value.data.runs)
+    } else {
+      optimizerEvalRunIds.value = new Set()
+      sourceWarning.value = 'Optimizer source tags unavailable.'
+    }
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Load failed'
   } finally {
@@ -78,6 +107,8 @@ onMounted(load)
         <thead>
           <tr>
             <th>Run</th>
+            <th>Source</th>
+            <th>Status</th>
             <th>Prompt Ver.</th>
             <th>Provider</th>
             <th>Model</th>
@@ -97,12 +128,20 @@ onMounted(load)
             @click="navigateTo(`/evaluate/history/${run.run_id}`)"
           >
             <td class="num">#{{ run.run_id }}</td>
+            <td>
+              <span class="arb-history__source" :class="sourceClass(run)">
+                {{ sourceLabel(run) }}
+              </span>
+            </td>
+            <td>
+              <span class="arb-history__status">{{ statusLabel(run.status) }}</span>
+            </td>
             <td class="num">v{{ run.prompt_version_id }}</td>
             <td>{{ run.provider }}</td>
             <td class="mono">{{ run.model }}</td>
             <td>
-              <span class="arb-history__acc" :style="{ color: accuracyColor(run.accuracy) }">
-                {{ formatAccuracy(run.accuracy) }}
+              <span class="arb-history__acc" :style="{ color: getRunAccuracyDisplay(run).color }">
+                {{ getRunAccuracyDisplay(run).label }}
               </span>
             </td>
             <td class="num">{{ run.correct }} / {{ run.total }}</td>
@@ -125,6 +164,7 @@ onMounted(load)
           </tr>
         </tbody>
       </table>
+      <div v-if="sourceWarning" class="arb-history__source-warning">{{ sourceWarning }}</div>
     </div>
   </div>
 </template>
@@ -185,6 +225,34 @@ onMounted(load)
   font-weight: 700;
   font-family: var(--font-mono);
   font-size: 13px;
+}
+.arb-history__source,
+.arb-history__status {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 3px 7px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.arb-history__source--optimizer {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.arb-history__source--manual {
+  color: var(--fg-3);
+  background: var(--bg-2);
+}
+.arb-history__status {
+  color: var(--fg-3);
+  background: var(--bg-2);
+}
+.arb-history__source-warning {
+  border-top: 1px solid var(--border-subtle);
+  padding: 8px 12px;
+  color: var(--fg-4);
+  font-size: 12px;
 }
 .arb-history__date { color: var(--fg-4); }
 .num { font-family: var(--font-mono); font-size: 12px; }
