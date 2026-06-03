@@ -79,7 +79,7 @@ async function loadHistory() {
   loadingHistory.value = true
   try {
     const res = await api.getEvalHistory()
-    if (res.status === 'success') history.value = res.data.runs.filter(r => r.source !== 'pool')
+    if (res.status === 'success') history.value = res.data.runs
   } catch { /* silent */ } finally {
     loadingHistory.value = false
   }

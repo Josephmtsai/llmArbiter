@@ -60,8 +60,12 @@ async function fetchCompare() {
   error.value = null
   try {
     const res = await api.getEvalCompare(activeDimension.value)
-    if (res.status === 'success') groups.value = res.data.groups
-    else error.value = res.message
+    if (res.status === 'success') {
+      groups.value = res.data.groups.map(g => ({
+        ...g,
+        runs: g.runs.filter(r => r.source == null || r.source === 'manual'),
+      }))
+    } else error.value = res.message
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Load failed'
   } finally {

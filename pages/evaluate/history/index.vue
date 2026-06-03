@@ -33,7 +33,7 @@ async function load() {
   error.value = null
   try {
     const res = await api.getEvalHistory()
-    if (res.status === 'success') runs.value = res.data.runs.filter(r => r.source !== 'pool')
+    if (res.status === 'success') runs.value = res.data.runs
     else error.value = res.message
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Load failed'

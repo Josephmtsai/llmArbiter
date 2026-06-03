@@ -171,8 +171,13 @@ export function useApi() {
       return { ...res, data: list }
     },
 
-    getEvalHistory: () =>
-      api<ArbiterResponse<{ runs: EvalRun[] }>>('/evaluate/history'),
+    getEvalHistory: async () => {
+      const res = await api<ArbiterResponse<{ runs: EvalRun[] }>>('/evaluate/history')
+      if (res.status === 'success') {
+        res.data.runs = res.data.runs.filter(r => r.source == null || r.source === 'manual')
+      }
+      return res
+    },
 
     getEvalRunDetail: (runId: number) =>
       api<ArbiterResponse<EvalRunDetail>>(`/evaluate/history/${runId}`),
