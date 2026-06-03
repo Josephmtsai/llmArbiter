@@ -84,7 +84,7 @@ function bestRoundAccuracy(run: OptimizerRun): number | null {
       >
         <div class="optimizer-history__run-item-head">
           <span class="num">#{{ run.optimizer_run_id }}</span>
-          <span class="optimizer-history__status-chip optimizer-history__status-chip--{{ run.status }}">{{ run.status }}</span>
+          <span class="optimizer-history__status-chip" :class="`optimizer-history__status-chip--${run.status}`">{{ run.status }}</span>
         </div>
         <!-- Model badges -->
         <div v-if="run.optimizer_model || run.evaluator_model" class="optimizer-history__model-badges">

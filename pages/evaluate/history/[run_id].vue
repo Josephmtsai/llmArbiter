@@ -21,6 +21,7 @@ const failuresOnly = ref(false)
 const deleting = ref(false)
 const deleteError = ref<string | null>(null)
 const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
+let loadSeq = 0
 
 const runId = computed(() => Number(route.params.run_id))
 const displayedResults = computed(() =>
@@ -51,11 +52,13 @@ function stopPolling() {
 }
 
 async function load() {
+  const seq = ++loadSeq
   loading.value = true
   error.value = null
   notFound.value = false
   try {
     const res = await api.getEvalRunDetail(runId.value)
+    if (seq !== loadSeq) return
     if (res.status === 'success') {
       run.value = res.data.run
       results.value = res.data.results
@@ -64,6 +67,7 @@ async function load() {
         pollTimer.value = setInterval(async () => {
           try {
             const poll = await api.getEvalRunDetail(runId.value)
+            if (seq !== loadSeq) return
             if (poll.status === 'success') {
               run.value = poll.data.run
               if (poll.data.run.status !== 'running') {
@@ -78,11 +82,12 @@ async function load() {
       error.value = res.message
     }
   } catch (e: unknown) {
+    if (seq !== loadSeq) return
     const msg = e instanceof Error ? e.message : String(e)
     if (msg.includes('run-not-found') || msg.includes('404')) notFound.value = true
     else error.value = msg
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 
