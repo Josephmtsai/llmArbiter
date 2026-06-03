@@ -46,6 +46,7 @@ function mountHistory(selectedRun: OptimizerRun) {
       stubs: {
         UiCard: { template: '<div><slot /></div>' },
         UiEyebrow: { template: '<span><slot /></span>' },
+        UiSpinner: { template: '<span />' },
         NuxtLink: {
           props: ['to'],
           template: '<a :href="to"><slot /></a>',
@@ -59,14 +60,16 @@ describe('OptimizerHistory', () => {
   it('renders baseline and round eval links while handling null round IDs', () => {
     const wrapper = mountHistory(makeRun({}))
 
+    // baseline eval link in stats row
     expect(wrapper.html()).toContain('/evaluate/history/24')
+    // round 1 has eval_run_id=25 → link rendered
     expect(wrapper.html()).toContain('/evaluate/history/25')
-    expect(wrapper.text()).toContain('n/a')
+    // kept/rejected badges reflect new labels
     expect(wrapper.text()).toContain('Kept')
-    expect(wrapper.text()).toContain('Reverted')
+    expect(wrapper.text()).toContain('Rejected')
   })
 
-  it('renders direct baseline pass messaging for completed runs without rounds', () => {
+  it('renders no-rounds empty state for completed runs without rounds', () => {
     const wrapper = mountHistory(
       makeRun({
         status: 'completed',
@@ -75,7 +78,9 @@ describe('OptimizerHistory', () => {
       }),
     )
 
-    expect(wrapper.text()).toContain('Baseline already met the target')
+    // baseline link still shown in stats
     expect(wrapper.html()).toContain('/evaluate/history/18')
+    // no-rounds empty state
+    expect(wrapper.text()).toContain('No rounds yet.')
   })
 })
