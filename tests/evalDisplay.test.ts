@@ -5,6 +5,8 @@ import {
   collectOptimizerEvalRunIds,
   countFailedResults,
   getEvalRunSource,
+  getEvalRunSourceLabel,
+  getEvalRunSourceTone,
   getRunAccuracyDisplay,
 } from '../utils/evalDisplay'
 import type { EvalRun, EvalRunResult, OptimizerRun } from '../types/api'
@@ -81,9 +83,25 @@ describe('eval display helpers', () => {
     expect([...ids].sort((a, b) => a - b)).toEqual([24, 25])
   })
 
-  it('tags eval runs as optimizer when their run ID is in the optimizer set', () => {
+  it('uses backend eval run source before falling back to optimizer run IDs', () => {
+    expect(getEvalRunSource(makeEvalRun({ run_id: 25, source: 'db' }), new Set([24, 25]))).toBe('db')
+    expect(getEvalRunSource(makeEvalRun({ run_id: 26, source: 'pool' }), new Set([24, 25]))).toBe('pool')
+    expect(getEvalRunSource(makeEvalRun({ run_id: 27, source: 'optimizer' }), new Set([24, 25]))).toBe(
+      'optimizer',
+    )
     expect(getEvalRunSource(makeEvalRun({ run_id: 25 }), new Set([24, 25]))).toBe('optimizer')
-    expect(getEvalRunSource(makeEvalRun({ run_id: 26 }), new Set([24, 25]))).toBe('manual')
+    expect(getEvalRunSource(makeEvalRun({ run_id: 26 }), new Set([24, 25]))).toBeNull()
+  })
+
+  it('formats eval run source badge labels and tones', () => {
+    expect(getEvalRunSourceLabel('db')).toBe('Manual')
+    expect(getEvalRunSourceLabel('pool')).toBe('Pool')
+    expect(getEvalRunSourceLabel('optimizer')).toBe('Optimizer')
+    expect(getEvalRunSourceLabel(null)).toBe('')
+    expect(getEvalRunSourceTone('db')).toBe('manual')
+    expect(getEvalRunSourceTone('pool')).toBe('pool')
+    expect(getEvalRunSourceTone('optimizer')).toBe('optimizer')
+    expect(getEvalRunSourceTone(null)).toBeNull()
   })
 
   it('formats completed accuracy and hides failed or running accuracy', () => {
@@ -103,9 +121,9 @@ describe('eval display helpers', () => {
       label: '--',
       color: 'var(--fg-4)',
     })
-    expect(getRunAccuracyDisplay(makeEvalRun({ accuracy: 0, status: 'running' }))).toEqual({
-      label: '--',
-      color: 'var(--fg-4)',
+    expect(getRunAccuracyDisplay(makeEvalRun({ accuracy: 0.115, status: 'running' }))).toEqual({
+      label: '11.5%',
+      color: 'var(--action-notify)',
     })
     expect(getRunAccuracyDisplay(makeEvalRun({ accuracy: 0, status: 'pending' }))).toEqual({
       label: '--',

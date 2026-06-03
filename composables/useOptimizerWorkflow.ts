@@ -29,6 +29,7 @@ export function useOptimizerWorkflow() {
   const activeTab = ref<OptimizerTab>('overview')
   const stats = ref<EvalPoolStats | null>(null)
   const optimizerRuns = ref<OptimizerRun[]>([])
+  const optimizerRunDetails = ref<Record<number, OptimizerRun>>({})
   const reviewItems = ref<ReviewQueueEntry[]>([])
   const reviewTotal = ref(0)
   const prompts = ref<PromptVersion[]>([])
@@ -36,6 +37,7 @@ export function useOptimizerWorkflow() {
 
   const loadingStats = ref(false)
   const loadingHistory = ref(false)
+  const loadingRunDetail = ref(false)
   const loadingReview = ref(false)
   const loadingPrompts = ref(false)
   const globalError = ref<string | null>(null)
@@ -67,9 +69,11 @@ export function useOptimizerWorkflow() {
     optimizerRuns.value.find(run => run.status === 'running' || run.status === 'cancelling') ?? null,
   )
   const latestRun = computed(() => optimizerRuns.value[0] ?? null)
-  const selectedRun = computed(() =>
-    optimizerRuns.value.find(run => run.optimizer_run_id === selectedRunId.value) ?? latestRun.value,
-  )
+  const selectedRun = computed(() => {
+    const id = selectedRunId.value ?? latestRun.value?.optimizer_run_id ?? null
+    if (id == null) return null
+    return optimizerRunDetails.value[id] ?? optimizerRuns.value.find(run => run.optimizer_run_id === id) ?? null
+  })
   const filteredReviewItems = computed(() => {
     const query = reviewSearch.value.trim().toLowerCase()
     return reviewItems.value.filter((item) => {
@@ -111,6 +115,21 @@ export function useOptimizerWorkflow() {
     }
   }
 
+  async function loadOptimizerRunDetail(runId: number, showLoading = true) {
+    if (showLoading) loadingRunDetail.value = true
+    try {
+      const res = await api.getOptimizerRunDetail(runId)
+      optimizerRunDetails.value = {
+        ...optimizerRunDetails.value,
+        [runId]: res.data,
+      }
+    } catch (error) {
+      globalError.value = extractOptimizerError(error)
+    } finally {
+      loadingRunDetail.value = false
+    }
+  }
+
   async function loadReviewQueue() {
     loadingReview.value = true
     try {
@@ -140,6 +159,7 @@ export function useOptimizerWorkflow() {
   async function refreshAll() {
     globalError.value = null
     await Promise.all([loadStats(), loadHistory(), loadReviewQueue(), loadPrompts()])
+    if (selectedRunId.value != null) await loadOptimizerRunDetail(selectedRunId.value, false)
   }
 
   function stopPolling() {
@@ -154,7 +174,12 @@ export function useOptimizerWorkflow() {
       stopPolling()
       return
     }
-    if (!pollTimer.value) pollTimer.value = setInterval(() => loadHistory(false), 3000)
+    if (!pollTimer.value) {
+      pollTimer.value = setInterval(async () => {
+        await loadHistory(false)
+        if (selectedRunId.value != null) await loadOptimizerRunDetail(selectedRunId.value, false)
+      }, 3000)
+    }
   }
 
   async function startOptimizer() {
@@ -237,12 +262,18 @@ export function useOptimizerWorkflow() {
   }
 
   watch(optimizerRuns, syncPolling, { deep: true })
+  watch(selectedRunId, (runId) => {
+    if (runId != null) void loadOptimizerRunDetail(runId)
+  })
+  watch(activeTab, (tab) => {
+    if (tab === 'history' && selectedRunId.value != null) void loadOptimizerRunDetail(selectedRunId.value)
+  })
   onMounted(refreshAll)
   onUnmounted(stopPolling)
 
   return {
     activeTab, stats, optimizerRuns, reviewTotal, prompts, selectedPromptId,
-    loadingStats, loadingHistory, loadingReview, loadingPrompts, globalError,
+    loadingStats, loadingHistory, loadingRunDetail, loadingReview, loadingPrompts, globalError,
     maxRounds, targetAccuracy, startingOptimizer, cancellingRunId, optimizerMessage,
     reviewSearch, reviewActionFilter, selectedReview, correctionAction, reviewMutatingId, reviewError,
     poolModel, startingPoolEval, poolEvalRunId, poolEvalError, selectedRunId,

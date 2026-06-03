@@ -1,5 +1,11 @@
 <script setup lang="ts">
 import type { EvaluationSummary, PromptVersion, EvalRun, EvalJob } from '~/types/api'
+import {
+  getEvalRunSource,
+  getEvalRunSourceLabel,
+  getEvalRunSourceTone,
+  getRunAccuracyDisplay,
+} from '~/utils/evalDisplay'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -79,10 +85,23 @@ async function loadHistory() {
   loadingHistory.value = true
   try {
     const res = await api.getEvalHistory()
-    if (res.status === 'success') history.value = res.data.runs.filter(r => r.source == null || r.source === 'db')
+    if (res.status === 'success') history.value = res.data.runs
   } catch { /* silent */ } finally {
     loadingHistory.value = false
   }
+}
+
+function evalSourceLabel(run: EvalRun | EvalJob): string {
+  return getEvalRunSourceLabel(getEvalRunSource(run))
+}
+
+function evalSourceClass(run: EvalRun | EvalJob): string {
+  const tone = getEvalRunSourceTone(getEvalRunSource(run))
+  return tone ? `arb-eval__source--${tone}` : ''
+}
+
+function historyAccuracyDisplay(run: EvalRun): { label: string; color: string } {
+  return getRunAccuracyDisplay(run)
 }
 
 function stopPolling() {
@@ -152,7 +171,16 @@ async function runEval() {
     const res = await api.startEvaluation(selectedPromptId.value, effectiveModel.value || undefined)
     if (res.status === 'success') {
       const { run_id } = res.data
-      activeJob.value = { run_id, status: 'running', completed: 0, total: 0, provider: activeProvider.value ?? '', model: effectiveModel.value, started_at: new Date().toISOString() }
+      activeJob.value = {
+        run_id,
+        status: 'running',
+        completed: 0,
+        total: 0,
+        provider: activeProvider.value ?? '',
+        model: effectiveModel.value,
+        started_at: new Date().toISOString(),
+        source: 'db',
+      }
       startPolling(run_id)
     } else {
       error.value = res.message
@@ -314,6 +342,9 @@ onUnmounted(() => {
       <div class="arb-eval__progress-meta">
         <span class="num">{{ activeJob.completed }}&thinsp;/&thinsp;{{ activeJob.total || '…' }}</span>
         <span v-if="activeJob.total > 0" class="num">{{ Math.round(activeJob.completed / activeJob.total * 100) }}%</span>
+        <span v-if="evalSourceLabel(activeJob)" class="arb-eval__source" :class="evalSourceClass(activeJob)">
+          {{ evalSourceLabel(activeJob) }}
+        </span>
         <span>{{ activeJob.provider }}<template v-if="activeJob.model"> · {{ activeJob.model }}</template></span>
       </div>
       <div class="arb-eval__progress-actions">
@@ -415,10 +446,13 @@ onUnmounted(() => {
         >
           <UiCard :clickable="true" class="arb-eval__history-item">
             <div class="arb-eval__history-row">
-              <span class="arb-eval__history-acc num" :style="{ color: accuracyColor(h.accuracy) }">
-                {{ Math.round(h.accuracy * 100) }}%
+              <span class="arb-eval__history-acc num" :style="{ color: historyAccuracyDisplay(h).color }">
+                {{ historyAccuracyDisplay(h).label }}
               </span>
               <span class="arb-eval__history-ratio num">{{ h.correct }} / {{ h.total }}</span>
+              <span v-if="evalSourceLabel(h)" class="arb-eval__source" :class="evalSourceClass(h)">
+                {{ evalSourceLabel(h) }}
+              </span>
               <UiChip v-if="h.timeout_count > 0" color="var(--conf-low)">
                 {{ h.timeout_count }} timeout
               </UiChip>
@@ -561,6 +595,28 @@ onUnmounted(() => {
   font-size: 12px;
   font-family: var(--font-mono);
   color: var(--fg-3);
+}
+.arb-eval__source {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 2px 7px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.arb-eval__source--optimizer {
+  color: #a78bfa;
+  background: rgba(167, 139, 250, 0.12);
+}
+.arb-eval__source--pool {
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.12);
+}
+.arb-eval__source--manual {
+  color: var(--fg-3);
+  background: var(--bg-2);
 }
 .arb-eval__progress-actions {
   display: flex;

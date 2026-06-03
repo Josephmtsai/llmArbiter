@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import type { EvalRun } from '~/types/api'
-import { getRunAccuracyDisplay } from '~/utils/evalDisplay'
+import {
+  getEvalRunSource,
+  getEvalRunSourceLabel,
+  getEvalRunSourceTone,
+  getRunAccuracyDisplay,
+} from '~/utils/evalDisplay'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -10,22 +15,13 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const deleteErrors = ref<Record<number, string>>({})
 
-function resolvedSource(run: EvalRun): 'db' | 'pool' | 'optimizer' | 'manual' {
-  return run.source ?? 'manual'
-}
-
 function sourceLabel(run: EvalRun): string {
-  const s = resolvedSource(run)
-  if (s === 'pool') return 'Pool'
-  if (s === 'optimizer') return 'Optimizer'
-  return 'Manual'
+  return getEvalRunSourceLabel(getEvalRunSource(run))
 }
 
 function sourceClass(run: EvalRun): string {
-  const s = resolvedSource(run)
-  if (s === 'pool') return 'arb-history__source--pool'
-  if (s === 'optimizer') return 'arb-history__source--optimizer'
-  return 'arb-history__source--manual'
+  const tone = getEvalRunSourceTone(getEvalRunSource(run))
+  return tone ? `arb-history__source--${tone}` : ''
 }
 
 function statusLabel(status: string | undefined): string {
@@ -117,7 +113,7 @@ onMounted(load)
           >
             <td class="num">#{{ run.run_id }}</td>
             <td>
-              <span class="arb-history__source" :class="sourceClass(run)">
+              <span v-if="sourceLabel(run)" class="arb-history__source" :class="sourceClass(run)">
                 {{ sourceLabel(run) }}
               </span>
             </td>

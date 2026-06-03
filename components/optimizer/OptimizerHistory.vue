@@ -421,6 +421,9 @@ function modelComparisonDecisionClass(comparison: OptimizerModelComparison): str
                       <span class="num">{{ formatConfidence(failure.confidence) }}</span>
                     </summary>
                     <div class="optimizer-history__failure-detail">
+                      <span v-if="failure.source_case_id != null" class="optimizer-history__metadata-item">
+                        <strong>source_case_id</strong>: {{ failure.source_case_id }}
+                      </span>
                       <div class="optimizer-history__log-preview">{{ failure.log_snippet }}</div>
                       <div v-if="metadataEntries(failure.hardware_info).length > 0" class="optimizer-history__metadata">
                         <span

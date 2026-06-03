@@ -84,6 +84,8 @@ export interface AsyncEvalStartResponse {
   status: 'running'
 }
 
+export type EvalRunSource = 'db' | 'pool' | 'optimizer'
+
 export interface EvalJob {
   run_id: number
   status: string
@@ -92,6 +94,7 @@ export interface EvalJob {
   provider: string
   model: string
   started_at: string
+  source?: EvalRunSource
 }
 
 export interface EvalJobsResponse {
@@ -199,7 +202,7 @@ export interface EvalRun {
   status?: string
   persisted?: boolean
   discard_reason?: 'timeout_ratio_exceeded' | null
-  source?: 'db' | 'pool' | 'optimizer'
+  source?: EvalRunSource
 }
 
 export interface EvalRunResult {
@@ -273,6 +276,7 @@ export type ReviewQueueMutationRequest =
 export type ConfusionMatrix = Record<string, Record<string, number>>
 
 export interface OptimizerRoundFailure {
+  source_case_id?: string | number | null
   expected_action: ArbiterAction | string
   predicted_action: ArbiterAction | 'timeout' | string
   confidence?: number | null

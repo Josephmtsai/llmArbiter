@@ -3,6 +3,9 @@ import type { EvalRun, EvalRunResult } from '~/types/api'
 import {
   averageLatencyMs,
   countFailedResults,
+  getEvalRunSource,
+  getEvalRunSourceLabel,
+  getEvalRunSourceTone,
   getRunAccuracyDisplay,
   hasMeaningfulAccuracy,
 } from '~/utils/evalDisplay'
@@ -30,6 +33,18 @@ const displayedResults = computed(() =>
 )
 const failedCount = computed(() => countFailedResults(results.value))
 const averageLatency = computed(() => averageLatencyMs(results.value))
+const runSource = computed(() => (run.value ? getEvalRunSource(run.value) : null))
+const runSourceLabel = computed(() => getEvalRunSourceLabel(runSource.value))
+const runSourceClass = computed(() => {
+  const tone = getEvalRunSourceTone(runSource.value)
+  return tone ? `arb-detail__source--${tone}` : ''
+})
+const liveProgressLabel = computed(() => {
+  if (!run.value || run.value.status !== 'running' || run.value.total <= 0) return null
+  const pct = (run.value.accuracy * 100).toFixed(1)
+  const remaining = Math.max(run.value.total - run.value.correct, 0)
+  return `${run.value.correct} / ${run.value.total} completed (${pct}%) - ${remaining} remaining`
+})
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString()
@@ -170,6 +185,10 @@ onUnmounted(stopPolling)
             <span class="arb-detail__stat-label">Status</span>
             <span class="arb-detail__stat-val mono">{{ statusLabel(run.status) }}</span>
           </div>
+          <div v-if="runSourceLabel" class="arb-detail__stat">
+            <span class="arb-detail__stat-label">Source</span>
+            <span class="arb-detail__source" :class="runSourceClass">{{ runSourceLabel }}</span>
+          </div>
           <div class="arb-detail__stat">
             <span class="arb-detail__stat-label">Provider</span>
             <span class="arb-detail__stat-val">{{ run.provider }}</span>
@@ -191,9 +210,7 @@ onUnmounted(stopPolling)
           <div class="arb-detail__stat">
             <span class="arb-detail__stat-label">Correct / Total</span>
             <span class="arb-detail__stat-val num">{{ run.correct }} / {{ run.total }}</span>
-            <span v-if="run.status === 'running' && run.total > 0" class="arb-detail__live-progress">
-              {{ Math.round(run.correct / run.total * 100) }}% live
-            </span>
+            <span v-if="liveProgressLabel" class="arb-detail__live-progress">{{ liveProgressLabel }}</span>
           </div>
           <div class="arb-detail__stat">
             <span class="arb-detail__stat-label">Timeouts</span>
@@ -380,6 +397,28 @@ onUnmounted(stopPolling)
   font-size: 15px;
   font-weight: 600;
   color: var(--fg-1);
+}
+.arb-detail__source {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 3px 7px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.arb-detail__source--optimizer {
+  color: #a78bfa;
+  background: rgba(167, 139, 250, 0.12);
+}
+.arb-detail__source--pool {
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.12);
+}
+.arb-detail__source--manual {
+  color: var(--fg-3);
+  background: var(--bg-2);
 }
 .arb-detail__acc { font-family: var(--font-mono); font-size: 18px; }
 .arb-detail__stat-note {

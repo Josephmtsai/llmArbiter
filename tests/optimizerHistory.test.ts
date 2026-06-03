@@ -101,6 +101,7 @@ describe('OptimizerHistory', () => {
             analysis_text: 'Fallback analysis should not be displayed when failure_analysis exists.',
             failures: [
               {
+                source_case_id: 'pool-abc',
                 expected_action: 'trigger_restart',
                 predicted_action: 'notify_human',
                 confidence: 0.62,
@@ -140,6 +141,8 @@ describe('OptimizerHistory', () => {
     expect(wrapper.text()).toContain('notify/human')
     expect(wrapper.text()).toContain('62.0%')
     expect(wrapper.text()).toContain('source_dataset')
+    expect(wrapper.text()).toContain('source_case_id')
+    expect(wrapper.text()).toContain('pool-abc')
     expect(wrapper.text()).toContain('logchunks')
     expect(wrapper.text()).toContain('request_id')
     expect(wrapper.text()).toContain('req-1')

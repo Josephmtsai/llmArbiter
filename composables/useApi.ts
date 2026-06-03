@@ -28,6 +28,7 @@ import type {
   ReviewQueueMutationRequest,
   ReviewQueueResponse,
   OptimizerHistoryResponse,
+  OptimizerRun,
   OptimizerRunStartRequest,
   OptimizerRunStartResponse,
   OptimizerCancelResponse,
@@ -204,6 +205,9 @@ export function useApi() {
 
     getOptimizerHistory: () =>
       api<ArbiterResponse<OptimizerHistoryResponse>>('/optimizer/history'),
+
+    getOptimizerRunDetail: (runId: number) =>
+      api<ArbiterResponse<OptimizerRun>>(`/optimizer/history/${runId}`),
 
     startOptimizerRun: (body: OptimizerRunStartRequest) =>
       api<ArbiterResponse<OptimizerRunStartResponse>>('/optimizer/run', {

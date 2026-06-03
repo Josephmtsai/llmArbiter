@@ -11,7 +11,7 @@ const tabs: Array<{ id: OptimizerTab; label: string }> = [
 ]
 const {
   activeTab, stats, optimizerRuns, reviewTotal, prompts, selectedPromptId,
-  loadingStats, loadingHistory, loadingReview, loadingPrompts, globalError,
+  loadingStats, loadingHistory, loadingRunDetail, loadingReview, loadingPrompts, globalError,
   maxRounds, targetAccuracy, startingOptimizer, cancellingRunId, optimizerMessage,
   reviewSearch, reviewActionFilter, selectedReview, correctionAction, reviewMutatingId, reviewError,
   poolModel, startingPoolEval, poolEvalRunId, poolEvalError, selectedRunId,
@@ -95,7 +95,7 @@ const {
       v-if="activeTab === 'history'"
       :runs="optimizerRuns"
       :selected-run="selectedRun"
-      :loading="loadingHistory"
+      :loading="loadingHistory || loadingRunDetail"
       @select-run="selectedRunId = $event"
     />
   </main>
