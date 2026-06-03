@@ -63,7 +63,7 @@ async function fetchCompare() {
     if (res.status === 'success') {
       groups.value = res.data.groups.map(g => ({
         ...g,
-        runs: g.runs.filter(r => r.source == null || r.source === 'manual'),
+        runs: g.runs.filter(r => r.source !== 'optimizer'),
       }))
     } else error.value = res.message
   } catch (e) {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { OptimizerRun, OptimizerRound, ConfusionMatrix } from '~/types/api'
+import type { OptimizerRun, ConfusionMatrix } from '~/types/api'
 import { bestOptimizerAccuracy } from '~/utils/optimizerState'
 
 const props = defineProps<{
