@@ -192,7 +192,7 @@ function bestRoundAccuracy(run: OptimizerRun): number | null {
                 eval #{{ round.eval_run_id }}
               </NuxtLink>
               <NuxtLink
-                :to="`/settings`"
+                :to="`/settings?tab=prompts&prompt=${round.prompt_version_id}`"
                 class="optimizer-history__link"
                 @click.stop
               >

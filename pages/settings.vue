@@ -4,9 +4,12 @@ import type { Rule, ProviderResponse, PromptVersion } from '~/types/api'
 definePageMeta({ middleware: 'auth' })
 
 const api = useApi()
+const route = useRoute()
 
 type Tab = 'rules' | 'providers' | 'prompts'
-const activeTab = ref<Tab>('rules')
+const VALID_TABS: Tab[] = ['rules', 'providers', 'prompts']
+const queryTab = route.query.tab as string | undefined
+const activeTab = ref<Tab>(VALID_TABS.includes(queryTab as Tab) ? (queryTab as Tab) : 'rules')
 
 const PROVIDER_LABELS: Record<string, string> = { nvidia: 'NVIDIA NIM' }
 function providerLabel(p: string): string { return PROVIDER_LABELS[p] ?? p }
@@ -82,8 +85,14 @@ async function loadPrompts() {
     const res = await api.getPrompts()
     if (res.status === 'success') {
       prompts.value = res.data
-      const active = res.data.find(p => p.active)
-      selectedPromptId.value = active?.id ?? res.data[0]?.id ?? null
+      const queryId = route.query.prompt ? Number(route.query.prompt) : null
+      const fromQuery = queryId ? res.data.find(p => p.id === queryId) : null
+      if (fromQuery) {
+        selectedPromptId.value = fromQuery.id
+      } else {
+        const active = res.data.find(p => p.active)
+        selectedPromptId.value = active?.id ?? res.data[0]?.id ?? null
+      }
     }
   } catch { /* silent */ } finally {
     loadingPrompts.value = false
