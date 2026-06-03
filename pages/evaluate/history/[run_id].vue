@@ -20,6 +20,7 @@ const notFound = ref(false)
 const failuresOnly = ref(false)
 const deleting = ref(false)
 const deleteError = ref<string | null>(null)
+const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 const runId = computed(() => Number(route.params.run_id))
 const displayedResults = computed(() =>
@@ -45,6 +46,10 @@ function statusLabel(status: string | undefined): string {
   return status ?? 'completed'
 }
 
+function stopPolling() {
+  if (pollTimer.value) { clearInterval(pollTimer.value); pollTimer.value = null }
+}
+
 async function load() {
   loading.value = true
   error.value = null
@@ -54,6 +59,21 @@ async function load() {
     if (res.status === 'success') {
       run.value = res.data.run
       results.value = res.data.results
+      if (res.data.run.status === 'running') {
+        stopPolling()
+        pollTimer.value = setInterval(async () => {
+          try {
+            const poll = await api.getEvalRunDetail(runId.value)
+            if (poll.status === 'success') {
+              run.value = poll.data.run
+              if (poll.data.run.status !== 'running') {
+                results.value = poll.data.results
+                stopPolling()
+              }
+            }
+          } catch { /* keep polling */ }
+        }, 3000)
+      }
     } else {
       error.value = res.message
     }
@@ -81,6 +101,7 @@ async function deleteRun() {
 }
 
 onMounted(load)
+onUnmounted(stopPolling)
 </script>
 
 <template>
@@ -142,6 +163,9 @@ onMounted(load)
           <div class="arb-detail__stat">
             <span class="arb-detail__stat-label">Correct / Total</span>
             <span class="arb-detail__stat-val num">{{ run.correct }} / {{ run.total }}</span>
+            <span v-if="run.status === 'running' && run.total > 0" class="arb-detail__live-progress">
+              {{ Math.round(run.correct / run.total * 100) }}% live
+            </span>
           </div>
           <div class="arb-detail__stat">
             <span class="arb-detail__stat-label">Timeouts</span>
@@ -277,6 +301,11 @@ onMounted(load)
 .arb-detail__stat-note {
   font-size: 11px;
   color: var(--fg-4);
+}
+.arb-detail__live-progress {
+  font-size: 11px;
+  color: var(--action-rebuild);
+  font-family: var(--font-mono);
 }
 .arb-detail__results-header {
   display: flex;

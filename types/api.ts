@@ -199,7 +199,7 @@ export interface EvalRun {
   status?: string
   persisted?: boolean
   discard_reason?: 'timeout_ratio_exceeded' | null
-  source?: 'manual' | 'pool'
+  source?: 'db' | 'pool' | 'optimizer'
 }
 
 export interface EvalRunResult {
@@ -266,6 +266,8 @@ export type ReviewQueueMutationRequest =
   | { action: 'correct'; expected_action: ArbiterAction }
   | { action: 'reject' }
 
+export type ConfusionMatrix = Record<string, Record<string, number>>
+
 export type OptimizerRunStatus =
   | 'running'
   | 'completed'
@@ -277,10 +279,15 @@ export type OptimizerRunStatus =
 export interface OptimizerRound {
   round_number: number
   accuracy: number
+  previous_best_accuracy?: number | null
+  accuracy_delta?: number | null
   prompt_version_id: number
   failed_case_count: number
   kept?: boolean
   eval_run_id: number | null
+  optimizer_model?: string
+  analysis_text?: string | null
+  confusion_matrix?: ConfusionMatrix | null
 }
 
 export interface OptimizerRun {
@@ -292,6 +299,14 @@ export interface OptimizerRun {
   finished_at: string | null
   rounds: OptimizerRound[]
   baseline_eval_run_id: number | null
+  prompt_version_id?: number | null
+  baseline_accuracy?: number | null
+  current_eval_run_id?: number | null
+  test_accuracy?: number | null
+  optimizer_model?: string
+  evaluator_provider?: string
+  evaluator_model?: string
+  error_message?: string | null
 }
 
 export interface OptimizerHistoryResponse {

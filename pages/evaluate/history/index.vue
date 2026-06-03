@@ -16,14 +16,23 @@ const error = ref<string | null>(null)
 const sourceWarning = ref<string | null>(null)
 const deleteErrors = ref<Record<number, string>>({})
 
+function resolvedSource(run: EvalRun): 'db' | 'pool' | 'optimizer' | 'manual' {
+  if (run.source) return run.source
+  return getEvalRunSource(run, optimizerEvalRunIds.value) === 'optimizer' ? 'optimizer' : 'manual'
+}
+
 function sourceLabel(run: EvalRun): string {
-  return getEvalRunSource(run, optimizerEvalRunIds.value) === 'optimizer' ? 'Opt' : 'Manual'
+  const s = resolvedSource(run)
+  if (s === 'pool') return 'Pool'
+  if (s === 'optimizer') return 'Optimizer'
+  return 'Manual'
 }
 
 function sourceClass(run: EvalRun): string {
-  return getEvalRunSource(run, optimizerEvalRunIds.value) === 'optimizer'
-    ? 'arb-history__source--optimizer'
-    : 'arb-history__source--manual'
+  const s = resolvedSource(run)
+  if (s === 'pool') return 'arb-history__source--pool'
+  if (s === 'optimizer') return 'arb-history__source--optimizer'
+  return 'arb-history__source--manual'
 }
 
 function statusLabel(status: string | undefined): string {
@@ -239,8 +248,12 @@ onMounted(load)
   font-size: 11px;
 }
 .arb-history__source--optimizer {
-  color: var(--accent);
-  background: var(--accent-soft);
+  color: #a78bfa;
+  background: rgba(167, 139, 250, 0.12);
+}
+.arb-history__source--pool {
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.12);
 }
 .arb-history__source--manual {
   color: var(--fg-3);

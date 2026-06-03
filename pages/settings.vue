@@ -8,6 +8,9 @@ const api = useApi()
 type Tab = 'rules' | 'providers' | 'prompts'
 const activeTab = ref<Tab>('rules')
 
+const PROVIDER_LABELS: Record<string, string> = { nvidia: 'NVIDIA NIM' }
+function providerLabel(p: string): string { return PROVIDER_LABELS[p] ?? p }
+
 // --- Rules ---
 const rules = ref<Rule[]>([])
 const loadingRules = ref(true)
@@ -202,7 +205,7 @@ watch(activeTab, (tab) => {
           @click="selectProvider(p)"
         >
           <div class="arb-settings__provider-row">
-            <span class="arb-settings__provider-name num">{{ p }}</span>
+            <span class="arb-settings__provider-name num">{{ providerLabel(p) }}</span>
             <span v-if="providerInfo.active_provider === p" class="arb-settings__provider-active-badge">Active</span>
             <UiSpinner v-else-if="settingProvider" size="sm" />
           </div>

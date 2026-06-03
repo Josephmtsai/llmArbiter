@@ -174,7 +174,7 @@ export function useApi() {
     getEvalHistory: async () => {
       const res = await api<ArbiterResponse<{ runs: EvalRun[] }>>('/evaluate/history')
       if (res.status === 'success') {
-        res.data.runs = res.data.runs.filter(r => r.source == null || r.source === 'manual')
+        res.data.runs = res.data.runs.filter(r => r.source !== 'optimizer')
       }
       return res
     },
