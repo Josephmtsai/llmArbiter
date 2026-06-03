@@ -199,6 +199,7 @@ export interface EvalRun {
   status?: string
   persisted?: boolean
   discard_reason?: 'timeout_ratio_exceeded' | null
+  source?: 'manual' | 'pool'
 }
 
 export interface EvalRunResult {
