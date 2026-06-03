@@ -145,7 +145,7 @@ function bestRoundAccuracy(run: OptimizerRun): number | null {
         </div>
 
         <!-- Currently evaluating -->
-        <div v-if="selectedRun.current_eval_run_id != null" class="optimizer-history__evaluating">
+        <div v-if="selectedRun.current_eval_run_id != null && selectedRun.status === 'running'" class="optimizer-history__evaluating">
           <UiSpinner size="sm" />
           <span>Evaluating…</span>
           <NuxtLink :to="`/evaluate/history/${selectedRun.current_eval_run_id}`" class="optimizer-history__link">

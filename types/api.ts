@@ -191,7 +191,7 @@ export interface EvalRun {
   provider: string
   model: string
   started_at: string
-  finished_at: string
+  finished_at: string | null
   total: number
   correct: number
   timeout_count: number

@@ -44,6 +44,7 @@ function formatDate(iso: string): string {
 }
 
 function durationSecs(run: EvalRun): string {
+  if (!run.finished_at) return '--'
   const ms = new Date(run.finished_at).getTime() - new Date(run.started_at).getTime()
   return (ms / 1000).toFixed(1) + 's'
 }
