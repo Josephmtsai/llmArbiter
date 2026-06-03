@@ -48,8 +48,16 @@ async function load() {
       api.getEvalHistory(),
       api.getOptimizerHistory(),
     ])
+    if (optimizerResult.status === 'fulfilled' && optimizerResult.value.status === 'success') {
+      optimizerEvalRunIds.value = collectOptimizerEvalRunIds(optimizerResult.value.data.runs)
+    } else {
+      optimizerEvalRunIds.value = new Set()
+      sourceWarning.value = 'Optimizer source tags unavailable.'
+    }
     if (historyResult.status === 'fulfilled' && historyResult.value.status === 'success') {
-      runs.value = historyResult.value.data.runs
+      runs.value = historyResult.value.data.runs.filter(
+        r => getEvalRunSource(r, optimizerEvalRunIds.value) === 'manual',
+      )
     } else {
       error.value =
         historyResult.status === 'fulfilled'
@@ -57,12 +65,6 @@ async function load() {
           : historyResult.reason instanceof Error
             ? historyResult.reason.message
             : 'Load failed'
-    }
-    if (optimizerResult.status === 'fulfilled' && optimizerResult.value.status === 'success') {
-      optimizerEvalRunIds.value = collectOptimizerEvalRunIds(optimizerResult.value.data.runs)
-    } else {
-      optimizerEvalRunIds.value = new Set()
-      sourceWarning.value = 'Optimizer source tags unavailable.'
     }
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Load failed'
