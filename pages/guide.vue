@@ -19,6 +19,115 @@ interface EndpointGroup {
   endpoints: string[]
 }
 
+interface FlowNode {
+  label: string
+  body: string
+  tag: string
+  important?: boolean
+}
+
+interface VisualLane {
+  label: string
+  nodes: FlowNode[]
+}
+
+interface Checkpoint {
+  label: string
+  title: string
+  body: string
+}
+
+const visualLanes: VisualLane[] = [
+  {
+    label: 'Pool preparation',
+    nodes: [
+      {
+        label: 'Raw logs',
+        body: 'LogChunks, Travis CI, BGL, and HPC hardware logs enter the pool builder.',
+        tag: 'inputs',
+      },
+      {
+        label: 'Review queue',
+        body: 'Low-confidence relabels wait for confirm, correct, or reject before joining the trusted pool.',
+        tag: 'human check',
+        important: true,
+      },
+      {
+        label: 'Split pool',
+        body: 'Train, validation, and test splits stay separated so optimizer scoring remains honest.',
+        tag: '4,000 cases',
+      },
+    ],
+  },
+  {
+    label: 'Optimizer loop',
+    nodes: [
+      {
+        label: 'Val snapshot',
+        body: 'Each run snapshots a fixed validation set before scoring baseline and candidates.',
+        tag: 'stable score',
+        important: true,
+      },
+      {
+        label: 'Baseline eval',
+        body: 'The active prompt is measured first, producing baseline accuracy and failure clusters.',
+        tag: 'source=optimizer',
+      },
+      {
+        label: 'Candidate round',
+        body: 'The optimizer model analyzes failures, creates an inactive prompt version, and evaluates it.',
+        tag: 'round N',
+      },
+      {
+        label: 'Keep or reject',
+        body: 'A candidate is kept only if validation accuracy beats the current best.',
+        tag: 'decision gate',
+        important: true,
+      },
+    ],
+  },
+  {
+    label: 'Release gate',
+    nodes: [
+      {
+        label: 'Held-out test',
+        body: 'After target accuracy or max rounds, the best prompt is scored on the reserved test split.',
+        tag: 'test_accuracy',
+        important: true,
+      },
+      {
+        label: 'History view',
+        body: 'Runs, rounds, confusion matrices, and failure samples are persisted in PostgreSQL.',
+        tag: 'auditable',
+      },
+      {
+        label: 'Manual activation',
+        body: 'Generated prompts remain inactive until an operator activates the chosen version.',
+        tag: 'operator gate',
+        important: true,
+      },
+    ],
+  },
+]
+
+const checkpoints: Checkpoint[] = [
+  {
+    label: 'Important',
+    title: 'Validation snapshot is fixed per run',
+    body: 'Every baseline and candidate round is scored against the same validation cases, so accuracy movement is comparable.',
+  },
+  {
+    label: 'Important',
+    title: 'Candidates are not auto-activated',
+    body: 'The optimizer can generate prompt versions, but the active production prompt changes only through the prompt settings gate.',
+  },
+  {
+    label: 'Important',
+    title: 'History list is lightweight',
+    body: 'The list view shows run summaries; heavy round failure samples are loaded from the detail endpoint for one selected run.',
+  },
+]
+
 const poolStats: StatItem[] = [
   {
     label: 'Eval pool',
@@ -129,21 +238,46 @@ const endpointGroups: EndpointGroup[] = [
         </p>
       </div>
       <div class="arb-guide__hero-panel" aria-label="Optimizer loop summary">
-        <div class="arb-guide__loop-row">
+        <div class="arb-guide__mini-map">
+          <span>Logs</span>
           <span>Pool</span>
-          <span>Review</span>
-          <span>Val snapshot</span>
-        </div>
-        <div class="arb-guide__loop-row arb-guide__loop-row--strong">
           <span>Baseline</span>
-          <span>Failure analysis</span>
-          <span>Candidate eval</span>
+          <span>Candidate</span>
+          <span>Test</span>
+          <span>Activate</span>
         </div>
-        <div class="arb-guide__loop-row">
-          <span>Keep / reject</span>
-          <span>Test set</span>
-          <span>Manual activate</span>
+        <div class="arb-guide__hero-callout">
+          <span class="arb-guide__marker">Key idea</span>
+          <strong>Improve on validation, prove on test, activate by human choice.</strong>
         </div>
+      </div>
+    </section>
+
+    <section class="arb-guide__section">
+      <div class="arb-guide__section-head">
+        <UiEyebrow>Flow diagram</UiEyebrow>
+        <h2 class="arb-guide__heading">The full optimizer flow in one picture</h2>
+      </div>
+
+      <div class="arb-guide__visual-flow" aria-label="Auto Prompt Optimizer flow diagram">
+        <section v-for="lane in visualLanes" :key="lane.label" class="arb-guide__lane">
+          <div class="arb-guide__lane-label">{{ lane.label }}</div>
+          <div class="arb-guide__lane-track">
+            <article
+              v-for="node in lane.nodes"
+              :key="node.label"
+              class="arb-guide__node"
+              :class="{ 'arb-guide__node--important': node.important }"
+            >
+              <div class="arb-guide__node-head">
+                <span>{{ node.label }}</span>
+                <span class="arb-guide__node-tag">{{ node.tag }}</span>
+              </div>
+              <span v-if="node.important" class="arb-guide__marker">Important checkpoint</span>
+              <p>{{ node.body }}</p>
+            </article>
+          </div>
+        </section>
       </div>
     </section>
 
@@ -169,6 +303,21 @@ const endpointGroups: EndpointGroup[] = [
             <p>{{ step.body }}</p>
             <code>{{ step.meta }}</code>
           </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="arb-guide__section">
+      <div class="arb-guide__section-head">
+        <UiEyebrow>Important checkpoints</UiEyebrow>
+        <h2 class="arb-guide__heading">The parts that protect prompt quality</h2>
+      </div>
+
+      <div class="arb-guide__checkpoint-grid">
+        <article v-for="checkpoint in checkpoints" :key="checkpoint.title" class="arb-guide__checkpoint">
+          <span class="arb-guide__marker">{{ checkpoint.label }}</span>
+          <h3>{{ checkpoint.title }}</h3>
+          <p>{{ checkpoint.body }}</p>
         </article>
       </div>
     </section>
@@ -276,20 +425,33 @@ const endpointGroups: EndpointGroup[] = [
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 8px;
+  gap: 12px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--r-md);
   padding: 14px;
   background: var(--bg-1);
 }
 
-.arb-guide__loop-row {
+.arb-guide__mini-map {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 18px;
+  position: relative;
 }
 
-.arb-guide__loop-row span {
+.arb-guide__mini-map::before {
+  position: absolute;
+  top: 50%;
+  right: 18px;
+  left: 18px;
+  height: 1px;
+  background: var(--border-subtle);
+  content: '';
+}
+
+.arb-guide__mini-map span {
+  position: relative;
+  z-index: 1;
   min-height: 42px;
   display: flex;
   align-items: center;
@@ -304,10 +466,26 @@ const endpointGroups: EndpointGroup[] = [
   text-align: center;
 }
 
-.arb-guide__loop-row--strong span {
-  border-color: rgba(96, 165, 250, 0.35);
+.arb-guide__mini-map span:nth-child(3),
+.arb-guide__mini-map span:nth-child(4) {
+  border-color: rgba(96, 165, 250, 0.42);
   color: var(--fg-1);
   background: rgba(96, 165, 250, 0.08);
+}
+
+.arb-guide__hero-callout {
+  border: 1px solid rgba(245, 158, 11, 0.32);
+  border-radius: var(--r-sm);
+  padding: 10px;
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.arb-guide__hero-callout strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--fg-1);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .arb-guide__stats,
@@ -369,6 +547,100 @@ const endpointGroups: EndpointGroup[] = [
 .arb-guide__timeline {
   display: grid;
   gap: 10px;
+}
+
+.arb-guide__visual-flow {
+  display: grid;
+  gap: 12px;
+}
+
+.arb-guide__lane {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.arb-guide__lane-label {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  padding: 12px;
+  background: var(--bg-2);
+  color: var(--fg-2);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.arb-guide__lane-track {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  position: relative;
+}
+
+.arb-guide__lane-track::before {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  left: 6px;
+  height: 1px;
+  background: var(--border-subtle);
+  content: '';
+}
+
+.arb-guide__node {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  padding: 12px;
+  background: var(--bg-1);
+}
+
+.arb-guide__node--important {
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.arb-guide__node-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.arb-guide__node-head > span:first-child {
+  color: var(--fg-1);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.arb-guide__node-tag,
+.arb-guide__marker {
+  border: 1px solid rgba(245, 158, 11, 0.38);
+  border-radius: var(--r-pill);
+  padding: 2px 7px;
+  color: var(--warning);
+  background: rgba(245, 158, 11, 0.08);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.arb-guide__node p {
+  margin: 0;
+  color: var(--fg-3);
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .arb-guide__step {
@@ -439,6 +711,36 @@ const endpointGroups: EndpointGroup[] = [
   gap: 12px;
 }
 
+.arb-guide__checkpoint-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.arb-guide__checkpoint {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid rgba(245, 158, 11, 0.32);
+  border-radius: var(--r-md);
+  padding: 14px;
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.arb-guide__checkpoint h3 {
+  margin: 0;
+  color: var(--fg-1);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.arb-guide__checkpoint p {
+  margin: 0;
+  color: var(--fg-3);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .arb-guide__surface {
   display: flex;
   flex-direction: column;
@@ -497,13 +799,26 @@ const endpointGroups: EndpointGroup[] = [
 @media (max-width: 920px) {
   .arb-guide__hero,
   .arb-guide__split,
-  .arb-guide__surface-grid {
+  .arb-guide__surface-grid,
+  .arb-guide__checkpoint-grid {
     grid-template-columns: 1fr;
   }
 
   .arb-guide__stats,
   .arb-guide__endpoint-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .arb-guide__lane {
+    grid-template-columns: 1fr;
+  }
+
+  .arb-guide__lane-track {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .arb-guide__lane-track::before {
+    display: none;
   }
 }
 
@@ -526,11 +841,17 @@ const endpointGroups: EndpointGroup[] = [
     padding: 10px;
   }
 
-  .arb-guide__loop-row {
+  .arb-guide__mini-map,
+  .arb-guide__lane-track {
     grid-template-columns: 1fr;
   }
 
-  .arb-guide__loop-row span {
+  .arb-guide__mini-map::before,
+  .arb-guide__lane-track::before {
+    display: none;
+  }
+
+  .arb-guide__mini-map span {
     min-height: 34px;
   }
 
