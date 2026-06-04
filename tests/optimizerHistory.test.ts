@@ -57,11 +57,13 @@ function mountHistory(selectedRun: OptimizerRun) {
 }
 
 describe('OptimizerHistory', () => {
-  it('renders baseline and round eval links while handling null round IDs', () => {
-    const wrapper = mountHistory(makeRun({}))
+  it('renders baseline, test, and round eval links while handling null round IDs', () => {
+    const wrapper = mountHistory(makeRun({ test_eval_run_id: 66 }))
 
     // baseline eval link in stats row
     expect(wrapper.html()).toContain('/evaluate/history/24')
+    expect(wrapper.html()).toContain('/evaluate/history/66')
+    expect(wrapper.text()).toContain('Test eval')
     // round 1 has eval_run_id=25 → link rendered
     expect(wrapper.html()).toContain('/evaluate/history/25')
     // kept/rejected badges reflect new labels
@@ -93,6 +95,7 @@ describe('OptimizerHistory', () => {
         best_accuracy: 0.735,
         baseline_accuracy: 0.5,
         test_accuracy: 0.7175,
+        test_eval_run_id: 66,
         current_eval_run_id: null,
         rounds: undefined,
       }),
@@ -100,6 +103,8 @@ describe('OptimizerHistory', () => {
 
     expect(wrapper.text()).toContain('#3')
     expect(wrapper.text()).toContain('73.5%')
+    expect(wrapper.html()).toContain('/evaluate/history/66')
+    expect(wrapper.text()).toContain('Test eval')
     expect(wrapper.text()).toContain('2 rounds')
     expect(wrapper.text()).toContain('No rounds yet.')
   })

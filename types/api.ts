@@ -336,6 +336,7 @@ export interface OptimizerRun {
   best_accuracy?: number | null
   current_eval_run_id?: number | null
   test_accuracy?: number | null
+  test_eval_run_id?: number | null
   optimizer_model?: string
   evaluator_provider?: string
   evaluator_model?: string
