@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { Ban, Bot } from 'lucide-vue-next'
+import { computed } from 'vue'
 import type { ArbiterAction, EvalPoolStats, OptimizerRun } from '~/types/api'
-import { ARBITER_ACTIONS, bestOptimizerAccuracy, isEvalPoolEmpty } from '~/utils/optimizerState'
+import {
+  ARBITER_ACTIONS,
+  bestOptimizerAccuracy,
+  isEvalPoolEmpty,
+  optimizerRoundCount,
+} from '~/utils/optimizerState'
 
 const maxRounds = defineModel<number>('maxRounds', { required: true })
 const targetAccuracy = defineModel<number>('targetAccuracy', { required: true })
@@ -165,7 +171,7 @@ function activeSegments(action: ArbiterAction): number {
           >
             <td class="num">#{{ run.optimizer_run_id }}</td>
             <td>{{ run.status }}</td>
-            <td class="num">{{ run.rounds.length }}</td>
+            <td class="num">{{ optimizerRoundCount(run) }}</td>
             <td class="num">{{ formatPercent(bestOptimizerAccuracy(run)) }}</td>
             <td class="num">{{ formatDate(run.started_at) }}</td>
           </tr>

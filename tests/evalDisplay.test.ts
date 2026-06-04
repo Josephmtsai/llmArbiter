@@ -77,7 +77,7 @@ describe('eval display helpers', () => {
           },
         ],
       }),
-      makeOptimizerRun({ optimizer_run_id: 2, baseline_eval_run_id: null }),
+      makeOptimizerRun({ optimizer_run_id: 2, baseline_eval_run_id: null, rounds: undefined }),
     ])
 
     expect([...ids].sort((a, b) => a - b)).toEqual([24, 25])

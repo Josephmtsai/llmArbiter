@@ -11,7 +11,7 @@ export const ARBITER_ACTIONS: readonly ArbiterAction[] = [
 const TERMINAL_OPTIMIZER_STATUSES = new Set(['completed', 'completed_max_rounds', 'failed', 'cancelled'])
 
 export function shouldPollOptimizerHistory(
-  runs: Array<Pick<OptimizerRun, 'status'> & { optimizer_run_id: number; rounds: unknown[] }>,
+  runs: Array<Pick<OptimizerRun, 'status'> & { optimizer_run_id: number }>,
 ): boolean {
   return runs.some(run => !TERMINAL_OPTIMIZER_STATUSES.has(run.status))
 }
@@ -27,7 +27,12 @@ export function getLowestActionCoverage(stats: EvalPoolStats): { action: Arbiter
   })).sort((a, b) => a.count - b.count)[0]
 }
 
-export function bestOptimizerAccuracy(run: Pick<OptimizerRun, 'rounds'>): number | null {
-  if (run.rounds.length === 0) return null
+export function optimizerRoundCount(run: Pick<OptimizerRun, 'rounds' | 'round_count'>): number {
+  return run.round_count ?? run.rounds?.length ?? 0
+}
+
+export function bestOptimizerAccuracy(run: Pick<OptimizerRun, 'rounds' | 'best_accuracy'>): number | null {
+  if (run.best_accuracy != null) return run.best_accuracy
+  if (!run.rounds || run.rounds.length === 0) return null
   return Math.max(...run.rounds.map(round => round.accuracy))
 }
