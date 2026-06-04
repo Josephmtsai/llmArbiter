@@ -24,7 +24,7 @@ function selectRun(id: number) {
 </script>
 
 <template>
-  <AppTopBar title="Auto Prompt Optimizer" subtitle="Curate eval data and supervise prompt improvement" />
+  <AppTopBar title="Auto Optimizer" subtitle="Prompt improvement pipeline" />
 
   <main class="optimizer-page">
     <div class="optimizer-page__toolbar">

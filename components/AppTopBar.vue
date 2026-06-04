@@ -52,6 +52,9 @@ async function handleLogout() {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
+  flex: 1;
+  margin: 0 12px;
 }
 .arb-topbar__title {
   font-size: 22px;
@@ -105,6 +108,17 @@ async function handleLogout() {
 @media (max-width: 767px) {
   .arb-topbar__hamburger { display: flex; }
   .arb-topbar { padding: 12px 16px; z-index: 201; }
-  .arb-topbar__title { font-size: 18px; }
+  .arb-topbar__title {
+    font-size: 16px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .arb-topbar__subtitle {
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 </style>

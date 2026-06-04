@@ -388,6 +388,25 @@ const stats = computed(() => {
   color: var(--fg-3);
 }
 
+@media (max-width: 767px) {
+  .arb-decisions__stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .arb-decisions__stat {
+    min-width: 0;
+  }
+  .arb-decisions__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .arb-decisions__time-pills {
+    justify-content: flex-start;
+  }
+}
+
 /* Drawer */
 .arb-drawer-overlay {
   position: fixed;

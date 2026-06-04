@@ -766,4 +766,38 @@ onUnmounted(() => {
   font-size: 10px;
   color: var(--fg-4);
 }
+
+@media (max-width: 767px) {
+  .arb-eval__control-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .arb-eval__run-col {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 0;
+  }
+  .arb-eval__summary {
+    flex-wrap: wrap;
+  }
+  .arb-eval__summary-stat {
+    min-width: calc(50% - 6px);
+    flex: 1;
+  }
+  .arb-eval__history-row {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .arb-eval__history-provider {
+    margin-left: 0;
+  }
+  .arb-eval__history-meta {
+    flex-wrap: wrap;
+  }
+  .arb-eval__progress-meta {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+}
 </style>

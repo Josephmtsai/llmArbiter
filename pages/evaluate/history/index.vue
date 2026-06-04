@@ -261,4 +261,8 @@ onMounted(load)
   color: var(--action-notify);
   margin-top: 2px;
 }
+
+@media (max-width: 767px) {
+  .arb-history__delete-btn { opacity: 1; }
+}
 </style>

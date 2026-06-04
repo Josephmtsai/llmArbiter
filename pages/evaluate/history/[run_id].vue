@@ -154,7 +154,7 @@ onUnmounted(stopPolling)
       <UiButton
         variant="ghost"
         size="sm"
-        class="arb-detail__delete-btn"
+        class="arb-detail__delete-btn arb-detail__delete-desktop"
         :disabled="loading || deleting"
         :loading="deleting"
         @click="deleteRun"
@@ -163,7 +163,20 @@ onUnmounted(stopPolling)
       </UiButton>
     </template>
   </AppTopBar>
-  <div v-if="deleteError" class="arb-detail__delete-err">{{ deleteError }}</div>
+
+  <div v-if="deleteError" class="arb-detail__delete-err-bar">{{ deleteError }}</div>
+  <div class="arb-detail__sub-bar">
+    <UiButton
+      variant="ghost"
+      size="sm"
+      class="arb-detail__delete-btn arb-detail__delete-mobile"
+      :disabled="loading || deleting"
+      :loading="deleting"
+      @click="deleteRun"
+    >
+      Delete run
+    </UiButton>
+  </div>
 
   <div class="arb-detail">
     <div v-if="loading" class="arb-detail__loading"><UiSpinner size="sm" /></div>
@@ -360,10 +373,25 @@ onUnmounted(stopPolling)
 }
 .arb-detail__back:hover { color: var(--fg-1); }
 .arb-detail__delete-btn { color: var(--action-notify) !important; }
-.arb-detail__delete-err {
+.arb-detail__delete-err-bar {
   padding: 8px 32px;
   font-size: 12px;
   color: var(--action-notify);
+}
+.arb-detail__sub-bar {
+  display: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.arb-detail__delete-mobile { display: none; }
+
+@media (max-width: 767px) {
+  .arb-detail__delete-desktop { display: none !important; }
+  .arb-detail__sub-bar { display: flex; }
+  .arb-detail__delete-mobile { display: inline-flex; }
 }
 .arb-detail__loading { padding: 40px; text-align: center; }
 .arb-detail__not-found,
