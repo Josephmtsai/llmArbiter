@@ -25,26 +25,33 @@ function extractOptimizerError(error: unknown): string {
 }
 
 const VALID_TABS: OptimizerTab[] = ['overview', 'review', 'evaluation', 'history']
+const TAB_PATHS: Record<OptimizerTab, string> = {
+  overview: '/optimizer',
+  review: '/optimizer/review',
+  evaluation: '/optimizer/evaluation',
+  history: '/optimizer/history',
+}
+
+function tabFromPath(path: string): OptimizerTab {
+  if (path === '/optimizer/review') return 'review'
+  if (path === '/optimizer/evaluation') return 'evaluation'
+  if (path === '/optimizer/history') return 'history'
+  return 'overview'
+}
 
 export function useOptimizerWorkflow() {
   const api = useApi()
   const route = useRoute()
   const router = useRouter()
 
-  // Initialise from URL query params so tabs are bookmarkable
-  const initialTab = VALID_TABS.includes(route.query.tab as OptimizerTab)
-    ? (route.query.tab as OptimizerTab)
-    : 'overview'
-  const initialRunId = route.query.run ? Number(route.query.run) : null
-
-  const activeTab = ref<OptimizerTab>(initialTab)
-  const stats = ref<EvalPoolStats | null>(null)
-  const optimizerRuns = ref<OptimizerRun[]>([])
-  const optimizerRunDetails = ref<Record<number, OptimizerRun>>({})
-  const reviewItems = ref<ReviewQueueEntry[]>([])
-  const reviewTotal = ref(0)
-  const prompts = ref<PromptVersion[]>([])
-  const selectedPromptId = ref<number | undefined>()
+  const activeTab = ref<OptimizerTab>(tabFromPath(route.path))
+  const stats = useState<EvalPoolStats | null>('optimizer:stats', () => null)
+  const optimizerRuns = useState<OptimizerRun[]>('optimizer:runs', () => [])
+  const optimizerRunDetails = useState<Record<number, OptimizerRun>>('optimizer:runDetails', () => ({}))
+  const reviewItems = useState<ReviewQueueEntry[]>('optimizer:reviewItems', () => [])
+  const reviewTotal = useState('optimizer:reviewTotal', () => 0)
+  const prompts = useState<PromptVersion[]>('optimizer:prompts', () => [])
+  const selectedPromptId = useState<number | undefined>('optimizer:selectedPromptId', () => undefined)
 
   const loadingStats = ref(false)
   const loadingHistory = ref(false)
@@ -71,7 +78,7 @@ export function useOptimizerWorkflow() {
   const poolEvalRunId = ref<number | null>(null)
   const poolEvalError = ref<string | null>(null)
 
-  const selectedRunId = ref<number | null>(initialRunId)
+  const selectedRunId = useState<number | null>('optimizer:selectedRunId', () => null)
   const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
   const lowestCoverage = computed(() => (stats.value ? getLowestActionCoverage(stats.value) : null))
@@ -280,12 +287,14 @@ export function useOptimizerWorkflow() {
     if (runId != null) void loadOptimizerRunDetail(runId)
   }, { immediate: true })
 
-  // Sync URL: tab + run (only when on history tab)
-  watch([activeTab, selectedRunId] as const, ([tab, runId]) => {
-    const query: Record<string, string> = {}
-    if (tab !== 'overview') query.tab = tab
-    if (tab === 'history' && runId != null) query.run = String(runId)
-    void router.replace({ query })
+  watch(() => route.path, (path) => {
+    activeTab.value = tabFromPath(path)
+  })
+
+  watch(activeTab, (tab) => {
+    if (!VALID_TABS.includes(tab)) return
+    const nextPath = TAB_PATHS[tab]
+    if (route.path !== nextPath) void router.push(nextPath)
   })
 
   onMounted(refreshAll)

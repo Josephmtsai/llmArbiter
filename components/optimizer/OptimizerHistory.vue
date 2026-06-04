@@ -44,6 +44,17 @@ function formatPercent(value: number | null | undefined): string {
   return `${(value * 100).toFixed(1)}%`
 }
 
+function formatDate(value: string | null | undefined): string {
+  if (!value) return 'n/a'
+  return new Date(value).toLocaleString()
+}
+
+function durationLabel(startedAt: string, finishedAt: string | null): string {
+  if (!finishedAt) return 'Running'
+  const ms = new Date(finishedAt).getTime() - new Date(startedAt).getTime()
+  return Number.isFinite(ms) && ms >= 0 ? `${(ms / 1000).toFixed(1)}s` : 'n/a'
+}
+
 function formatConfidence(value: number | null | undefined): string {
   return value == null ? 'n/a' : formatPercent(value)
 }
@@ -227,6 +238,40 @@ function modelComparisonDecisionClass(comparison: OptimizerModelComparison): str
           >
             eval: {{ [selectedRun.evaluator_provider, selectedRun.evaluator_model].filter(Boolean).join(' / ') }}
           </span>
+        </div>
+
+        <div class="optimizer-history__run-meta">
+          <div>
+            <span>Started</span>
+            <strong class="num">{{ formatDate(selectedRun.started_at) }}</strong>
+          </div>
+          <div>
+            <span>Finished</span>
+            <strong class="num">{{ formatDate(selectedRun.finished_at) }}</strong>
+          </div>
+          <div>
+            <span>Duration</span>
+            <strong class="num">{{ durationLabel(selectedRun.started_at, selectedRun.finished_at) }}</strong>
+          </div>
+          <div>
+            <span>Max rounds</span>
+            <strong class="num">{{ selectedRun.max_rounds }}</strong>
+          </div>
+          <div>
+            <span>Prompt version</span>
+            <strong class="num">{{ selectedRun.prompt_version_id ?? 'n/a' }}</strong>
+          </div>
+          <div>
+            <span>Current eval</span>
+            <NuxtLink
+              v-if="selectedRun.current_eval_run_id != null"
+              :to="`/evaluate/history/${selectedRun.current_eval_run_id}`"
+              class="optimizer-history__link"
+            >
+              #{{ selectedRun.current_eval_run_id }}
+            </NuxtLink>
+            <strong v-else class="num">n/a</strong>
+          </div>
         </div>
 
         <div class="optimizer-history__stats">
@@ -627,6 +672,36 @@ function modelComparisonDecisionClass(comparison: OptimizerModelComparison): str
   gap: 14px;
 }
 
+.optimizer-history__run-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.optimizer-history__run-meta > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  background: var(--bg-1);
+}
+
+.optimizer-history__run-meta span {
+  color: var(--fg-4);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.optimizer-history__run-meta strong {
+  color: var(--fg-2);
+  font-size: 11px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
 .optimizer-history__title {
   margin: 4px 0 0;
   color: var(--fg-0);
@@ -900,5 +975,11 @@ function modelComparisonDecisionClass(comparison: OptimizerModelComparison): str
   padding: 3px 6px;
   color: var(--fg-3);
   font-size: 11px;
+}
+
+@media (max-width: 640px) {
+  .optimizer-history__run-meta {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
