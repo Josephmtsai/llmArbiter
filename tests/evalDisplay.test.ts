@@ -58,6 +58,7 @@ describe('eval display helpers', () => {
     const ids = collectOptimizerEvalRunIds([
       makeOptimizerRun({
         baseline_eval_run_id: 24,
+        test_eval_run_id: 66,
         rounds: [
           {
             round_number: 1,
@@ -80,7 +81,7 @@ describe('eval display helpers', () => {
       makeOptimizerRun({ optimizer_run_id: 2, baseline_eval_run_id: null, rounds: undefined }),
     ])
 
-    expect([...ids].sort((a, b) => a - b)).toEqual([24, 25])
+    expect([...ids].sort((a, b) => a - b)).toEqual([24, 25, 66])
   })
 
   it('uses backend eval run source before falling back to optimizer run IDs', () => {

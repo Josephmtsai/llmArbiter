@@ -287,6 +287,13 @@ function modelComparisonDecisionClass(comparison: OptimizerModelComparison): str
           >
             Baseline eval
           </NuxtLink>
+          <NuxtLink
+            v-if="selectedRun.test_eval_run_id != null"
+            :to="`/evaluate/history/${selectedRun.test_eval_run_id}`"
+            class="optimizer-history__stats-link"
+          >
+            Test eval
+          </NuxtLink>
         </div>
 
         <div v-if="selectedRun.current_eval_run_id != null && selectedRun.status === 'running'" class="optimizer-history__evaluating">

@@ -4,10 +4,13 @@ export type EvalRunSourceTone = 'manual' | 'pool' | 'optimizer'
 
 const MEANINGFUL_ACCURACY_STATUSES = new Set(['completed', 'completed_max_rounds'])
 
-export function collectOptimizerEvalRunIds(runs: Pick<OptimizerRun, 'baseline_eval_run_id' | 'rounds'>[]): Set<number> {
+export function collectOptimizerEvalRunIds(
+  runs: Pick<OptimizerRun, 'baseline_eval_run_id' | 'rounds' | 'test_eval_run_id'>[],
+): Set<number> {
   const ids = new Set<number>()
   for (const run of runs) {
     if (run.baseline_eval_run_id != null) ids.add(run.baseline_eval_run_id)
+    if (run.test_eval_run_id != null) ids.add(run.test_eval_run_id)
     for (const round of run.rounds ?? []) {
       if (round.eval_run_id != null) ids.add(round.eval_run_id)
     }
