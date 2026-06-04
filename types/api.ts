@@ -299,10 +299,12 @@ export interface OptimizerModelComparison {
 
 export type OptimizerRunStatus =
   | 'running'
+  | 'evaluating'
   | 'completed'
   | 'completed_max_rounds'
   | 'failed'
   | 'cancelled'
+  | 'aborted'
   | 'cancelling'
 
 export interface OptimizerRound {

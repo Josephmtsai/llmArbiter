@@ -109,6 +109,38 @@ describe('OptimizerHistory', () => {
     expect(wrapper.text()).toContain('No rounds yet.')
   })
 
+  it('labels current eval as final test eval while optimizer status is evaluating', () => {
+    const wrapper = mountHistory(
+      makeRun({
+        status: 'evaluating',
+        finished_at: null,
+        current_eval_run_id: 66,
+        round_count: 3,
+        rounds: undefined,
+      }),
+    )
+
+    expect(wrapper.text()).toContain('Test eval')
+    expect(wrapper.text()).toContain('Final test eval is running')
+    expect(wrapper.html()).toContain('/evaluate/history/66')
+  })
+
+  it('does not show a running final eval banner after the run has finished', () => {
+    const wrapper = mountHistory(
+      makeRun({
+        status: 'evaluating',
+        finished_at: '2026-06-04T15:11:48.523503Z',
+        current_eval_run_id: 66,
+        round_count: 3,
+        rounds: undefined,
+      }),
+    )
+
+    expect(wrapper.text()).toContain('Test eval')
+    expect(wrapper.text()).not.toContain('Final test eval is running')
+    expect(wrapper.html()).toContain('/evaluate/history/66')
+  })
+
   it('renders failure samples with filters while omitting secret-like metadata', async () => {
     const wrapper = mountHistory(
       makeRun({

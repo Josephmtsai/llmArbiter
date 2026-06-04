@@ -7,7 +7,7 @@ import type {
   OptimizerRoundFailure,
   OptimizerRun,
 } from '~/types/api'
-import { bestOptimizerAccuracy, optimizerRoundCount } from '~/utils/optimizerState'
+import { bestOptimizerAccuracy, isOptimizerRunActive, optimizerRoundCount } from '~/utils/optimizerState'
 
 const props = defineProps<{
   runs: OptimizerRun[]
@@ -84,6 +84,14 @@ function shortAction(action: string): string {
 
 function bestRoundAccuracy(run: OptimizerRun): number | null {
   return bestOptimizerAccuracy(run) ?? null
+}
+
+function currentEvalLabel(run: OptimizerRun): string {
+  return run.status === 'evaluating' ? 'Test eval' : 'Current eval'
+}
+
+function currentEvalMessage(run: OptimizerRun): string {
+  return run.status === 'evaluating' ? 'Final test eval is running' : 'Evaluating'
 }
 
 function roundAnalysis(round: OptimizerRound): string | null {
@@ -262,7 +270,7 @@ function modelComparisonDecisionClass(comparison: OptimizerModelComparison): str
             <strong class="num">{{ selectedRun.prompt_version_id ?? 'n/a' }}</strong>
           </div>
           <div>
-            <span>Current eval</span>
+            <span>{{ currentEvalLabel(selectedRun) }}</span>
             <NuxtLink
               v-if="selectedRun.current_eval_run_id != null"
               :to="`/evaluate/history/${selectedRun.current_eval_run_id}`"
@@ -296,9 +304,12 @@ function modelComparisonDecisionClass(comparison: OptimizerModelComparison): str
           </NuxtLink>
         </div>
 
-        <div v-if="selectedRun.current_eval_run_id != null && selectedRun.status === 'running'" class="optimizer-history__evaluating">
+        <div
+          v-if="selectedRun.current_eval_run_id != null && isOptimizerRunActive(selectedRun)"
+          class="optimizer-history__evaluating"
+        >
           <UiSpinner size="sm" />
-          <span>Evaluating</span>
+          <span>{{ currentEvalMessage(selectedRun) }}</span>
           <NuxtLink :to="`/evaluate/history/${selectedRun.current_eval_run_id}`" class="optimizer-history__link">
             View eval #{{ selectedRun.current_eval_run_id }}
           </NuxtLink>

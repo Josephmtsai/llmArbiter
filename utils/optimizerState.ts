@@ -8,12 +8,17 @@ export const ARBITER_ACTIONS: readonly ArbiterAction[] = [
   'send_email',
 ] as const
 
-const TERMINAL_OPTIMIZER_STATUSES = new Set(['completed', 'completed_max_rounds', 'failed', 'cancelled'])
+const ACTIVE_OPTIMIZER_STATUSES = new Set(['running', 'evaluating'])
+
+export function isOptimizerRunActive(run: Pick<OptimizerRun, 'status' | 'finished_at'>): boolean {
+  if (run.finished_at != null) return false
+  return ACTIVE_OPTIMIZER_STATUSES.has(run.status)
+}
 
 export function shouldPollOptimizerHistory(
-  runs: Array<Pick<OptimizerRun, 'status'> & { optimizer_run_id: number }>,
+  runs: Array<Pick<OptimizerRun, 'status' | 'finished_at'> & { optimizer_run_id: number }>,
 ): boolean {
-  return runs.some(run => !TERMINAL_OPTIMIZER_STATUSES.has(run.status))
+  return runs.some(run => isOptimizerRunActive(run))
 }
 
 export function isEvalPoolEmpty(stats: EvalPoolStats | null | undefined): boolean {

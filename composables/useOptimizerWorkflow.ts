@@ -6,7 +6,12 @@ import type {
   ReviewQueueEntry,
   ReviewQueueMutationRequest,
 } from '~/types/api'
-import { getLowestActionCoverage, isEvalPoolEmpty, shouldPollOptimizerHistory } from '~/utils/optimizerState'
+import {
+  getLowestActionCoverage,
+  isEvalPoolEmpty,
+  isOptimizerRunActive,
+  shouldPollOptimizerHistory,
+} from '~/utils/optimizerState'
 
 export type OptimizerTab = 'overview' | 'review' | 'evaluation' | 'history'
 
@@ -83,9 +88,7 @@ export function useOptimizerWorkflow() {
 
   const lowestCoverage = computed(() => (stats.value ? getLowestActionCoverage(stats.value) : null))
   const poolIsEmpty = computed(() => isEvalPoolEmpty(stats.value))
-  const activeOptimizerRun = computed(() =>
-    optimizerRuns.value.find(run => run.status === 'running' || run.status === 'cancelling') ?? null,
-  )
+  const activeOptimizerRun = computed(() => optimizerRuns.value.find(run => isOptimizerRunActive(run)) ?? null)
   const latestRun = computed(() => optimizerRuns.value[0] ?? null)
   const selectedRun = computed(() => {
     const id = selectedRunId.value ?? latestRun.value?.optimizer_run_id ?? null
