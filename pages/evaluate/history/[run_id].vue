@@ -165,7 +165,7 @@ onUnmounted(stopPolling)
   </AppTopBar>
 
   <div v-if="deleteError" class="arb-detail__delete-err-bar">{{ deleteError }}</div>
-  <div class="arb-detail__sub-bar">
+  <div v-if="!loading && !notFound && !error" class="arb-detail__sub-bar">
     <UiButton
       variant="ghost"
       size="sm"
@@ -392,6 +392,7 @@ onUnmounted(stopPolling)
   .arb-detail__delete-desktop { display: none !important; }
   .arb-detail__sub-bar { display: flex; }
   .arb-detail__delete-mobile { display: inline-flex; }
+  .arb-detail__delete-err-bar { padding: 8px 16px; }
 }
 .arb-detail__loading { padding: 40px; text-align: center; }
 .arb-detail__not-found,
