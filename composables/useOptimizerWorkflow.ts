@@ -24,9 +24,20 @@ function extractOptimizerError(error: unknown): string {
   return 'Request failed'
 }
 
+const VALID_TABS: OptimizerTab[] = ['overview', 'review', 'evaluation', 'history']
+
 export function useOptimizerWorkflow() {
   const api = useApi()
-  const activeTab = ref<OptimizerTab>('overview')
+  const route = useRoute()
+  const router = useRouter()
+
+  // Initialise from URL query params so tabs are bookmarkable
+  const initialTab = VALID_TABS.includes(route.query.tab as OptimizerTab)
+    ? (route.query.tab as OptimizerTab)
+    : 'overview'
+  const initialRunId = route.query.run ? Number(route.query.run) : null
+
+  const activeTab = ref<OptimizerTab>(initialTab)
   const stats = ref<EvalPoolStats | null>(null)
   const optimizerRuns = ref<OptimizerRun[]>([])
   const optimizerRunDetails = ref<Record<number, OptimizerRun>>({})
@@ -60,7 +71,7 @@ export function useOptimizerWorkflow() {
   const poolEvalRunId = ref<number | null>(null)
   const poolEvalError = ref<string | null>(null)
 
-  const selectedRunId = ref<number | null>(null)
+  const selectedRunId = ref<number | null>(initialRunId)
   const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
   const lowestCoverage = computed(() => (stats.value ? getLowestActionCoverage(stats.value) : null))
@@ -159,7 +170,7 @@ export function useOptimizerWorkflow() {
   async function refreshAll() {
     globalError.value = null
     await Promise.all([loadStats(), loadHistory(), loadReviewQueue(), loadPrompts()])
-    if (selectedRunId.value != null) await loadOptimizerRunDetail(selectedRunId.value, false)
+    // loadOptimizerRunDetail is triggered by watch(selectedRunId) — no explicit call needed here
   }
 
   function stopPolling() {
@@ -262,12 +273,21 @@ export function useOptimizerWorkflow() {
   }
 
   watch(optimizerRuns, syncPolling, { deep: true })
+
+  // Single source of truth for run detail loading — immediate so URL-initialised
+  // selectedRunId also triggers a load without waiting for a change event
   watch(selectedRunId, (runId) => {
     if (runId != null) void loadOptimizerRunDetail(runId)
+  }, { immediate: true })
+
+  // Sync URL: tab + run (only when on history tab)
+  watch([activeTab, selectedRunId] as const, ([tab, runId]) => {
+    const query: Record<string, string> = {}
+    if (tab !== 'overview') query.tab = tab
+    if (tab === 'history' && runId != null) query.run = String(runId)
+    void router.replace({ query })
   })
-  watch(activeTab, (tab) => {
-    if (tab === 'history' && selectedRunId.value != null) void loadOptimizerRunDetail(selectedRunId.value)
-  })
+
   onMounted(refreshAll)
   onUnmounted(stopPolling)
 
