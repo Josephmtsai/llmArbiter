@@ -8,7 +8,7 @@ export function collectOptimizerEvalRunIds(runs: Pick<OptimizerRun, 'baseline_ev
   const ids = new Set<number>()
   for (const run of runs) {
     if (run.baseline_eval_run_id != null) ids.add(run.baseline_eval_run_id)
-    for (const round of run.rounds) {
+    for (const round of run.rounds ?? []) {
       if (round.eval_run_id != null) ids.add(round.eval_run_id)
     }
   }

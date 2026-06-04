@@ -7,7 +7,7 @@ import type {
   OptimizerRoundFailure,
   OptimizerRun,
 } from '~/types/api'
-import { bestOptimizerAccuracy } from '~/utils/optimizerState'
+import { bestOptimizerAccuracy, optimizerRoundCount } from '~/utils/optimizerState'
 
 const props = defineProps<{
   runs: OptimizerRun[]
@@ -19,7 +19,7 @@ defineEmits<{ selectRun: [id: number] }>()
 
 const sortedRounds = computed(() =>
   props.selectedRun
-    ? [...props.selectedRun.rounds].sort((a, b) => a.round_number - b.round_number)
+    ? [...(props.selectedRun.rounds ?? [])].sort((a, b) => a.round_number - b.round_number)
     : [],
 )
 
@@ -279,7 +279,7 @@ function modelComparisonDecisionClass(comparison: OptimizerModelComparison): str
           <span>Baseline {{ formatPercent(selectedRun.baseline_accuracy) }}</span>
           <span>Best {{ formatPercent(bestRoundAccuracy(selectedRun)) }}</span>
           <span>Test {{ formatPercent(selectedRun.test_accuracy) }}</span>
-          <span>{{ selectedRun.rounds.length }} rounds</span>
+          <span>{{ optimizerRoundCount(selectedRun) }} rounds</span>
           <NuxtLink
             v-if="selectedRun.baseline_eval_run_id != null"
             :to="`/evaluate/history/${selectedRun.baseline_eval_run_id}`"

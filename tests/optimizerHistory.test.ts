@@ -84,6 +84,26 @@ describe('OptimizerHistory', () => {
     expect(wrapper.text()).toContain('No rounds yet.')
   })
 
+  it('renders lightweight history list runs without round detail payloads', () => {
+    const wrapper = mountHistory(
+      makeRun({
+        optimizer_run_id: 3,
+        status: 'completed_max_rounds',
+        round_count: 2,
+        best_accuracy: 0.735,
+        baseline_accuracy: 0.5,
+        test_accuracy: 0.7175,
+        current_eval_run_id: null,
+        rounds: undefined,
+      }),
+    )
+
+    expect(wrapper.text()).toContain('#3')
+    expect(wrapper.text()).toContain('73.5%')
+    expect(wrapper.text()).toContain('2 rounds')
+    expect(wrapper.text()).toContain('No rounds yet.')
+  })
+
   it('renders failure samples with filters while omitting secret-like metadata', async () => {
     const wrapper = mountHistory(
       makeRun({

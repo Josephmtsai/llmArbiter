@@ -328,10 +328,12 @@ export interface OptimizerRun {
   target_accuracy: number
   started_at: string
   finished_at: string | null
-  rounds: OptimizerRound[]
+  rounds?: OptimizerRound[]
+  round_count?: number
   baseline_eval_run_id: number | null
   prompt_version_id?: number | null
   baseline_accuracy?: number | null
+  best_accuracy?: number | null
   current_eval_run_id?: number | null
   test_accuracy?: number | null
   optimizer_model?: string
