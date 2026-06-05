@@ -365,35 +365,46 @@ function modelComparisonDecisionClass(comparison: OptimizerModelComparison): str
           <div v-for="round in sortedRounds" :key="round.round_number" class="optimizer-history__round">
             <button class="optimizer-history__round-head" type="button" @click="toggleRound(round.round_number)">
               <span class="num">R{{ round.round_number }}</span>
-              <span
-                class="optimizer-history__kept-badge"
-                :class="round.kept ? 'optimizer-history__kept-badge--kept' : 'optimizer-history__kept-badge--rejected'"
-              >
-                {{ round.kept ? 'Kept' : 'Rejected' }}
-              </span>
-              <span class="num" :class="deltaToneClass(round.accuracy_delta)">
-                {{ deltaLabel(round.accuracy_delta) }}
-              </span>
-              <span class="num">{{ formatPercent(round.accuracy) }}</span>
-              <span class="optimizer-history__muted num">{{ round.failed_case_count }} failed</span>
-              <NuxtLink
-                v-if="round.eval_run_id != null"
-                :to="`/evaluate/history/${round.eval_run_id}`"
-                class="optimizer-history__link"
-                @click.stop
-              >
-                eval #{{ round.eval_run_id }}
-              </NuxtLink>
-              <NuxtLink
-                :to="`/settings?tab=prompts&prompt=${round.prompt_version_id}`"
-                class="optimizer-history__link"
-                @click.stop
-              >
-                pv{{ round.prompt_version_id }}
-              </NuxtLink>
-              <span v-if="round.optimizer_model" class="optimizer-history__badge optimizer-history__badge--opt">
-                {{ round.optimizer_model.split('/').pop() }}
-              </span>
+
+              <!-- Skipped round: LLM returned an invalid candidate -->
+              <template v-if="round.skip_reason">
+                <span class="optimizer-history__kept-badge optimizer-history__kept-badge--skipped">Skipped</span>
+                <span class="optimizer-history__skip-reason num">{{ round.skip_reason }}</span>
+              </template>
+
+              <!-- Normal round: evaluated and kept or rejected -->
+              <template v-else>
+                <span
+                  class="optimizer-history__kept-badge"
+                  :class="round.kept ? 'optimizer-history__kept-badge--kept' : 'optimizer-history__kept-badge--rejected'"
+                >
+                  {{ round.kept ? 'Kept' : 'Rejected' }}
+                </span>
+                <span class="num" :class="deltaToneClass(round.accuracy_delta)">
+                  {{ deltaLabel(round.accuracy_delta) }}
+                </span>
+                <span class="num">{{ formatPercent(round.accuracy) }}</span>
+                <span class="optimizer-history__muted num">{{ round.failed_case_count }} failed</span>
+                <NuxtLink
+                  v-if="round.eval_run_id != null"
+                  :to="`/evaluate/history/${round.eval_run_id}`"
+                  class="optimizer-history__link"
+                  @click.stop
+                >
+                  eval #{{ round.eval_run_id }}
+                </NuxtLink>
+                <NuxtLink
+                  :to="`/settings?tab=prompts&prompt=${round.prompt_version_id}`"
+                  class="optimizer-history__link"
+                  @click.stop
+                >
+                  pv{{ round.prompt_version_id }}
+                </NuxtLink>
+                <span v-if="round.optimizer_model" class="optimizer-history__badge optimizer-history__badge--opt">
+                  {{ round.optimizer_model.split('/').pop() }}
+                </span>
+              </template>
+
               <span class="optimizer-history__round-toggle">
                 {{ expandedRounds.has(round.round_number) ? 'Collapse' : 'Expand' }}
               </span>
@@ -834,6 +845,18 @@ function modelComparisonDecisionClass(comparison: OptimizerModelComparison): str
 .optimizer-history__kept-badge--neutral {
   background: var(--bg-2);
   color: var(--fg-4);
+}
+
+.optimizer-history__kept-badge--skipped {
+  background: rgba(251, 191, 36, 0.12);
+  color: var(--action-fallback);
+}
+
+.optimizer-history__skip-reason {
+  color: var(--fg-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  word-break: break-all;
 }
 
 .optimizer-history__round-detail {

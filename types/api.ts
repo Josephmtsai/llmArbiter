@@ -321,6 +321,7 @@ export interface OptimizerRound {
   analysis_text?: string | null
   confusion_matrix?: ConfusionMatrix | null
   failures?: OptimizerRoundFailure[]
+  skip_reason?: string | null
 }
 
 export interface OptimizerRun {
