@@ -280,4 +280,184 @@ describe('OptimizerHistory', () => {
     expect(wrapper.text()).toContain('Would keep')
     expect(wrapper.text()).toContain('Reject')
   })
+
+  it('shows rejection reason inline in the badge when reject_reason is present', () => {
+    const wrapper = mountHistory(
+      makeRun({
+        rounds: [
+          {
+            round_number: 1,
+            accuracy: 0.72,
+            prompt_version_id: 10,
+            failed_case_count: 5,
+            kept: false,
+            eval_run_id: 30,
+            reject_reason: 'send_email regressed beyond tolerance',
+          },
+        ],
+      }),
+    )
+
+    expect(wrapper.text()).toContain('Rejected: send_email regressed beyond tolerance')
+  })
+
+  it('shows plain Rejected badge when kept is false and reject_reason is absent', () => {
+    const wrapper = mountHistory(
+      makeRun({
+        rounds: [
+          {
+            round_number: 1,
+            accuracy: 0.68,
+            prompt_version_id: 11,
+            failed_case_count: 8,
+            kept: false,
+            eval_run_id: 31,
+          },
+        ],
+      }),
+    )
+
+    expect(wrapper.text()).toContain('Rejected')
+    expect(wrapper.text()).not.toContain('Rejected:')
+  })
+
+  it('renders per-action deltas table with action names and formatted percentages', async () => {
+    const wrapper = mountHistory(
+      makeRun({
+        rounds: [
+          {
+            round_number: 1,
+            accuracy: 0.75,
+            prompt_version_id: 12,
+            failed_case_count: 3,
+            kept: false,
+            eval_run_id: 32,
+            reject_reason: 'send_email regressed beyond tolerance',
+            per_action_deltas: {
+              trigger_rebuild: {
+                baseline_accuracy: 0.85,
+                candidate_accuracy: 0.88,
+                delta: 0.03,
+                baseline_total: 20,
+                candidate_total: 20,
+                tolerance: 0.05,
+              },
+              send_email: {
+                baseline_accuracy: 0.8,
+                candidate_accuracy: 0.71,
+                delta: -0.09,
+                baseline_total: 25,
+                candidate_total: 25,
+                tolerance: 0.05,
+              },
+            },
+          },
+        ],
+      }),
+    )
+
+    await wrapper.find('.optimizer-history__round-head').trigger('click')
+
+    expect(wrapper.text()).toContain('Per-action deltas')
+    expect(wrapper.text()).toContain('rebuild')
+    expect(wrapper.text()).toContain('send/email')
+    expect(wrapper.text()).toContain('85.0%')
+    expect(wrapper.text()).toContain('88.0%')
+    expect(wrapper.text()).toContain('80.0%')
+    expect(wrapper.text()).toContain('71.0%')
+  })
+
+  it('highlights delta cells that exceed gate tolerance with regression class', async () => {
+    const wrapper = mountHistory(
+      makeRun({
+        rounds: [
+          {
+            round_number: 1,
+            accuracy: 0.75,
+            prompt_version_id: 13,
+            failed_case_count: 3,
+            kept: false,
+            eval_run_id: 33,
+            per_action_deltas: {
+              trigger_rebuild: {
+                baseline_accuracy: 0.85,
+                candidate_accuracy: 0.88,
+                delta: 0.03,
+                baseline_total: 20,
+                candidate_total: 20,
+                tolerance: 0.05,
+              },
+              send_email: {
+                baseline_accuracy: 0.8,
+                candidate_accuracy: 0.71,
+                delta: -0.09,
+                baseline_total: 25,
+                candidate_total: 25,
+                tolerance: 0.05,
+              },
+            },
+          },
+        ],
+      }),
+    )
+
+    await wrapper.find('.optimizer-history__round-head').trigger('click')
+
+    const regressionCells = wrapper.findAll('.optimizer-history__delta-cell--regression')
+    expect(regressionCells).toHaveLength(1)
+  })
+
+  it('does not highlight delta cell when delta equals tolerance exactly', async () => {
+    const wrapper = mountHistory(
+      makeRun({
+        rounds: [
+          {
+            round_number: 1,
+            accuracy: 0.75,
+            prompt_version_id: 15,
+            failed_case_count: 2,
+            kept: false,
+            eval_run_id: 34,
+            per_action_deltas: {
+              send_email: {
+                baseline_accuracy: 0.8,
+                candidate_accuracy: 0.75,
+                delta: -0.05,
+                baseline_total: 20,
+                candidate_total: 20,
+                tolerance: 0.05,
+              },
+            },
+          },
+        ],
+      }),
+    )
+
+    await wrapper.find('.optimizer-history__round-head').trigger('click')
+
+    const regressionCells = wrapper.findAll('.optimizer-history__delta-cell--regression')
+    expect(regressionCells).toHaveLength(0)
+  })
+
+  it('does not render per-action deltas table when per_action_deltas is null', async () => {
+    const wrapper = mountHistory(
+      makeRun({
+        rounds: [
+          {
+            round_number: 1,
+            accuracy: 0.72,
+            prompt_version_id: 14,
+            failed_case_count: 0,
+            kept: true,
+            eval_run_id: null,
+            per_action_deltas: null,
+          },
+        ],
+      }),
+    )
+
+    await wrapper.find('.optimizer-history__round-head').trigger('click')
+
+    expect(wrapper.text()).not.toContain('Per-action deltas')
+  })
 })

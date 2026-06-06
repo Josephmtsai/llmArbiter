@@ -322,6 +322,9 @@ export interface OptimizerRound {
   confusion_matrix?: ConfusionMatrix | null
   failures?: OptimizerRoundFailure[]
   skip_reason?: string | null
+  reject_reason?: string | null
+  per_action_metrics?: Record<string, { total: number; correct: number; accuracy: number }> | null
+  per_action_deltas?: Record<string, { baseline_accuracy: number; candidate_accuracy: number; delta: number; baseline_total: number; candidate_total: number; tolerance: number }> | null
 }
 
 export interface OptimizerRun {

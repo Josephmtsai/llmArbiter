@@ -378,7 +378,7 @@ function modelComparisonDecisionClass(comparison: OptimizerModelComparison): str
                   class="optimizer-history__kept-badge"
                   :class="round.kept ? 'optimizer-history__kept-badge--kept' : 'optimizer-history__kept-badge--rejected'"
                 >
-                  {{ round.kept ? 'Kept' : 'Rejected' }}
+                  {{ round.kept ? 'Kept' : round.reject_reason ? `Rejected: ${round.reject_reason}` : 'Rejected' }}
                 </span>
                 <span class="num" :class="deltaToneClass(round.accuracy_delta)">
                   {{ deltaLabel(round.accuracy_delta) }}
@@ -438,6 +438,35 @@ function modelComparisonDecisionClass(comparison: OptimizerModelComparison): str
                           :class="{ 'optimizer-history__matrix-cell--nonzero': (predicted[col] ?? 0) > 0 }"
                         >
                           {{ predicted[col] ?? 0 }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div v-if="round.per_action_deltas && Object.keys(round.per_action_deltas).length > 0" class="optimizer-history__per-action">
+                <div class="optimizer-history__section-label">Per-action deltas</div>
+                <div class="optimizer-history__matrix-wrap">
+                  <table class="optimizer-history__matrix-table">
+                    <thead>
+                      <tr>
+                        <th class="optimizer-history__matrix-corner">Action</th>
+                        <th class="num">Baseline</th>
+                        <th class="num">Candidate</th>
+                        <th class="num">Delta</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(entry, action) in round.per_action_deltas" :key="action">
+                        <td class="optimizer-history__matrix-row-label">{{ shortAction(String(action)) }}</td>
+                        <td class="num">{{ formatPercent(entry.baseline_accuracy) }}</td>
+                        <td class="num">{{ formatPercent(entry.candidate_accuracy) }}</td>
+                        <td
+                          class="num optimizer-history__delta-cell"
+                          :class="[deltaToneClass(entry.delta), { 'optimizer-history__delta-cell--regression': entry.delta < 0 && Math.abs(entry.delta) > entry.tolerance }]"
+                        >
+                          {{ deltaLabel(entry.delta) }}
                         </td>
                       </tr>
                     </tbody>
@@ -948,6 +977,12 @@ function modelComparisonDecisionClass(comparison: OptimizerModelComparison): str
 }
 
 .optimizer-history__matrix-cell--nonzero {
+  background: var(--action-notify-soft);
+  color: var(--action-notify);
+  font-weight: 700;
+}
+
+.optimizer-history__delta-cell--regression {
   background: var(--action-notify-soft);
   color: var(--action-notify);
   font-weight: 700;
