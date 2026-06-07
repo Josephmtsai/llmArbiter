@@ -234,30 +234,30 @@ const toleranceRows: ToleranceRow[] = [
 // ── Round states ─────────────────────────────────────────────
 const roundStates: RoundState[] = [
   {
-    badgeClass: 'g-badge--kept',
+    badgeClass: 'arb-guide__badge--kept',
     label: 'Kept',
     body: 'Candidate passed both gates — overall validation accuracy improved and no protected action regressed beyond tolerance. The candidate became the new best prompt for subsequent rounds.',
   },
   {
-    badgeClass: 'g-badge--rejected',
+    badgeClass: 'arb-guide__badge--rejected',
     label: 'Rejected: no overall improvement',
     body: 'Overall validation accuracy did not improve compared to the previous best. The previous best prompt is kept. This is the most common rejection reason.',
   },
   {
-    badgeClass: 'g-badge--rejected',
+    badgeClass: 'arb-guide__badge--rejected',
     label: 'Rejected: action regression',
     body: 'Overall accuracy improved, but at least one protected action (notify_human or send_email) regressed beyond its tolerance. Even a net improvement is rejected when a critical action degrades.',
   },
   {
-    badgeClass: 'g-badge--skipped',
+    badgeClass: 'arb-guide__badge--skipped',
     label: 'Skipped',
     body: 'The optimizer model did not return a usable candidate prompt. A skipped round is NOT evidence the prompt got worse — it means no candidate was tested. The backend retries once before recording a skip.',
     skipReasons: [
       'optimizer-candidate-invalid-json',
-      'optimizer-candidate-missing-actions',
+      'optimizer-candidate-missing-actions:<action>',
       'optimizer-candidate-missing-json-contract',
-      'optimizer-candidate-missing-fields',
-      'optimizer-candidate-unsupported-actions',
+      'optimizer-candidate-missing-fields:<field>',
+      'optimizer-candidate-unsupported-actions:<action>',
     ],
   },
 ]
@@ -455,7 +455,7 @@ const endpointGroups: EndpointGroup[] = [
 
           <!-- Tolerance table only for Gate 2 -->
           <template v-if="gate.num === '2'">
-            <div class="arb-guide__section-label" style="margin-top: 12px;">
+            <div class="arb-guide__section-label arb-guide__section-label--spaced">
               <GuideTooltip text="Maximum allowed drop in per-action accuracy. Protected actions (notify_human, send_email): 2%. Other actions: 5%.">Regression tolerance</GuideTooltip>
               by action
             </div>
@@ -807,6 +807,10 @@ const endpointGroups: EndpointGroup[] = [
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 6px;
+}
+
+.arb-guide__section-label--spaced {
+  margin-top: 12px;
 }
 
 .arb-guide__heading {

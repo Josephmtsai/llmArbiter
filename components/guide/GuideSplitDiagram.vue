@@ -188,9 +188,8 @@
 }
 
 .gsd__snapshot-connector {
-  width: 1px;
+  width: 0;
   height: 16px;
-  background: var(--border-subtle);
   border-left: 1px dashed var(--border);
 }
 

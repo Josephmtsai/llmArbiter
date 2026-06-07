@@ -3,7 +3,7 @@ defineProps<{ text: string }>()
 </script>
 
 <template>
-  <span class="g-tooltip">
+  <span class="g-tooltip" tabindex="0">
     <slot />
     <span class="g-tooltip__panel" role="tooltip">{{ text }}</span>
   </span>
@@ -15,6 +15,12 @@ defineProps<{ text: string }>()
   display: inline-block;
   border-bottom: 1px dashed var(--fg-4);
   cursor: help;
+  border-radius: var(--r-xs, 2px);
+}
+
+.g-tooltip:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
 }
 
 .g-tooltip__panel {
