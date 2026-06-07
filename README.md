@@ -58,8 +58,8 @@ pnpm test:coverage          # coverage report (target ≥ 80%)
 |----------|-------|-------------|
 | `NUXT_AUTH_PASSWORD` | server-only | Password for the login page (min 32 chars for `nuxt-auth-utils`) |
 | `NUXT_SESSION_PASSWORD` | server-only | Session encryption key (min 32 chars for `nuxt-auth-utils`) |
-| `NUXT_PUBLIC_API_BASE` | public | Backend base URL (default `https://artbiter-production.up.railway.app`) |
-| `NUXT_PUBLIC_API_KEY` | public | `X-API-Key` header value sent with every API call |
+| `NUXT_API_BASE_URL` | server-only | Backend base URL — never exposed to the browser |
+| `NUXT_API_KEY` | server-only | `X-API-Key` sent only from the Nuxt server proxy — never in the browser |
 | `PORT` | server-only | Port for the Nuxt/Nitro server on Railway (`8080` for this deployment) |
 
 > **Rule**: `runtimeConfig.public.*` is exposed to the browser. Never put secrets there.
@@ -69,8 +69,8 @@ pnpm test:coverage          # coverage report (target ≥ 80%)
 ```
 NUXT_AUTH_PASSWORD=change-me-at-least-32-characters-long
 NUXT_SESSION_PASSWORD=change-me-at-least-32-characters-long
-NUXT_PUBLIC_API_BASE=https://artbiter-production.up.railway.app
-NUXT_PUBLIC_API_KEY=your-api-key-here
+NUXT_API_BASE_URL=https://artbiter-production.up.railway.app
+NUXT_API_KEY=your-api-key-here
 PORT=8080
 ```
 
@@ -78,23 +78,35 @@ PORT=8080
 
 ## API Integration
 
-**Base URL**: `NUXT_PUBLIC_API_BASE`
-**Auth header**: `X-API-Key: {NUXT_PUBLIC_API_KEY}` on every request.
+All browser API calls go to the Nuxt server proxy at `/api/arbiter/*`.
+The Nuxt server adds `X-API-Key` and forwards the request to the real backend.
+The API key is **never sent to the browser**.
 
 All API calls must go through Nuxt's `$fetch` / `useFetch` — never raw `fetch` or axios.
 
 ### Composable pattern
 
 ```ts
-// composables/useApi.ts
+// composables/useApi.ts — no API key needed; proxy handles it server-side
 export function useApi() {
-  const config = useRuntimeConfig()
-
-  return $fetch.create({
-    baseURL: config.public.apiBase,
-    headers: { 'X-API-Key': config.public.apiKey },
-  })
+  return $fetch.create({ baseURL: '/api/arbiter' })
 }
+```
+
+### Proxy route
+
+```ts
+// server/api/arbiter/[...].ts — catch-all that forwards to the real backend
+export default defineEventHandler(async (event) => {
+  const session = await getUserSession(event)
+  if (!session.user) throw createError({ statusCode: 401, message: 'Unauthorized' })
+
+  const config = useRuntimeConfig(event)
+  const path = event.path.replace(/^\/api\/arbiter/, '')
+  return proxyRequest(event, `${config.apiBaseUrl}${path}`, {
+    headers: { 'X-API-Key': config.apiKey as string },
+  })
+})
 ```
 
 ### Key endpoints
@@ -204,8 +216,8 @@ export default defineRsbuildConfig({
    ```
    NUXT_AUTH_PASSWORD=<strong-secret-min-32-chars>
    NUXT_SESSION_PASSWORD=<strong-session-secret-min-32-chars>
-   NUXT_PUBLIC_API_BASE=https://artbiter-production.up.railway.app
-   NUXT_PUBLIC_API_KEY=<your-api-key>
+   NUXT_API_BASE_URL=https://artbiter-production.up.railway.app
+   NUXT_API_KEY=<your-api-key>
    PORT=8080
    ```
 
@@ -239,8 +251,8 @@ Keep application runtime variables in Railway service variables, not GitHub secr
 ```
 NUXT_AUTH_PASSWORD=<strong-secret-min-32-chars>
 NUXT_SESSION_PASSWORD=<strong-session-secret-min-32-chars>
-NUXT_PUBLIC_API_BASE=https://artbiter-production.up.railway.app
-NUXT_PUBLIC_API_KEY=<your-api-key>
+NUXT_API_BASE_URL=https://artbiter-production.up.railway.app
+NUXT_API_KEY=<your-api-key>
 PORT=8080
 ```
 

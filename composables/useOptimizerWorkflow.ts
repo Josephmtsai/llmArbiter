@@ -126,7 +126,7 @@ export function useOptimizerWorkflow() {
     try {
       const res = await api.getOptimizerHistory()
       optimizerRuns.value = res.data.runs
-      if (!selectedRunId.value && res.data.runs.length > 0) {
+      if (selectedRunId.value == null && res.data.runs.length > 0) {
         selectedRunId.value = res.data.runs[0].optimizer_run_id
       }
     } catch (error) {

@@ -40,12 +40,8 @@ interface GetCasesParams {
 }
 
 export function useApi() {
-  const config = useRuntimeConfig()
-  const apiKey = config.public.apiKey as string
-
   const api = $fetch.create({
-    baseURL: config.public.apiBase as string,
-    headers: { 'X-API-Key': apiKey },
+    baseURL: '/api/arbiter',
   })
 
   function normalizePrompt(prompt: PromptVersion): PromptVersion {

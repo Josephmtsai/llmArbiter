@@ -5,7 +5,7 @@ description: |
   適用情境：
   - rsbuild / Nuxt build 失敗
   - 部署平台問題（Vercel / Railway / Netlify）
-  - 環境變數未正確注入（NUXT_PUBLIC_API_KEY、AUTH_PASSWORD）
+  - 環境變數未正確注入（NUXT_API_KEY、AUTH_PASSWORD）
   - GitHub Actions CI 失敗（lint、vue-tsc、test、build）
   - Nuxt SSR / SSG 切換問題
   - QA PASS 後執行 /opsx:archive
@@ -56,12 +56,13 @@ CI（GitHub Actions）
 
 | 變數名稱 | 平台注入位置 | 說明 |
 |---------|------------|------|
-| `NUXT_PUBLIC_API_KEY` | Platform Variables | 打外部 API 的 key |
-| `NUXT_PUBLIC_API_BASE` | Platform Variables | 外部 API base URL |
+| `NUXT_API_KEY` | Platform Variables (Secret) | 打外部 API 的 key，**只在 server-side 使用，絕不暴露給 browser** |
+| `NUXT_API_BASE_URL` | Platform Variables | 外部 API base URL，server-side only |
 | `AUTH_PASSWORD` | Platform Variables (Secret) | 管理介面登入密碼，**必須標記為 Secret** |
 
-**注意**：`AUTH_PASSWORD` 在所有平台都必須設為 Secret / Encrypted，
+**注意**：`AUTH_PASSWORD` 和 `NUXT_API_KEY` 在所有平台都必須設為 Secret / Encrypted，
 確保不出現在 build log 或 client bundle。
+前端 API 呼叫統一走 `/api/arbiter/*` proxy，由 Nuxt server 注入 X-API-Key 後轉發。
 
 ---
 
@@ -69,7 +70,7 @@ CI（GitHub Actions）
 
 | 症狀 | 常見原因 | 排查方向 |
 |------|---------|---------|
-| `NUXT_PUBLIC_API_KEY` 為空 | 環境變數未在平台注入 | 確認 Platform Variables 設定，`NUXT_PUBLIC_` 前綴必須完整 |
+| `NUXT_API_KEY` 為空 | 環境變數未在平台注入 | 確認 Platform Variables 設定，使用 `NUXT_API_KEY`（不含 PUBLIC） |
 | `AUTH_PASSWORD` 洩漏到 client | 誤放 `runtimeConfig.public` | 檢查 nuxt.config.ts，移回 private section |
 | rsbuild build 失敗 | TypeScript 錯誤或版本衝突 | 執行 `pnpm vue-tsc --noEmit` 確認型別錯誤 |
 | Nuxt build 後白屏 | SSR hydration 不一致 | 確認 composable 使用 `onMounted` 避免 server/client 差異 |
@@ -117,8 +118,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test --coverage
       env:
-        NUXT_PUBLIC_API_KEY: test-key
-        NUXT_PUBLIC_API_BASE: https://api.test.example.com
+        NUXT_API_KEY: test-key
+        NUXT_API_BASE_URL: https://api.test.example.com
         AUTH_PASSWORD: test-password
 
   build:
@@ -134,8 +135,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       env:
-        NUXT_PUBLIC_API_KEY: ${{ secrets.NUXT_PUBLIC_API_KEY }}
-        NUXT_PUBLIC_API_BASE: ${{ secrets.NUXT_PUBLIC_API_BASE }}
+        NUXT_API_KEY: ${{ secrets.NUXT_API_KEY }}
+        NUXT_API_BASE_URL: ${{ secrets.NUXT_API_BASE_URL }}
         AUTH_PASSWORD: ${{ secrets.AUTH_PASSWORD }}
 ```
 
@@ -145,8 +146,8 @@ jobs:
 
 ```
 ☐ Project → Settings → Environment Variables 設定：
-  ☐ NUXT_PUBLIC_API_KEY（Production / Preview）
-  ☐ NUXT_PUBLIC_API_BASE（Production / Preview）
+  ☐ NUXT_API_KEY（Production / Preview，標記 Sensitive）
+  ☐ NUXT_API_BASE_URL（Production / Preview）
   ☐ AUTH_PASSWORD（Production，標記 Sensitive）
 ☐ Framework Preset: Nuxt.js
 ☐ Build Command: pnpm build
@@ -158,12 +159,12 @@ jobs:
 
 ```
 ☐ Service → Variables 設定：
-  ☐ NUXT_PUBLIC_API_KEY
-  ☐ NUXT_PUBLIC_API_BASE
+  ☐ NUXT_API_KEY（設為 Hidden）
+  ☐ NUXT_API_BASE_URL
   ☐ AUTH_PASSWORD（設為 Hidden）
 ☐ Build Command: pnpm build
 ☐ Start Command: node .output/server/index.mjs（SSR 模式）
-☐ 靜態模式：.output/public 設為 Static Site
+☐ 靜態模式不支援此架構（proxy 需要 Node.js runtime）
 ```
 
 ---

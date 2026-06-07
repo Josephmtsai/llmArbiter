@@ -34,7 +34,8 @@ tools:
 
 本專案是**純前端管理介面**，連接到外部 API（另一個 repo）。
 關鍵環境變數：
-- `NUXT_PUBLIC_API_KEY`：打外部 API 端點用的 api-key（存 `runtimeConfig.public`）
+- `NUXT_API_KEY`：打外部 API 端點用的 api-key（存 `runtimeConfig` private，**只由 server proxy 使用，絕不暴露給 browser**）
+- `NUXT_API_BASE_URL`：外部 API base URL（`runtimeConfig.apiBaseUrl`，server-side only）
 - `AUTH_PASSWORD`：登入本介面的驗證密碼（存 `runtimeConfig` private，**絕不能暴露給客戶端**）
 
 ---
@@ -118,33 +119,34 @@ tools:
 ## 環境變數規範（Nuxt runtimeConfig）
 
 ```typescript
-// nuxt.config.ts
+// nuxt.config.ts — API key 和 base URL 都在 server-side，不暴露給 browser
 export default defineNuxtConfig({
   runtimeConfig: {
-    // Private：只在 server-side 可讀，絕不暴露給客戶端
-    authPassword: process.env.AUTH_PASSWORD,
-    // Public：客戶端可讀（api-key 供打外部 API 用）
-    public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE ?? 'https://api.example.com',
-      apiKey: process.env.NUXT_PUBLIC_API_KEY ?? '',
-    },
+    authPassword: '',      // NUXT_AUTH_PASSWORD
+    apiBaseUrl: 'https://artbiter-production.up.railway.app',  // NUXT_API_BASE_URL
+    apiKey: '',            // NUXT_API_KEY
   },
 })
 ```
 
 ```typescript
-// composables/useApi.ts — 封裝外部 API 呼叫，自動注入 api-key
+// server/api/arbiter/[...].ts — catch-all proxy，server 注入 X-API-Key
+export default defineEventHandler(async (event) => {
+  const session = await getUserSession(event)
+  if (!session.user) throw createError({ statusCode: 401, message: 'Unauthorized' })
+  const config = useRuntimeConfig(event)
+  const path = event.path.replace(/^\/api\/arbiter/, '')
+  return proxyRequest(event, `${config.apiBaseUrl}${path}`, {
+    headers: { 'X-API-Key': config.apiKey as string },
+  })
+})
+```
+
+```typescript
+// composables/useApi.ts — 前端只呼叫本地 proxy，不需要 api-key
 export function useApi() {
-  const config = useRuntimeConfig()
-
-  async function get<T>(path: string, opts?: object): Promise<T> {
-    return $fetch<T>(`${config.public.apiBase}${path}`, {
-      headers: { 'X-Api-Key': config.public.apiKey },
-      ...opts,
-    })
-  }
-
-  return { get }
+  const api = $fetch.create({ baseURL: '/api/arbiter' })
+  return { /* ... */ }
 }
 ```
 

@@ -5,10 +5,8 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     authPassword: '',
-    public: {
-      apiBase: 'https://artbiter-production.up.railway.app',
-      apiKey: '',
-    },
+    apiBaseUrl: 'https://artbiter-production.up.railway.app',
+    apiKey: '',
   },
 
   app: {

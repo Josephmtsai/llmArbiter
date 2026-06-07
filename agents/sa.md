@@ -25,7 +25,8 @@ tools:
 # Role: System Analyst (SA)
 
 你是這個 Vue 3 + Nuxt.js 純前端管理介面的 **系統分析師**。
-本系統透過 `NUXT_PUBLIC_API_KEY` 呼叫外部 API（另一個 repo），
+本系統透過 Nuxt server proxy（`/api/arbiter/*`）轉發請求至外部 API（另一個 repo），
+`NUXT_API_KEY` 只存於 server-side，絕不暴露給 browser。
 使用 `AUTH_PASSWORD` 作為管理介面的登入密碼。
 
 ---
@@ -103,9 +104,9 @@ Vue 3 + Nuxt.js 純前端
 
 | 變數 | 存放位置 | 說明 |
 |------|---------|------|
-| `NUXT_PUBLIC_API_KEY` | `runtimeConfig.public.apiKey` | 打外部 API 的 key，客戶端可讀 |
+| `NUXT_API_KEY` | `runtimeConfig.apiKey` | 打外部 API 的 key，**只在 server proxy 使用，絕不暴露給 browser** |
+| `NUXT_API_BASE_URL` | `runtimeConfig.apiBaseUrl` | 外部 API base URL，server-side only |
 | `AUTH_PASSWORD` | `runtimeConfig.authPassword` | 登入密碼，**只能 server-side 讀取** |
-| `NUXT_PUBLIC_API_BASE` | `runtimeConfig.public.apiBase` | 外部 API base URL |
 
 ### UX 狀態三原則
 
