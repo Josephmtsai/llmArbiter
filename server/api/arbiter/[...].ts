@@ -6,9 +6,15 @@ export default defineEventHandler(async (event) => {
 
   const config = useRuntimeConfig(event)
   const base = (config.apiBaseUrl as string).replace(/\/$/, '')
-  const path = event.path.replace(/^\/api\/arbiter/, '')
+  const wildcard = getRouterParam(event, '_') ?? ''
+  const query = new URLSearchParams(
+    Object.entries(getQuery(event)).flatMap(([k, v]) =>
+      Array.isArray(v) ? v.map(String).map((s) => [k, s]) : [[k, String(v ?? '')]],
+    ),
+  ).toString()
+  const targetPath = '/' + wildcard + (query ? '?' + query : '')
 
-  return proxyRequest(event, `${base}${path}`, {
+  return proxyRequest(event, `${base}${targetPath}`, {
     headers: { 'X-API-Key': config.apiKey as string },
   })
 })
