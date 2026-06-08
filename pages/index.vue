@@ -15,8 +15,9 @@ const loadingRecent = ref(false)
 
 const activeProvider = useState<string | null>('sidebar:activeProvider', () => null)
 const activeModel = useState<string | null>('sidebar:activeModel', () => null)
+const providerDefaultModel = useState<string | null>('sidebar:providerDefaultModel', () => null)
 
-const QUICK_MODELS = [
+const OPENROUTER_QUICK_MODELS = [
   { label: 'DeepSeek Flash', value: 'deepseek-flash' },
   { label: 'Qwen Plus', value: 'qwen-plus' },
   { label: 'HY3', value: 'hy3' },
@@ -100,22 +101,34 @@ onMounted(fetchRecent)
         <!-- Model selector -->
         <div v-if="activeProvider" class="arb-analyze__model-section">
           <UiEyebrow>Model <span class="arb-analyze__model-eyebrow-note">optional</span></UiEyebrow>
-          <!-- OpenRouter quick picks -->
-          <div v-if="activeProvider === 'openrouter'" class="arb-analyze__model-picker">
+          <div class="arb-analyze__model-picker">
+            <!-- Configured default from provider -->
             <button
-              v-for="m in QUICK_MODELS"
-              :key="m.value"
-              class="arb-analyze__model-btn"
-              :class="{ 'arb-analyze__model-btn--active': selectedQuickModel === m.value }"
-              @click="pickQuickModel(m.value)"
+              v-if="providerDefaultModel"
+              class="arb-analyze__model-btn arb-analyze__model-btn--configured"
+              :class="{ 'arb-analyze__model-btn--active': selectedQuickModel === providerDefaultModel }"
+              @click="pickQuickModel(providerDefaultModel)"
             >
-              {{ m.label }}
+              {{ providerDefaultModel }}
+              <span class="arb-analyze__model-btn-tag">default</span>
             </button>
+            <!-- OpenRouter quick picks -->
+            <template v-if="activeProvider === 'openrouter'">
+              <button
+                v-for="m in OPENROUTER_QUICK_MODELS"
+                :key="m.value"
+                class="arb-analyze__model-btn"
+                :class="{ 'arb-analyze__model-btn--active': selectedQuickModel === m.value }"
+                @click="pickQuickModel(m.value)"
+              >
+                {{ m.label }}
+              </button>
+            </template>
           </div>
           <input
             v-model="customModel"
             class="arb-analyze__model-input"
-            :placeholder="activeProvider === 'openrouter' ? 'Or enter any OpenRouter model ID…' : 'Enter model ID to override default…'"
+            placeholder="Or enter a model ID…"
             @input="onCustomModelInput"
           />
         </div>
@@ -331,6 +344,27 @@ onMounted(fetchRecent)
   border-color: var(--action-rebuild);
   color: var(--action-rebuild);
   background: var(--action-rebuild-soft);
+}
+.arb-analyze__model-btn--configured {
+  font-family: var(--font-mono);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.arb-analyze__model-btn-tag {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-4);
+  background: var(--bg-2);
+  border-radius: var(--r-sm);
+  padding: 1px 4px;
+  flex-shrink: 0;
 }
 .arb-analyze__model-input {
   font-family: var(--font-mono);

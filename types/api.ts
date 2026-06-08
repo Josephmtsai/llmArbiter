@@ -57,6 +57,8 @@ export interface GetStatsParams {
 
 export interface ProviderResponse {
   active_provider: string
+  active_model: string
+  optimizer_model: string
   available_providers: string[]
 }
 

@@ -32,6 +32,8 @@ const apiOnline = ref(false)
 const latencyMs = ref<number | null>(null)
 const activeProvider = useState<string | null>('sidebar:activeProvider', () => null)
 const activeModel = useState<string | null>('sidebar:activeModel', () => null)
+const providerDefaultModel = useState<string | null>('sidebar:providerDefaultModel', () => null)
+const optimizerDefaultModel = useState<string | null>('sidebar:optimizerDefaultModel', () => null)
 const availableProviders = ref<string[]>([])
 
 const providerDropdownOpen = ref(false)
@@ -53,6 +55,8 @@ async function pollStatus() {
     const res = await api.getProviders()
     activeProvider.value = res.active_provider ?? null
     availableProviders.value = res.available_providers ?? []
+    providerDefaultModel.value = res.active_model || null
+    optimizerDefaultModel.value = res.optimizer_model || null
   } catch {
     activeProvider.value = null
     availableProviders.value = []
@@ -83,6 +87,8 @@ async function selectProvider(p: string) {
     const res = await api.setProvider(p)
     activeProvider.value = res.active_provider ?? p
     availableProviders.value = res.available_providers ?? availableProviders.value
+    providerDefaultModel.value = res.active_model || null
+    optimizerDefaultModel.value = res.optimizer_model || null
   } catch {
     activeProvider.value = prev
     switchError.value = 'Switch failed'

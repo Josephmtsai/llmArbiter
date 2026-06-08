@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Ban, Bot } from 'lucide-vue-next'
 import { computed } from 'vue'
+
+const optimizerDefaultModel = useState<string | null>('sidebar:optimizerDefaultModel', () => null)
 import type { ArbiterAction, EvalPoolStats, OptimizerRun } from '~/types/api'
 import {
   ARBITER_ACTIONS,
@@ -135,6 +137,10 @@ function activeSegments(action: ArbiterAction): number {
             <UiInput v-model.number="targetAccuracy" type="number" min="0.01" max="1" step="0.01" mono />
           </UiField>
         </div>
+        <div v-if="optimizerDefaultModel" class="optimizer-overview__model-info">
+          <span class="optimizer-overview__model-info-label">Optimizer model</span>
+          <code class="optimizer-overview__model-info-value">{{ optimizerDefaultModel }}</code>
+        </div>
         <UiButton
           class="optimizer-overview__wide-btn"
           :loading="starting"
@@ -204,6 +210,29 @@ function activeSegments(action: ArbiterAction): number {
 .optimizer-overview__coverage-count { color: var(--fg-3); text-align: right; }
 .optimizer-overview__coverage-count--low { color: var(--warning); }
 .optimizer-overview__form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.optimizer-overview__model-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-0);
+}
+.optimizer-overview__model-info-label {
+  font-size: 11px;
+  color: var(--fg-4);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.optimizer-overview__model-info-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .optimizer-overview__wide-btn { width: 100%; justify-content: center; }
 .optimizer-overview__empty { display: flex; justify-content: center; border: 1px dashed var(--border-subtle); border-radius: var(--r-md); padding: 22px; color: var(--fg-4); font-size: 13px; text-align: center; }
 .optimizer-overview__table { width: 100%; border-collapse: collapse; margin-top: 12px; }

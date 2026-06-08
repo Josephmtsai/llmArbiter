@@ -78,7 +78,8 @@ export function useOptimizerWorkflow() {
   const reviewMutatingId = ref<string | null>(null)
   const reviewError = ref<string | null>(null)
 
-  const poolModel = ref('')
+  const optimizerDefaultModel = useState<string | null>('sidebar:optimizerDefaultModel', () => null)
+  const poolModel = ref(optimizerDefaultModel.value ?? '')
   const startingPoolEval = ref(false)
   const poolEvalRunId = ref<number | null>(null)
   const poolEvalError = ref<string | null>(null)
