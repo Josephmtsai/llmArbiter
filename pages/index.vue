@@ -99,7 +99,7 @@ onMounted(fetchRecent)
           style="min-height: 220px; margin-top: 10px"
         />
         <!-- Model selector -->
-        <div v-if="activeProvider" class="arb-analyze__model-section">
+        <div v-if="activeProvider === 'openrouter'" class="arb-analyze__model-section">
           <UiEyebrow>Model <span class="arb-analyze__model-eyebrow-note">optional</span></UiEyebrow>
           <div class="arb-analyze__model-picker">
             <!-- Configured default from provider -->
