@@ -77,6 +77,14 @@ function sourcePath(result: EvalRunResult): string | null {
   return typeof p === 'string' ? p : null
 }
 
+function resultReason(result: EvalRunResult): string | null {
+  return result.reason ?? result.parsed_output?.reason ?? null
+}
+
+function resultThinking(result: EvalRunResult): string | null {
+  return result.thinking ?? result.parsed_output?.thinking ?? null
+}
+
 function statusLabel(status: string | undefined): string {
   return status ?? 'completed'
 }
@@ -319,9 +327,15 @@ onUnmounted(stopPolling)
                 <td colspan="7" class="arb-detail__panel-cell">
                   <div class="arb-detail__panel">
                     <!-- Reason -->
-                    <div v-if="result.reason" class="arb-detail__panel-section">
+                    <div v-if="resultReason(result)" class="arb-detail__panel-section">
                       <div class="arb-detail__panel-label">Reason</div>
-                      <p class="arb-detail__panel-text">{{ result.reason }}</p>
+                      <p class="arb-detail__panel-text">{{ resultReason(result) }}</p>
+                    </div>
+
+                    <!-- Thinking -->
+                    <div v-if="resultThinking(result)" class="arb-detail__panel-section">
+                      <div class="arb-detail__panel-label">Thinking</div>
+                      <p class="arb-detail__panel-text arb-detail__panel-text--thinking">{{ resultThinking(result) }}</p>
                     </div>
 
                     <!-- Log Snippet -->
@@ -337,7 +351,7 @@ onUnmounted(stopPolling)
                     </div>
 
                     <div
-                      v-if="!result.reason && !result.log_snippet && !sourcePath(result)"
+                      v-if="!resultReason(result) && !resultThinking(result) && !result.log_snippet && !sourcePath(result)"
                       class="arb-detail__panel-empty"
                     >
                       No additional detail available.
@@ -594,6 +608,10 @@ onUnmounted(stopPolling)
   line-height: 1.6;
   margin: 0;
   white-space: pre-wrap;
+}
+.arb-detail__panel-text--thinking {
+  color: var(--fg-3);
+  font-style: italic;
 }
 .arb-detail__panel-pre {
   margin: 0;

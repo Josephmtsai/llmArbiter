@@ -213,8 +213,17 @@ export interface EvalRunResult {
   latency_ms: number | null
   confidence?: number | null
   reason?: string | null
+  thinking?: string | null
   log_snippet?: string | null
   hardware_info?: Record<string, unknown> | null
+  raw_output?: string | null
+  parsed_output?: {
+    primary_action?: string | null
+    side_action?: string | null
+    confidence?: number | null
+    reason?: string | null
+    thinking?: string | null
+  } | null
 }
 
 export interface EvalRunDetail {
