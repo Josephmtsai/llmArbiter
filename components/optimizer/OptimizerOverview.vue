@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { Ban, Bot } from 'lucide-vue-next'
 import { computed } from 'vue'
-
-const optimizerDefaultModel = useState<string | null>('sidebar:optimizerDefaultModel', () => null)
 import type { ArbiterAction, EvalPoolStats, OptimizerRun } from '~/types/api'
 import {
   ARBITER_ACTIONS,
@@ -24,6 +22,7 @@ const props = defineProps<{
   loadingStats: boolean
   starting: boolean
   cancellingRunId: number | null
+  optimizerDefaultModel?: string | null
 }>()
 
 defineEmits<{
@@ -137,9 +136,9 @@ function activeSegments(action: ArbiterAction): number {
             <UiInput v-model.number="targetAccuracy" type="number" min="0.01" max="1" step="0.01" mono />
           </UiField>
         </div>
-        <div v-if="optimizerDefaultModel" class="optimizer-overview__model-info">
+        <div v-if="props.optimizerDefaultModel" class="optimizer-overview__model-info">
           <span class="optimizer-overview__model-info-label">Optimizer model</span>
-          <code class="optimizer-overview__model-info-value">{{ optimizerDefaultModel }}</code>
+          <code class="optimizer-overview__model-info-value">{{ props.optimizerDefaultModel }}</code>
         </div>
         <UiButton
           class="optimizer-overview__wide-btn"

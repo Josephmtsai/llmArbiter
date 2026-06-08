@@ -7,6 +7,8 @@ const tabs: Array<{ id: OptimizerTab; label: string; href: string }> = [
   { id: 'evaluation', label: 'Pool evaluation', href: '/optimizer/evaluation' },
   { id: 'history', label: 'History', href: '/optimizer/history' },
 ]
+const optimizerDefaultModel = useState<string | null>('sidebar:optimizerDefaultModel', () => null)
+
 const {
   activeTab, stats, optimizerRuns, reviewTotal, prompts, selectedPromptId,
   loadingStats, loadingHistory, loadingRunDetail, loadingReview, loadingPrompts, globalError,
@@ -60,6 +62,7 @@ function selectRun(id: number) {
       :loading-stats="loadingStats"
       :starting="startingOptimizer"
       :cancelling-run-id="cancellingRunId"
+      :optimizer-default-model="optimizerDefaultModel"
       @start="startOptimizer"
       @cancel="cancelOptimizerRun"
       @select-run="selectRun"
