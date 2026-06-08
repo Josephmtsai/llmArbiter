@@ -176,8 +176,10 @@ const stats = computed(() => {
             <td><UiSmallMeter :value="d.confidence" /></td>
             <td><UiSourceBadge :source="d.source" /></td>
             <td>
-              <UiProviderChip :provider="d.provider" />
-              <span v-if="d.model" class="arb-decisions__model-chip num">{{ d.model }}</span>
+              <div class="arb-decisions__provider-cell">
+                <UiProviderChip :provider="d.provider" />
+                <span v-if="d.model !== undefined" class="arb-decisions__model-sub num">{{ d.model || '—' }}</span>
+              </div>
             </td>
             <td class="num arb-decisions__td-time">{{ new Date(d.created_at).toLocaleString() }}</td>
           </tr>
@@ -209,8 +211,10 @@ const stats = computed(() => {
           <div class="arb-drawer__row">
             <UiActionBadge :action="selectedDecision.primary_action" size="lg" />
             <UiSourceBadge :source="selectedDecision.source" />
-            <UiProviderChip :provider="selectedDecision.provider" />
-            <span v-if="selectedDecision.model" class="arb-decisions__model-chip num">{{ selectedDecision.model }}</span>
+            <div class="arb-drawer__provider-block">
+              <UiProviderChip :provider="selectedDecision.provider" />
+              <span v-if="selectedDecision.model !== undefined" class="arb-decisions__model-sub num">{{ selectedDecision.model || '—' }}</span>
+            </div>
           </div>
           <UiSmallMeter :value="selectedDecision.confidence" />
           <div class="arb-drawer__section">
@@ -364,17 +368,21 @@ const stats = computed(() => {
 .arb-decisions__row:hover td { background: var(--bg-2); }
 .arb-decisions__row:last-child td { border-bottom: none; }
 .arb-decisions__td-time { font-size: 11px; color: var(--fg-4); }
-.arb-decisions__model-chip {
-  display: inline-block;
-  margin-left: 4px;
+.arb-decisions__provider-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+}
+.arb-decisions__model-sub {
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--fg-4);
-  background: var(--bg-2);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r-sm);
-  padding: 1px 6px;
-  vertical-align: middle;
+  line-height: 1;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .arb-decisions__pagination {
   display: flex;
@@ -466,6 +474,12 @@ const stats = computed(() => {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+}
+.arb-drawer__provider-block {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
 }
 .arb-drawer__section {
   display: flex;
