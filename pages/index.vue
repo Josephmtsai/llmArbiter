@@ -41,11 +41,9 @@ watch(effectiveModel, (val) => {
   activeModel.value = val || null
 })
 
-watch(activeProvider, (val) => {
-  if (val !== 'openrouter') {
-    selectedQuickModel.value = null
-    customModel.value = ''
-  }
+watch(activeProvider, () => {
+  selectedQuickModel.value = null
+  customModel.value = ''
 })
 
 async function analyze() {
@@ -99,10 +97,11 @@ onMounted(fetchRecent)
           placeholder="Paste build log, error output, or system event here…"
           style="min-height: 220px; margin-top: 10px"
         />
-        <!-- OpenRouter model selector -->
-        <div v-if="activeProvider === 'openrouter'" class="arb-analyze__model-section">
-          <UiEyebrow>Model</UiEyebrow>
-          <div class="arb-analyze__model-picker">
+        <!-- Model selector -->
+        <div v-if="activeProvider" class="arb-analyze__model-section">
+          <UiEyebrow>Model <span class="arb-analyze__model-eyebrow-note">optional</span></UiEyebrow>
+          <!-- OpenRouter quick picks -->
+          <div v-if="activeProvider === 'openrouter'" class="arb-analyze__model-picker">
             <button
               v-for="m in QUICK_MODELS"
               :key="m.value"
@@ -116,7 +115,7 @@ onMounted(fetchRecent)
           <input
             v-model="customModel"
             class="arb-analyze__model-input"
-            placeholder="Or enter any OpenRouter model ID…"
+            :placeholder="activeProvider === 'openrouter' ? 'Or enter any OpenRouter model ID…' : 'Enter model ID to override default…'"
             @input="onCustomModelInput"
           />
         </div>
@@ -131,8 +130,8 @@ onMounted(fetchRecent)
             />
           </UiField>
           <div class="arb-analyze__run-col">
-            <span v-if="activeProvider === 'openrouter'" class="arb-analyze__model-chip num">
-              openrouter · {{ effectiveModel || 'default' }}
+            <span v-if="activeProvider && effectiveModel" class="arb-analyze__model-chip num">
+              {{ activeProvider }} · {{ effectiveModel }}
             </span>
             <UiButton
               variant="primary"
@@ -299,6 +298,14 @@ onMounted(fetchRecent)
   gap: 8px;
   padding-top: 4px;
   border-top: 1px solid var(--border-subtle);
+}
+.arb-analyze__model-eyebrow-note {
+  font-size: 9px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--fg-4);
+  margin-left: 4px;
 }
 .arb-analyze__model-picker {
   display: flex;
