@@ -1,0 +1,19 @@
+{
+  "from": "sa",
+  "to": "developer",
+  "feature": "guide-zh-tab-detail",
+  "status": "ready",
+  "summary": "Guide page 加入 EN/ZH 語言切換 tab、將所有文字資料轉為雙語物件、補充詳細說明（兩層仲裁邏輯、split_group 去重、confusion clusters、Gate 2 保護說明）、並新增六個 tooltip",
+  "artifacts": [
+    "specs/guide-zh-tab-detail/spec.md",
+    "specs/guide-zh-tab-detail/tasks.md"
+  ],
+  "assumptions": [
+    "GuideTooltip component 介面不變，只吃一個 string text prop",
+    "不引入 vue-i18n；語言狀態用 page-local ref<'en' | 'zh'>",
+    "Tooltip 文字第一版只提供英文，不翻譯",
+    "語言偏好不持久化（不寫 localStorage）",
+    "Code identifier、formula、API endpoint 不翻譯，保持英文",
+    "新增的中文內容以台灣正體中文為準"
+  ]
+}

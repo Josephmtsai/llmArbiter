@@ -1,0 +1,12 @@
+{
+  "from": "developer",
+  "to": "qa",
+  "feature": "guide-zh-tab-detail",
+  "status": "ready",
+  "summary": "Added EN/ZH language toggle tab to guide page, converted all data arrays to bilingual {en, zh} objects with t() helper, enriched EN content (two-layer arbiter concept, split_group dedup, confusion clusters detail, Gate 2 protection rationale, accuracy delta clarification), added 6 new GuideTooltips (split_group, notify_human, send_email, source=optimizer, confusion clusters in Gate 2 note, held-out test snapshot)",
+  "changed_files": ["pages/guide.vue", "specs/guide-zh-tab-detail/handoff-dev.json"],
+  "ac_ref": "specs/guide-zh-tab-detail/tasks.md",
+  "retry_count": 0,
+  "max_retries": 2,
+  "retry_history": []
+}
