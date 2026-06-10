@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({ middleware: 'auth' })
+definePageMeta({ middleware: [] })
 
 const lang = ref<'en' | 'zh'>('en')
 function t(obj: { en: string; zh: string }): string {

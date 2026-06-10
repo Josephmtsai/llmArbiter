@@ -1,0 +1,16 @@
+{
+  "from": "sa",
+  "to": "developer",
+  "feature": "guide-public-access",
+  "status": "pending-human-review",
+  "summary": "將 guide page 的 middleware: 'auth' 改為 middleware: []，使 /guide 在未登入時可存取；其他頁面不受影響",
+  "artifacts": [
+    "specs/guide-public-access/spec.md",
+    "specs/guide-public-access/tasks.md"
+  ],
+  "assumptions": [
+    "AppSidebar 的 API 呼叫失敗已由 try/catch 優雅處理，無需另建 layout",
+    "未登入使用者點擊 sidebar 其他連結會被各頁面自身的 auth middleware 導向 /login",
+    "guide page 本身不呼叫任何 API，純靜態內容"
+  ]
+}

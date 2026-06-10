@@ -1,0 +1,12 @@
+{
+  "from": "developer",
+  "to": "qa",
+  "feature": "guide-public-access",
+  "status": "ready",
+  "summary": "Changed definePageMeta middleware from 'auth' to [] on guide.vue — /guide is now publicly accessible without login",
+  "changed_files": ["pages/guide.vue", "specs/guide-public-access/handoff-dev.json"],
+  "ac_ref": "specs/guide-public-access/tasks.md",
+  "retry_count": 0,
+  "max_retries": 2,
+  "retry_history": []
+}
