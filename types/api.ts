@@ -286,6 +286,38 @@ export type ReviewQueueMutationRequest =
 
 export type ConfusionMatrix = Record<string, Record<string, number>>
 
+export type OptimizerErrorType =
+  | 'wrong_action'
+  | 'confidence_too_high'
+  | 'confidence_too_low'
+  | 'missing_required_field'
+  | 'invalid_json'
+  | 'unsupported_action'
+  | 'protected_action_regression'
+  | 'unknown'
+  | string
+
+export interface OptimizerErrorRepresentativeCase {
+  source_case_id: string | null
+  expected_action: string | null
+  predicted_action: string | null
+  confidence: number | null
+  log_snippet: string | null
+  hardware_info?: Record<string, unknown>
+  raw_output?: string | null
+  parsed_output?: unknown
+}
+
+export interface OptimizerErrorCluster {
+  error_type: OptimizerErrorType
+  expected_action: string | null
+  predicted_action: string | null
+  count: number
+  accuracy_impact: number | null
+  representative_cases: OptimizerErrorRepresentativeCase[]
+  suggested_rule_focus?: string | null
+}
+
 export interface OptimizerRoundFailure {
   source_case_id?: string | number | null
   expected_action: ArbiterAction | string
@@ -336,6 +368,7 @@ export interface OptimizerRound {
   reject_reason?: string | null
   per_action_metrics?: Record<string, { total: number; correct: number; accuracy: number }> | null
   per_action_deltas?: Record<string, { baseline_accuracy: number; candidate_accuracy: number; delta: number; baseline_total: number; candidate_total: number; tolerance: number }> | null
+  error_clusters?: OptimizerErrorCluster[] | null
 }
 
 export interface OptimizerRun {

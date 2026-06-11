@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import type {
   ConfusionMatrix,
+  OptimizerErrorCluster,
   OptimizerModelComparison,
   OptimizerRound,
   OptimizerRoundFailure,
@@ -180,6 +181,30 @@ function modelComparisonDecisionClass(comparison: OptimizerModelComparison): str
   return comparison.would_keep
     ? 'optimizer-history__kept-badge--kept'
     : 'optimizer-history__kept-badge--rejected'
+}
+
+const ERROR_TYPE_LABELS: Record<string, string> = {
+  wrong_action: 'Wrong action',
+  confidence_too_high: 'Confidence too high',
+  confidence_too_low: 'Confidence too low',
+  missing_required_field: 'Missing field',
+  invalid_json: 'Invalid JSON',
+  unsupported_action: 'Unsupported action',
+  protected_action_regression: 'Protected action regression',
+  unknown: 'Unknown',
+}
+
+function errorTypeLabel(errorType: string): string {
+  return ERROR_TYPE_LABELS[errorType] ?? errorType
+}
+
+function formatImpact(value: number | null): string {
+  if (value == null) return 'n/a'
+  return `${(Math.abs(value) * 100).toFixed(1)}%`
+}
+
+function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
+  return round.error_clusters ?? []
 }
 </script>
 
@@ -471,6 +496,67 @@ function modelComparisonDecisionClass(comparison: OptimizerModelComparison): str
                       </tr>
                     </tbody>
                   </table>
+                </div>
+              </div>
+
+              <!-- Error Intelligence -->
+              <div v-if="errorClusters(round).length > 0" class="optimizer-history__error-intel">
+                <div class="optimizer-history__section-label">Error Intelligence</div>
+                <p class="optimizer-history__error-intel-desc">
+                  These are grouped validation failures used to guide the next prompt candidate.
+                </p>
+                <div class="optimizer-history__cluster-list">
+                  <details
+                    v-for="(cluster, ci) in errorClusters(round)"
+                    :key="ci"
+                    class="optimizer-history__cluster"
+                  >
+                    <summary class="optimizer-history__cluster-summary">
+                      <span class="optimizer-history__cluster-type">{{ errorTypeLabel(cluster.error_type) }}</span>
+                      <template v-if="cluster.expected_action && cluster.predicted_action">
+                        <span class="optimizer-history__acc-arrow">·</span>
+                        <span class="optimizer-history__cluster-action">{{ shortAction(cluster.expected_action) }}</span>
+                        <span class="optimizer-history__acc-arrow">→</span>
+                        <span class="optimizer-history__cluster-action">{{ shortAction(cluster.predicted_action) }}</span>
+                      </template>
+                      <span class="optimizer-history__cluster-count num">{{ cluster.count }}</span>
+                      <span v-if="cluster.accuracy_impact != null" class="optimizer-history__cluster-impact num">
+                        {{ formatImpact(cluster.accuracy_impact) }}
+                      </span>
+                    </summary>
+                    <div class="optimizer-history__cluster-detail">
+                      <p v-if="cluster.suggested_rule_focus" class="optimizer-history__cluster-focus">
+                        {{ cluster.suggested_rule_focus }}
+                      </p>
+                      <div v-if="cluster.representative_cases.length > 0" class="optimizer-history__rep-cases">
+                        <div class="optimizer-history__section-label optimizer-history__section-label--minor">
+                          Representative cases
+                        </div>
+                        <details
+                          v-for="(rc, ri) in cluster.representative_cases"
+                          :key="ri"
+                          class="optimizer-history__failure"
+                        >
+                          <summary class="optimizer-history__failure-summary">
+                            <span>{{ rc.expected_action ?? 'n/a' }}</span>
+                            <span class="optimizer-history__acc-arrow">→</span>
+                            <span>{{ rc.predicted_action ?? 'n/a' }}</span>
+                            <span class="num">{{ formatConfidence(rc.confidence) }}</span>
+                          </summary>
+                          <div class="optimizer-history__failure-detail">
+                            <span v-if="rc.source_case_id" class="optimizer-history__metadata-item">
+                              <strong>source_case_id</strong>: {{ rc.source_case_id }}
+                            </span>
+                            <div v-if="rc.log_snippet" class="optimizer-history__log-preview">{{ rc.log_snippet }}</div>
+                            <details v-if="rc.raw_output" class="optimizer-history__raw-output">
+                              <summary>Raw output</summary>
+                              <pre>{{ rc.raw_output }}</pre>
+                            </details>
+                          </div>
+                        </details>
+                      </div>
+                    </div>
+                  </details>
                 </div>
               </div>
 
@@ -1057,5 +1143,93 @@ function modelComparisonDecisionClass(comparison: OptimizerModelComparison): str
   .optimizer-history__run-meta {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Error Intelligence ─────────────────────────────────────── */
+.optimizer-history__error-intel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.optimizer-history__error-intel-desc {
+  margin: 0;
+  color: var(--fg-4);
+  font-size: 11px;
+}
+
+.optimizer-history__cluster-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.optimizer-history__cluster {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+}
+
+.optimizer-history__cluster-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px;
+  color: var(--fg-3);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  list-style: none;
+  user-select: none;
+}
+
+.optimizer-history__cluster-type {
+  color: var(--fg-1);
+}
+
+.optimizer-history__cluster-action {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.optimizer-history__cluster-count {
+  margin-left: auto;
+  color: var(--fg-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.optimizer-history__cluster-impact {
+  color: var(--action-notify);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.optimizer-history__cluster-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border-subtle);
+  padding: 10px 12px;
+  background: var(--bg-1);
+}
+
+.optimizer-history__cluster-focus {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.optimizer-history__rep-cases {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.optimizer-history__section-label--minor {
+  font-size: 10px;
+  margin-bottom: 0;
 }
 </style>

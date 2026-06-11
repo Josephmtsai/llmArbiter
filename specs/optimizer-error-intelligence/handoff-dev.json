@@ -1,0 +1,16 @@
+{
+  "from": "developer",
+  "to": "qa",
+  "feature": "optimizer-error-intelligence",
+  "status": "ready",
+  "summary": "Added OptimizerErrorType/OptimizerErrorRepresentativeCase/OptimizerErrorCluster types + error_clusters field to OptimizerRound in types/api.ts; added Error Intelligence section to OptimizerHistory.vue round detail with cluster list, collapsed representative cases, raw_output behind nested details, and label mapping",
+  "changed_files": [
+    "types/api.ts",
+    "components/optimizer/OptimizerHistory.vue",
+    "specs/optimizer-error-intelligence/handoff-dev.json"
+  ],
+  "ac_ref": "specs/optimizer-error-intelligence/tasks.md",
+  "retry_count": 0,
+  "max_retries": 2,
+  "retry_history": []
+}
