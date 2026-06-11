@@ -80,18 +80,18 @@ const poolStats: StatItem[] = [
   },
   {
     label: { en: 'Train split', zh: '訓練集' },
-    value: '10,400',
-    note: { en: 'Used for relabeling and curation — not used for optimizer scoring.', zh: '用於重新標記與資料整理，不用於最佳化器評分。' },
+    value: '7,200',
+    note: { en: '60% of pool (1,440/action) — used for relabeling and curation, not optimizer scoring.', zh: '佔資料池 60%（每動作 1,440 筆），用於重新標記與資料整理，不用於最佳化器評分。' },
   },
   {
     label: { en: 'Validation split', zh: '驗證集' },
-    value: '800',
-    note: { en: 'Optimizer snapshots 200 of these per run (40/action) — fixed for the whole run.', zh: '最佳化器每次執行從中抽樣 200 筆（每動作 40 筆），全程固定不變。' },
+    value: '2,400',
+    note: { en: '20% of pool (480/action) — optimizer snapshots 200 per run (40/action), fixed for the whole run.', zh: '佔資料池 20%（每動作 480 筆），最佳化器每次執行抽樣 200 筆（每動作 40 筆），全程固定不變。' },
   },
   {
     label: { en: 'Test split', zh: '測試集' },
-    value: '800',
-    note: { en: 'Final test snapshot is 400 cases (80/action), evaluated once after the optimizer loop.', zh: '最終測試快照為 400 筆（每動作 80 筆），只在最佳化迴圈結束後評估一次。' },
+    value: '2,400',
+    note: { en: '20% of pool (480/action) — final test snapshot is 400 cases (80/action), evaluated once after the optimizer loop.', zh: '佔資料池 20%（每動作 480 筆），最終測試快照為 400 筆（每動作 80 筆），只在最佳化迴圈結束後評估一次。' },
   },
 ]
 
@@ -113,7 +113,7 @@ const visualLanes: VisualLane[] = [
       },
       {
         label: { en: 'Split pool', zh: '資料分割' },
-        body: { en: 'Train (10,400), validation (800), and test (800) splits stay separated so optimizer scoring remains honest.', zh: '訓練（10,400）、驗證（800）、測試（800）三份資料保持隔離，確保最佳化器評分不受污染。' },
+        body: { en: 'Train (7,200), validation (2,400), and test (2,400) splits stay separated so optimizer scoring remains honest.', zh: '訓練（7,200）、驗證（2,400）、測試（2,400）三份資料保持隔離，確保最佳化器評分不受污染。' },
         tag: '12,000 cases',
       },
     ],
