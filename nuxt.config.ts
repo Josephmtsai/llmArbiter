@@ -30,7 +30,15 @@ export default defineNuxtConfig({
     },
   },
 
-  css: ['~/assets/css/design-tokens.css'],
+  css: [
+    '~/assets/css/design-tokens.css',
+    '@vueform/slider/themes/default.css',
+    '@vuepic/vue-datepicker/dist/main.css',
+  ],
+
+  build: {
+    transpile: ['@vuepic/vue-datepicker'],
+  },
 
   typescript: { strict: true },
 })

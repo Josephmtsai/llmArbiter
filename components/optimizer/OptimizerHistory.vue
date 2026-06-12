@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import Slider from '@vueform/slider'
+import { VueDatePicker } from '@vuepic/vue-datepicker'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type {
   ConfusionMatrix,
   OptimizerErrorCluster,
@@ -40,6 +42,9 @@ watch(
   },
 )
 
+// ── Sub-tab state ─────────────────────────────────────────────────────────────
+const historySubTab = ref<'runs' | 'compare'>('runs')
+
 // ── Filter state ─────────────────────────────────────────────────────────────
 const ALL_STATUSES = [
   'running',
@@ -58,6 +63,65 @@ const filterAccuracyMin = ref<number | null>(null)
 const filterAccuracyMax = ref<number | null>(null)
 const filterDateStart = ref<string>('')
 const filterDateEnd = ref<string>('')
+
+// ── Exclusive filter dropdown state ──────────────────────────────────────────
+type FilterDimension = 'status' | 'optimizerModel' | 'evaluatorModel' | 'accuracy' | 'date'
+
+const activeFilterDimension = ref<FilterDimension | null>(null)
+const filterBarRef = ref<HTMLElement | null>(null)
+
+function toggleFilter(dimension: FilterDimension): void {
+  activeFilterDimension.value = activeFilterDimension.value === dimension ? null : dimension
+}
+
+function handleDocumentMousedown(event: MouseEvent): void {
+  const target = event.target
+  if (!(target instanceof Node)) return
+  if (filterBarRef.value && !filterBarRef.value.contains(target)) {
+    activeFilterDimension.value = null
+  }
+}
+
+onMounted(() => document.addEventListener('mousedown', handleDocumentMousedown))
+onUnmounted(() => document.removeEventListener('mousedown', handleDocumentMousedown))
+
+// ── Accuracy range slider (percentage 0–100, filter values stay 0–1) ─────────
+const sliderAccuracy = ref<[number, number]>([0, 100])
+
+function onSliderUpdate(value: number | number[] | string): void {
+  if (!Array.isArray(value) || value.length !== 2) return
+  const [min, max] = value
+  sliderAccuracy.value = [min, max]
+  filterAccuracyMin.value = min <= 0 ? null : min / 100
+  filterAccuracyMax.value = max >= 100 ? null : max / 100
+}
+
+watch([filterAccuracyMin, filterAccuracyMax], ([min, max]) => {
+  sliderAccuracy.value = [
+    min == null ? 0 : Math.round(min * 100),
+    max == null ? 100 : Math.round(max * 100),
+  ]
+})
+
+// ── Date picker models (string 'yyyy-MM-dd' ↔ filterDateStart/End) ───────────
+const isDark = computed(() => {
+  if (typeof document === 'undefined') return true
+  return document.documentElement.dataset.theme !== 'light'
+})
+
+const dateStartModel = computed<string | null>({
+  get: () => filterDateStart.value || null,
+  set: (value) => {
+    filterDateStart.value = value ?? ''
+  },
+})
+
+const dateEndModel = computed<string | null>({
+  get: () => filterDateEnd.value || null,
+  set: (value) => {
+    filterDateEnd.value = value ?? ''
+  },
+})
 
 const uniqueOptimizerModels = computed(() =>
   [...new Set(props.runs.map((r) => r.optimizer_model).filter((m): m is string => Boolean(m)))].sort(),
@@ -136,8 +200,6 @@ function toggleSetValue(set: Set<string>, value: string): Set<string> {
 // ── Compare state ─────────────────────────────────────────────────────────────
 const MAX_COMPARE = 4
 const compareSelectedIds = ref<Set<number>>(new Set())
-const comparePanel = ref(false)
-const compareTip = ref('')
 
 const compareSelectedRuns = computed(() =>
   [...compareSelectedIds.value]
@@ -150,13 +212,6 @@ watch(filteredRuns, (visible) => {
   const next = new Set([...compareSelectedIds.value].filter((id) => visibleIds.has(id)))
   if (next.size !== compareSelectedIds.value.size) {
     compareSelectedIds.value = next
-    if (next.size < 2 && comparePanel.value) {
-      comparePanel.value = false
-      compareTip.value = '請至少選取 2 個 runs 進行比較'
-      setTimeout(() => {
-        compareTip.value = ''
-      }, 3000)
-    }
   }
 })
 
@@ -167,7 +222,6 @@ function toggleCompare(runId: number, event: Event): void {
     const next = new Set(current)
     next.delete(runId)
     compareSelectedIds.value = next
-    if (next.size < 2) comparePanel.value = false
   } else if (current.size < MAX_COMPARE) {
     compareSelectedIds.value = new Set([...current, runId])
   }
@@ -177,15 +231,6 @@ function removeFromCompare(runId: number): void {
   const next = new Set(compareSelectedIds.value)
   next.delete(runId)
   compareSelectedIds.value = next
-  if (next.size < 2) {
-    comparePanel.value = false
-    if (next.size === 1) {
-      compareTip.value = '請至少選取 2 個 runs 進行比較'
-      setTimeout(() => {
-        compareTip.value = ''
-      }, 3000)
-    }
-  }
 }
 
 function formatCompareAccuracy(value: number | null | undefined): string {
@@ -412,27 +457,49 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
 
 <template>
   <div class="optimizer-history__wrapper">
-    <section class="optimizer-history">
+    <!-- Sub-tab bar: Runs / Compare -->
+    <div class="optimizer-history__subtabs" role="tablist" aria-label="History views">
+      <button
+        type="button"
+        role="tab"
+        class="optimizer-history__subtab"
+        :class="{ 'optimizer-history__subtab--active': historySubTab === 'runs' }"
+        :aria-selected="historySubTab === 'runs'"
+        @click="historySubTab = 'runs'"
+      >
+        Runs
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="optimizer-history__subtab"
+        :class="{ 'optimizer-history__subtab--active': historySubTab === 'compare' }"
+        :aria-selected="historySubTab === 'compare'"
+        @click="historySubTab = 'compare'"
+      >
+        Compare
+        <span v-if="compareSelectedIds.size > 0" class="optimizer-history__subtab-badge num">
+          {{ compareSelectedIds.size }}
+        </span>
+      </button>
+    </div>
+
+    <section v-if="historySubTab === 'runs'" class="optimizer-history">
       <UiCard class="optimizer-history__list-card">
         <div class="optimizer-history__panel-head">
           <UiEyebrow>Runs</UiEyebrow>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span v-if="compareSelectedIds.size > 0" class="optimizer-history__muted">
-              已選取 {{ compareSelectedIds.size }} 個
-            </span>
-            <span v-if="loading" class="optimizer-history__muted">Loading</span>
-          </div>
+          <span v-if="loading" class="optimizer-history__muted">Loading</span>
         </div>
 
         <!-- Filter Bar -->
-        <div class="optimizer-history__filter-bar">
+        <div ref="filterBarRef" class="optimizer-history__filter-bar">
           <!-- Status filter -->
-          <details class="optimizer-history__filter-group">
-            <summary class="optimizer-history__filter-summary">
+          <details class="optimizer-history__filter-group" :open="activeFilterDimension === 'status'">
+            <summary class="optimizer-history__filter-summary" @click.prevent="toggleFilter('status')">
               Status
               <span v-if="filterStatuses.size > 0" class="optimizer-history__filter-badge">{{ filterStatuses.size }}</span>
             </summary>
-            <div class="optimizer-history__filter-options">
+            <div v-show="activeFilterDimension === 'status'" class="optimizer-history__filter-options">
               <label
                 v-for="status in ALL_STATUSES"
                 :key="status"
@@ -450,12 +517,12 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
           </details>
 
           <!-- Optimizer Model filter -->
-          <details v-if="uniqueOptimizerModels.length > 0" class="optimizer-history__filter-group">
-            <summary class="optimizer-history__filter-summary">
+          <details v-if="uniqueOptimizerModels.length > 0" class="optimizer-history__filter-group" :open="activeFilterDimension === 'optimizerModel'">
+            <summary class="optimizer-history__filter-summary" @click.prevent="toggleFilter('optimizerModel')">
               Optimizer Model
               <span v-if="filterOptimizerModels.size > 0" class="optimizer-history__filter-badge">{{ filterOptimizerModels.size }}</span>
             </summary>
-            <div class="optimizer-history__filter-options">
+            <div v-show="activeFilterDimension === 'optimizerModel'" class="optimizer-history__filter-options">
               <label
                 v-for="model in uniqueOptimizerModels"
                 :key="model"
@@ -473,12 +540,12 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
           </details>
 
           <!-- Evaluator Model filter -->
-          <details v-if="uniqueEvaluatorModels.length > 0" class="optimizer-history__filter-group">
-            <summary class="optimizer-history__filter-summary">
+          <details v-if="uniqueEvaluatorModels.length > 0" class="optimizer-history__filter-group" :open="activeFilterDimension === 'evaluatorModel'">
+            <summary class="optimizer-history__filter-summary" @click.prevent="toggleFilter('evaluatorModel')">
               Evaluator Model
               <span v-if="filterEvaluatorModels.size > 0" class="optimizer-history__filter-badge">{{ filterEvaluatorModels.size }}</span>
             </summary>
-            <div class="optimizer-history__filter-options">
+            <div v-show="activeFilterDimension === 'evaluatorModel'" class="optimizer-history__filter-options">
               <label
                 v-for="model in uniqueEvaluatorModels"
                 :key="model"
@@ -496,53 +563,76 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
           </details>
 
           <!-- Test Accuracy range -->
-          <details class="optimizer-history__filter-group">
-            <summary class="optimizer-history__filter-summary">
+          <details class="optimizer-history__filter-group" :open="activeFilterDimension === 'accuracy'">
+            <summary class="optimizer-history__filter-summary" @click.prevent="toggleFilter('accuracy')">
               Test Accuracy
               <span v-if="filterAccuracyMin != null || filterAccuracyMax != null" class="optimizer-history__filter-badge">1</span>
             </summary>
-            <div class="optimizer-history__filter-options optimizer-history__filter-options--range">
-              <label class="optimizer-history__filter-range-label">
-                Min
-                <input
-                  type="number"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  :value="filterAccuracyMin ?? ''"
-                  placeholder="0.00"
-                  @input="filterAccuracyMin = ($event.target as HTMLInputElement).value ? Number(($event.target as HTMLInputElement).value) : null"
+            <div
+              v-show="activeFilterDimension === 'accuracy'"
+              class="optimizer-history__filter-options optimizer-history__filter-options--range optimizer-history__filter-options--slider"
+            >
+              <div class="optimizer-history__slider-value num">
+                {{ sliderAccuracy[0] }}% – {{ sliderAccuracy[1] }}%
+              </div>
+              <ClientOnly>
+                <Slider
+                  class="optimizer-history__accuracy-slider"
+                  :model-value="sliderAccuracy"
+                  :min="0"
+                  :max="100"
+                  :step="1"
+                  :tooltips="false"
+                  :lazy="false"
+                  @update:model-value="onSliderUpdate"
                 />
-              </label>
-              <label class="optimizer-history__filter-range-label">
-                Max
-                <input
-                  type="number"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  :value="filterAccuracyMax ?? ''"
-                  placeholder="1.00"
-                  @input="filterAccuracyMax = ($event.target as HTMLInputElement).value ? Number(($event.target as HTMLInputElement).value) : null"
-                />
-              </label>
+              </ClientOnly>
             </div>
           </details>
 
           <!-- Date range -->
-          <details class="optimizer-history__filter-group">
-            <summary class="optimizer-history__filter-summary">
+          <details class="optimizer-history__filter-group" :open="activeFilterDimension === 'date'">
+            <summary class="optimizer-history__filter-summary" @click.prevent="toggleFilter('date')">
               Started At
               <span v-if="filterDateStart || filterDateEnd" class="optimizer-history__filter-badge">1</span>
             </summary>
-            <div class="optimizer-history__filter-options optimizer-history__filter-options--range">
+            <div
+              v-show="activeFilterDimension === 'date'"
+              class="optimizer-history__filter-options optimizer-history__filter-options--range optimizer-history__filter-options--date"
+            >
               <label class="optimizer-history__filter-range-label">
                 From
-                <input type="date" v-model="filterDateStart" />
+                <ClientOnly>
+                  <VueDatePicker
+                    v-model="dateStartModel"
+                    :dark="isDark"
+                    :enable-time-picker="false"
+                    auto-apply
+                    format="yyyy-MM-dd"
+                    model-type="yyyy-MM-dd"
+                    placeholder="From"
+                  />
+                  <template #fallback>
+                    <input type="date" v-model="filterDateStart" />
+                  </template>
+                </ClientOnly>
               </label>
               <label class="optimizer-history__filter-range-label">
                 To
-                <input type="date" v-model="filterDateEnd" />
+                <ClientOnly>
+                  <VueDatePicker
+                    v-model="dateEndModel"
+                    :dark="isDark"
+                    :enable-time-picker="false"
+                    auto-apply
+                    format="yyyy-MM-dd"
+                    model-type="yyyy-MM-dd"
+                    placeholder="To"
+                  />
+                  <template #fallback>
+                    <input type="date" v-model="filterDateEnd" />
+                  </template>
+                </ClientOnly>
               </label>
             </div>
           </details>
@@ -579,19 +669,6 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
             @click="clearAllFilters"
           >Clear all filters</button>
         </div>
-
-        <!-- Compare bar -->
-        <div v-if="filteredRuns.length > 0 || compareSelectedIds.size > 0" class="optimizer-history__compare-bar">
-          <button
-            class="optimizer-history__compare-btn"
-            :disabled="compareSelectedIds.size < 2"
-            @click="compareSelectedIds.size >= 2 && (comparePanel = !comparePanel)"
-          >
-            {{ comparePanel && compareSelectedIds.size >= 2 ? 'Hide comparison' : `Compare Selected (${compareSelectedIds.size})` }}
-          </button>
-          <span v-if="compareSelectedIds.size > 0" class="optimizer-history__muted">{{ compareSelectedIds.size }} selected</span>
-        </div>
-        <div v-if="compareTip" class="optimizer-history__compare-tip">{{ compareTip }}</div>
 
         <!-- Run list -->
         <div v-if="props.runs.length === 0" class="optimizer-history__empty">
@@ -1052,13 +1129,18 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
     </UiCard>
   </section>
 
-  <!-- Compare panel: full width, below the grid -->
-  <UiCard v-if="comparePanel && compareSelectedRuns.length >= 2" class="optimizer-history__compare-panel">
+  <!-- Compare sub-tab view -->
+  <UiCard v-else class="optimizer-history__compare-view">
     <div class="optimizer-history__panel-head">
       <UiEyebrow>Run Comparison</UiEyebrow>
-      <button class="optimizer-history__compare-close" @click="comparePanel = false">Close ×</button>
+      <span v-if="compareSelectedIds.size > 0" class="optimizer-history__muted">
+        已選取 {{ compareSelectedIds.size }} 個
+      </span>
     </div>
-    <div class="optimizer-history__compare-table-wrap">
+    <div v-if="compareSelectedRuns.length < 2" class="optimizer-history__empty">
+      請回到 Runs 選取至少 2 個 run 進行比較（最多 4 個）
+    </div>
+    <div v-else class="optimizer-history__compare-table-wrap">
       <table class="optimizer-history__compare-table">
         <thead>
           <tr>
@@ -1854,6 +1936,126 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
   width: 90px;
 }
 
+/* ── Custom checkboxes (filter options + run compare) ────────── */
+.optimizer-history__filter-option input[type='checkbox'],
+.optimizer-history__run-checkbox-label input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  margin: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-xs);
+  background: var(--bg-2);
+  cursor: pointer;
+  transition: background var(--dur-fast), border-color var(--dur-fast);
+}
+
+.optimizer-history__filter-option input[type='checkbox']:hover:not(:disabled),
+.optimizer-history__run-checkbox-label input[type='checkbox']:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.optimizer-history__filter-option input[type='checkbox']:checked,
+.optimizer-history__run-checkbox-label input[type='checkbox']:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.optimizer-history__filter-option input[type='checkbox']:checked::after,
+.optimizer-history__run-checkbox-label input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 4px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.optimizer-history__filter-option input[type='checkbox']:focus-visible,
+.optimizer-history__run-checkbox-label input[type='checkbox']:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+}
+
+.optimizer-history__filter-option input[type='checkbox']:disabled,
+.optimizer-history__run-checkbox-label input[type='checkbox']:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Accuracy range slider ───────────────────────────────────── */
+.optimizer-history__filter-options--slider {
+  min-width: 220px;
+  padding: 12px 16px 16px;
+}
+
+.optimizer-history__slider-value {
+  margin-bottom: 14px;
+  color: var(--fg-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: center;
+}
+
+.optimizer-history__filter-options--slider :deep(.optimizer-history__accuracy-slider) {
+  --slider-bg: var(--bg-3);
+  --slider-connect-bg: var(--accent);
+  --slider-handle-bg: var(--accent);
+  --slider-handle-border: 0;
+  --slider-handle-shadow: var(--shadow-sm);
+  --slider-handle-shadow-active: var(--shadow-sm);
+  --slider-handle-ring-color: var(--accent-ring);
+  --slider-handle-ring-width: 3px;
+  --slider-handle-width: 14px;
+  --slider-handle-height: 14px;
+  --slider-height: 4px;
+  margin: 0 7px;
+}
+
+/* ── Date picker dropdown ────────────────────────────────────── */
+.optimizer-history__filter-options--date {
+  min-width: 280px;
+}
+
+.optimizer-history__filter-options--date .optimizer-history__filter-range-label {
+  align-items: flex-start;
+  width: 100%;
+}
+
+.optimizer-history__filter-options--date :deep(.dp__main) {
+  width: 100%;
+  font-family: var(--font-sans);
+}
+
+.optimizer-history__filter-options--date :deep(.dp__theme_dark),
+.optimizer-history__filter-options--date :deep(.dp__theme_light) {
+  --dp-background-color: var(--bg-1);
+  --dp-text-color: var(--fg-1);
+  --dp-hover-color: var(--bg-3);
+  --dp-hover-text-color: var(--fg-0);
+  --dp-primary-color: var(--accent);
+  --dp-primary-text-color: #fff;
+  --dp-secondary-color: var(--fg-4);
+  --dp-border-color: var(--border);
+  --dp-border-color-hover: var(--border-strong);
+  --dp-border-color-focus: var(--border-focus);
+  --dp-menu-border-color: var(--border);
+  --dp-disabled-color: var(--bg-2);
+  --dp-disabled-color-text: var(--fg-4);
+  --dp-icon-color: var(--fg-3);
+  --dp-font-family: var(--font-sans);
+  --dp-font-size: 12px;
+  --dp-border-radius: var(--r-sm);
+  --dp-cell-border-radius: var(--r-xs);
+  --dp-input-padding: 5px 30px 5px 10px;
+}
+
 /* ── Active chips ────────────────────────────────────────────── */
 .optimizer-history__filter-chips {
   display: flex;
@@ -1916,59 +2118,48 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
   padding-bottom: 4px;
 }
 
-/* ── Compare tip ─────────────────────────────────────────────── */
-.optimizer-history__compare-tip {
-  padding: 6px 14px;
-  color: var(--fg-3);
-  font-size: 11px;
-  background: var(--bg-2);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-/* ── Compare bar ─────────────────────────────────────────────── */
-.optimizer-history__compare-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--border-subtle);
+/* ── Sub-tabs (Runs / Compare) ───────────────────────────────── */
+.optimizer-history__subtabs {
+  display: inline-flex;
+  gap: 2px;
+  align-self: flex-start;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  padding: 3px;
   background: var(--bg-1);
 }
 
-.optimizer-history__compare-btn {
-  border: 1px solid var(--accent);
+.optimizer-history__subtab {
+  display: inline-flex;
+  height: 30px;
+  align-items: center;
+  gap: 6px;
+  border: 0;
   border-radius: var(--r-sm);
-  padding: 5px 12px;
-  background: transparent;
-  color: var(--accent);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.optimizer-history__compare-btn:hover:not(:disabled) {
-  background: var(--accent);
-  color: #fff;
-}
-
-.optimizer-history__compare-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-/* ── Compare panel ───────────────────────────────────────────── */
-.optimizer-history__compare-panel {
-  margin-top: 0;
-}
-
-.optimizer-history__compare-close {
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r-sm);
-  padding: 4px 10px;
+  padding: 0 12px;
   background: transparent;
   color: var(--fg-3);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
+}
+
+.optimizer-history__subtab--active {
+  background: var(--bg-3);
+  color: var(--fg-0);
+}
+
+.optimizer-history__subtab-badge {
+  border-radius: var(--r-pill);
+  padding: 1px 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* ── Compare view (sub-tab) ──────────────────────────────────── */
+.optimizer-history__compare-view {
+  margin-top: 0;
 }
 
 .optimizer-history__compare-table-wrap {

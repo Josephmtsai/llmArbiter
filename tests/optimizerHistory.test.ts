@@ -1,8 +1,40 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 
 import OptimizerHistory from '../components/optimizer/OptimizerHistory.vue'
 import type { OptimizerRun } from '../types/api'
+
+vi.mock('@vueform/slider', () => ({
+  default: {
+    name: 'Slider',
+    props: ['modelValue', 'min', 'max', 'step', 'tooltips', 'lazy'],
+    emits: ['update:modelValue'],
+    template: '<div class="slider-stub" />',
+  },
+}))
+
+vi.mock('@vuepic/vue-datepicker', () => ({
+  VueDatePicker: {
+    name: 'VueDatePicker',
+    props: ['modelValue', 'dark', 'enableTimePicker', 'autoApply', 'format', 'modelType', 'placeholder'],
+    emits: ['update:modelValue'],
+    template: '<input class="datepicker-stub" />',
+  },
+}))
+
+const globalStubs = {
+  UiCard: { template: '<div><slot /></div>' },
+  UiEyebrow: { template: '<span><slot /></span>' },
+  UiSpinner: { template: '<span />' },
+  ClientOnly: { template: '<div><slot /></div>' },
+  NuxtLink: {
+    props: ['to'],
+    template: '<a :href="to"><slot /></a>',
+  },
+}
+
+const COMPARE_GUIDE_TEXT = '請回到 Runs 選取至少 2 個 run 進行比較（最多 4 個）'
 
 function makeRun(overrides: Partial<OptimizerRun>): OptimizerRun {
   return {
@@ -43,15 +75,7 @@ function mountHistory(selectedRun: OptimizerRun) {
       loading: false,
     },
     global: {
-      stubs: {
-        UiCard: { template: '<div><slot /></div>' },
-        UiEyebrow: { template: '<span><slot /></span>' },
-        UiSpinner: { template: '<span />' },
-        NuxtLink: {
-          props: ['to'],
-          template: '<a :href="to"><slot /></a>',
-        },
-      },
+      stubs: globalStubs,
     },
   })
 }
@@ -490,17 +514,34 @@ function mountHistoryMulti(runs: OptimizerRun[], selectedRun: OptimizerRun | nul
   return mount(OptimizerHistory, {
     props: { runs, selectedRun, loading: false },
     global: {
-      stubs: {
-        UiCard: { template: '<div><slot /></div>' },
-        UiEyebrow: { template: '<span><slot /></span>' },
-        UiSpinner: { template: '<span />' },
-        NuxtLink: {
-          props: ['to'],
-          template: '<a :href="to"><slot /></a>',
-        },
-      },
+      stubs: globalStubs,
     },
   })
+}
+
+type HistoryWrapper = ReturnType<typeof mountHistoryMulti>
+
+function subTabs(wrapper: HistoryWrapper) {
+  return wrapper.findAll('.optimizer-history__subtab')
+}
+
+async function openCompareTab(wrapper: HistoryWrapper): Promise<void> {
+  await subTabs(wrapper)[1].trigger('click')
+}
+
+async function openRunsTab(wrapper: HistoryWrapper): Promise<void> {
+  await subTabs(wrapper)[0].trigger('click')
+}
+
+async function emitSliderUpdate(wrapper: HistoryWrapper, value: [number, number]): Promise<void> {
+  wrapper.findComponent({ name: 'Slider' }).vm.$emit('update:modelValue', value)
+  await nextTick()
+}
+
+function openDetailsCount(wrapper: HistoryWrapper): number {
+  return wrapper
+    .findAll('details.optimizer-history__filter-group')
+    .filter((d) => (d.element as HTMLDetailsElement).open).length
 }
 
 describe('Filter functionality', () => {
@@ -618,9 +659,7 @@ describe('Filter functionality', () => {
     ]
     const wrapper = mountHistoryMulti(runs)
 
-    const minInput = wrapper.find('input[type="number"][placeholder="0.00"]')
-    await minInput.setValue('0.70')
-    await minInput.trigger('input')
+    await emitSliderUpdate(wrapper, [70, 100])
 
     expect(wrapper.text()).toContain('#1')
     expect(wrapper.text()).not.toContain('#2')
@@ -640,23 +679,26 @@ describe('Filter functionality', () => {
 })
 
 describe('Compare functionality', () => {
-  it('shows compare bar with disabled button when fewer than 2 runs selected', () => {
+  it('shows guidance text in Compare tab when fewer than 2 runs selected', async () => {
     const runs = [makeMultiRun({}, 1), makeMultiRun({}, 2)]
     const wrapper = mountHistoryMulti(runs)
 
-    // Compare bar is always visible when runs exist (AC-21)
-    expect(wrapper.find('.optimizer-history__compare-bar').exists()).toBe(true)
-    // But the compare button should be disabled
-    const btn = wrapper.find('.optimizer-history__compare-btn')
-    expect((btn.element as HTMLButtonElement).disabled).toBe(true)
+    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    await checkInput(runCheckboxes[0])
+
+    await openCompareTab(wrapper)
+
+    // Cannot compare with < 2 selected: guidance text instead of a table
+    expect(wrapper.text()).toContain(COMPARE_GUIDE_TEXT)
+    expect(wrapper.find('.optimizer-history__compare-table').exists()).toBe(false)
   })
 
-  it('shows compare bar with enabled button when 2+ runs selected', async () => {
+  it('shows badge count and comparison table when 2+ runs selected', async () => {
     const runs = [makeMultiRun({}, 1), makeMultiRun({}, 2)]
     const wrapper = mountHistoryMulti(runs)
 
     const checkboxes = wrapper.findAll('input[type="checkbox"]')
-    // Skip status filter checkboxes; find run checkboxes by label having no status text
+    // Skip status filter checkboxes; find run checkboxes by label class
     const runCheckboxes = checkboxes.filter((cb) => {
       const label = cb.element.closest('label')
       return label?.classList.contains('optimizer-history__run-checkbox-label')
@@ -664,13 +706,15 @@ describe('Compare functionality', () => {
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
 
-    expect(wrapper.find('.optimizer-history__compare-bar').exists()).toBe(true)
-    const btn = wrapper.find('.optimizer-history__compare-btn')
-    expect((btn.element as HTMLButtonElement).disabled).toBe(false)
-    expect(wrapper.text()).toContain('2 selected')
+    const badge = wrapper.find('.optimizer-history__subtab-badge')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toBe('2')
+
+    await openCompareTab(wrapper)
+    expect(wrapper.find('.optimizer-history__compare-table').exists()).toBe(true)
   })
 
-  it('shows comparison panel with correct fields when Compare button clicked', async () => {
+  it('shows comparison table with correct fields when Compare sub-tab opened', async () => {
     const runs = [
       makeMultiRun({ baseline_accuracy: 0.5, test_accuracy: 0.7 }, 1),
       makeMultiRun({ baseline_accuracy: 0.6, test_accuracy: 0.8 }, 2),
@@ -681,7 +725,7 @@ describe('Compare functionality', () => {
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
 
-    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+    await openCompareTab(wrapper)
 
     expect(wrapper.find('.optimizer-history__compare-table').exists()).toBe(true)
     expect(wrapper.text()).toContain('Run Comparison')
@@ -691,7 +735,7 @@ describe('Compare functionality', () => {
     expect(wrapper.text()).toContain('Accuracy Gain')
   })
 
-  it('highlights max test accuracy in comparison panel', async () => {
+  it('highlights max test accuracy in comparison table', async () => {
     const runs = [
       makeMultiRun({ test_accuracy: 0.7 }, 1),
       makeMultiRun({ test_accuracy: 0.85 }, 2),
@@ -701,7 +745,7 @@ describe('Compare functionality', () => {
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
-    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+    await openCompareTab(wrapper)
 
     const highlighted = wrapper.findAll('.optimizer-history__compare-highlight')
     expect(highlighted.length).toBeGreaterThan(0)
@@ -714,16 +758,17 @@ describe('Compare functionality', () => {
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
-    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+    await openCompareTab(wrapper)
 
-    // Compare panel visible
+    // Compare table visible
     expect(wrapper.find('.optimizer-history__compare-table').exists()).toBe(true)
 
     // Click remove on first run column
     await wrapper.find('.optimizer-history__compare-remove').trigger('click')
 
-    // Panel hidden (< 2 runs)
+    // Table replaced by guidance text (< 2 runs)
     expect(wrapper.find('.optimizer-history__compare-table').exists()).toBe(false)
+    expect(wrapper.text()).toContain(COMPARE_GUIDE_TEXT)
   })
 
   it('limits selection to 4 runs (MAX_COMPARE)', async () => {
@@ -754,9 +799,8 @@ describe('Filter-Compare integration', () => {
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
 
-    // Both selected — compare button should be enabled
-    const btn = wrapper.find('.optimizer-history__compare-btn')
-    expect((btn.element as HTMLButtonElement).disabled).toBe(false)
+    // Both selected — Compare badge shows 2
+    expect(wrapper.find('.optimizer-history__subtab-badge').text()).toBe('2')
 
     // Now filter to only 'completed' — run #2 (failed) gets filtered out
     const completedCheckbox = wrapper.findAll('input[type="checkbox"]').find((cb) => {
@@ -765,28 +809,34 @@ describe('Filter-Compare integration', () => {
     })
     await checkInput(completedCheckbox!)
 
-    // Only 1 run selected now — compare button disabled (AC-21: bar still visible but button disabled)
-    const btn2 = wrapper.find('.optimizer-history__compare-btn')
-    expect((btn2.element as HTMLButtonElement).disabled).toBe(true)
+    // Only 1 run selected now — Compare tab shows guidance text instead of a table
+    expect(wrapper.find('.optimizer-history__subtab-badge').text()).toBe('1')
+    await openCompareTab(wrapper)
+    expect(wrapper.find('.optimizer-history__compare-table').exists()).toBe(false)
+    expect(wrapper.text()).toContain(COMPARE_GUIDE_TEXT)
   })
 
-  it('closes compare panel when selected runs drop below 2', async () => {
+  it('shows guidance text in Compare tab when selected runs drop below 2', async () => {
     const runs = [makeMultiRun({}, 1), makeMultiRun({}, 2)]
     const wrapper = mountHistoryMulti(runs)
 
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
-    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+    await openCompareTab(wrapper)
 
-    // Panel open
+    // Table visible
     expect(wrapper.find('.optimizer-history__compare-table').exists()).toBe(true)
 
-    // Deselect one run
-    await checkInput(runCheckboxes[1], false)
+    // Go back to Runs and deselect one run
+    await openRunsTab(wrapper)
+    const refreshedCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    await checkInput(refreshedCheckboxes[1], false)
 
-    // Panel closed
+    // Compare tab now shows guidance instead of the table
+    await openCompareTab(wrapper)
     expect(wrapper.find('.optimizer-history__compare-table').exists()).toBe(false)
+    expect(wrapper.text()).toContain(COMPARE_GUIDE_TEXT)
   })
 })
 
@@ -802,7 +852,7 @@ describe('formatDuration in compare panel', () => {
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
-    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+    await openCompareTab(wrapper)
     const rows = wrapper.findAll('.optimizer-history__compare-table tr')
     const durationRow = rows.find((r) => r.text().includes('Duration'))
     expect(durationRow?.text()).toContain('—')
@@ -817,7 +867,7 @@ describe('formatDuration in compare panel', () => {
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
-    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+    await openCompareTab(wrapper)
     const rows = wrapper.findAll('.optimizer-history__compare-table tr')
     const durationRow = rows.find((r) => r.text().includes('Duration'))
     expect(durationRow?.text()).toContain('2m 30s')
@@ -836,7 +886,7 @@ describe('accuracyGain in compare panel', () => {
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
-    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+    await openCompareTab(wrapper)
     const rows = wrapper.findAll('.optimizer-history__compare-table tr')
     const gainRow = rows.find((r) => r.text().includes('Accuracy Gain'))
     expect(gainRow?.text()).toContain('—')
@@ -853,7 +903,7 @@ describe('accuracyGain in compare panel', () => {
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
-    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+    await openCompareTab(wrapper)
     const rows = wrapper.findAll('.optimizer-history__compare-table tr')
     const gainRow = rows.find((r) => r.text().includes('Accuracy Gain'))
     expect(gainRow?.text()).toContain('+30.0%')
@@ -873,7 +923,7 @@ describe('compare highlight logic', () => {
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
-    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+    await openCompareTab(wrapper)
     const highlights = wrapper.findAll('.optimizer-history__compare-highlight')
     const testAccuracyHighlights = highlights.filter((h) => {
       const row = h.element.closest('tr')
@@ -891,10 +941,184 @@ describe('compare highlight logic', () => {
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
-    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+    await openCompareTab(wrapper)
     const rows = wrapper.findAll('.optimizer-history__compare-table tr')
     const testRow = rows.find((r) => r.text().includes('Test Accuracy'))
     const highlights = testRow?.findAll('.optimizer-history__compare-highlight') ?? []
     expect(highlights).toHaveLength(2)
+  })
+})
+
+// ── Sub-tab switching (Runs / Compare) ───────────────────────────────────────
+
+describe('Sub-tab switching', () => {
+  it('defaults to Runs sub-tab without compare bar or compare panel', () => {
+    const runs = [makeMultiRun({}, 1), makeMultiRun({}, 2)]
+    const wrapper = mountHistoryMulti(runs)
+
+    const tabs = subTabs(wrapper)
+    expect(tabs).toHaveLength(2)
+    expect(tabs[0].classes()).toContain('optimizer-history__subtab--active')
+    expect(tabs[1].classes()).not.toContain('optimizer-history__subtab--active')
+
+    // Runs view content visible
+    expect(wrapper.find('.optimizer-history__filter-bar').exists()).toBe(true)
+    expect(wrapper.text()).toContain('#1')
+
+    // Legacy compare bar and full-width compare panel no longer exist
+    expect(wrapper.find('.optimizer-history__compare-bar').exists()).toBe(false)
+    expect(wrapper.find('.optimizer-history__compare-btn').exists()).toBe(false)
+    expect(wrapper.find('.optimizer-history__compare-panel').exists()).toBe(false)
+    expect(wrapper.find('.optimizer-history__compare-table').exists()).toBe(false)
+  })
+
+  it('shows guidance text in Compare tab when nothing is selected', async () => {
+    const runs = [makeMultiRun({}, 1), makeMultiRun({}, 2)]
+    const wrapper = mountHistoryMulti(runs)
+
+    await openCompareTab(wrapper)
+
+    expect(subTabs(wrapper)[1].classes()).toContain('optimizer-history__subtab--active')
+    expect(wrapper.text()).toContain(COMPARE_GUIDE_TEXT)
+    expect(wrapper.find('.optimizer-history__compare-table').exists()).toBe(false)
+    // No badge when nothing is selected
+    expect(wrapper.find('.optimizer-history__subtab-badge').exists()).toBe(false)
+  })
+
+  it('shows selection count badge on the Compare sub-tab label', async () => {
+    const runs = [makeMultiRun({}, 1), makeMultiRun({}, 2), makeMultiRun({}, 3)]
+    const wrapper = mountHistoryMulti(runs)
+
+    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    await checkInput(runCheckboxes[0])
+    await checkInput(runCheckboxes[1])
+    await checkInput(runCheckboxes[2])
+
+    const badge = wrapper.find('.optimizer-history__subtab-badge')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toBe('3')
+  })
+
+  it('preserves compare selection when switching back to Runs sub-tab', async () => {
+    const runs = [makeMultiRun({}, 1), makeMultiRun({}, 2)]
+    const wrapper = mountHistoryMulti(runs)
+
+    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    await checkInput(runCheckboxes[0])
+    await checkInput(runCheckboxes[1])
+
+    await openCompareTab(wrapper)
+    expect(wrapper.find('.optimizer-history__compare-table').exists()).toBe(true)
+
+    await openRunsTab(wrapper)
+    // Selection preserved: badge still shows 2 and both rows are marked selected
+    expect(wrapper.find('.optimizer-history__subtab-badge').text()).toBe('2')
+    expect(wrapper.findAll('.optimizer-history__run-item--selected')).toHaveLength(2)
+  })
+})
+
+// ── Exclusive filter dropdown expansion ──────────────────────────────────────
+
+describe('Exclusive filter dropdown', () => {
+  it('keeps at most one filter dropdown open at a time', async () => {
+    const runs = [makeMultiRun({}, 1)]
+    const wrapper = mountHistoryMulti(runs)
+
+    const summaries = wrapper.findAll('.optimizer-history__filter-summary')
+    // Runs without models render 3 filter groups: Status, Test Accuracy, Started At
+    expect(summaries.length).toBeGreaterThanOrEqual(3)
+
+    await summaries[0].trigger('click')
+    expect(openDetailsCount(wrapper)).toBe(1)
+
+    await summaries[1].trigger('click')
+    expect(openDetailsCount(wrapper)).toBe(1)
+
+    const details = wrapper.findAll('details.optimizer-history__filter-group')
+    expect((details[0].element as HTMLDetailsElement).open).toBe(false)
+    expect((details[1].element as HTMLDetailsElement).open).toBe(true)
+  })
+
+  it('toggles a dropdown closed when its summary is clicked again', async () => {
+    const runs = [makeMultiRun({}, 1)]
+    const wrapper = mountHistoryMulti(runs)
+
+    const summaries = wrapper.findAll('.optimizer-history__filter-summary')
+    await summaries[0].trigger('click')
+    expect(openDetailsCount(wrapper)).toBe(1)
+
+    await summaries[0].trigger('click')
+    expect(openDetailsCount(wrapper)).toBe(0)
+  })
+
+  it('closes all dropdowns when clicking outside the filter bar', async () => {
+    const runs = [makeMultiRun({}, 1)]
+    const wrapper = mountHistoryMulti(runs)
+
+    const summaries = wrapper.findAll('.optimizer-history__filter-summary')
+    await summaries[0].trigger('click')
+    expect(openDetailsCount(wrapper)).toBe(1)
+
+    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    await nextTick()
+
+    expect(openDetailsCount(wrapper)).toBe(0)
+  })
+})
+
+// ── Accuracy range slider sync ───────────────────────────────────────────────
+
+describe('Accuracy slider sync', () => {
+  it('syncs slider percentages to 0-1 filter values and shows the chip', async () => {
+    const runs = [
+      makeMultiRun({ test_accuracy: 0.5 }, 1),
+      makeMultiRun({ test_accuracy: 0.6 }, 2),
+      makeMultiRun({ test_accuracy: 0.9 }, 3),
+    ]
+    const wrapper = mountHistoryMulti(runs)
+
+    await emitSliderUpdate(wrapper, [55, 85])
+
+    // Chip reflects 0-1 values formatted as percentages
+    expect(wrapper.text()).toContain('Accuracy: 55.0% to 85.0%')
+    // Range display shows the slider percentages
+    expect(wrapper.text()).toContain('55% – 85%')
+    // Runs filtered by 0-1 values (0.55–0.85)
+    expect(wrapper.text()).not.toContain('#1')
+    expect(wrapper.text()).toContain('#2')
+    expect(wrapper.text()).not.toContain('#3')
+  })
+
+  it('treats the full range [0, 100] as no active accuracy filter', async () => {
+    const runs = [
+      makeMultiRun({ test_accuracy: 0.5 }, 1),
+      makeMultiRun({ test_accuracy: null }, 2),
+    ]
+    const wrapper = mountHistoryMulti(runs)
+
+    await emitSliderUpdate(wrapper, [40, 85])
+    expect(wrapper.text()).toContain('1 filter active')
+
+    await emitSliderUpdate(wrapper, [0, 100])
+
+    // No accuracy chip and runs with null accuracy stay visible
+    expect(wrapper.text()).not.toContain('filter active')
+    expect(wrapper.text()).toContain('#1')
+    expect(wrapper.text()).toContain('#2')
+  })
+
+  it('resets the slider to [0, 100] when clearing all filters', async () => {
+    const runs = [makeMultiRun({ test_accuracy: 0.5 }, 1)]
+    const wrapper = mountHistoryMulti(runs)
+
+    await emitSliderUpdate(wrapper, [40, 85])
+    expect(wrapper.text()).toContain('Accuracy: 40.0% to 85.0%')
+
+    await wrapper.find('.optimizer-history__clear-all').trigger('click')
+
+    const slider = wrapper.findComponent({ name: 'Slider' })
+    expect(slider.props('modelValue')).toEqual([0, 100])
+    expect(wrapper.text()).not.toContain('Accuracy: 40.0%')
+    expect(wrapper.text()).toContain('0% – 100%')
   })
 })

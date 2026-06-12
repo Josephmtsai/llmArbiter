@@ -19,6 +19,8 @@
   },
   "dependencies": {
     "@pinia/nuxt": "^0.7.0",
+    "@vueform/slider": "^2.1.10",
+    "@vuepic/vue-datepicker": "^14.0.0",
     "lucide-vue-next": "^0.477.0",
     "nuxt": "^3.15.0",
     "nuxt-auth-utils": "^0.5.0",
