@@ -464,6 +464,14 @@ describe('OptimizerHistory', () => {
 
 // ── Filter & Compare tests ────────────────────────────────────────────────────
 
+async function checkInput(
+  wrapper: { element: Element; trigger: (event: string) => Promise<void> },
+  checked = true,
+): Promise<void> {
+  ;(wrapper.element as HTMLInputElement).checked = checked
+  await wrapper.trigger('change')
+}
+
 function makeMultiRun(overrides: Partial<OptimizerRun>, id: number): OptimizerRun {
   return {
     optimizer_run_id: id,
@@ -527,7 +535,7 @@ describe('Filter functionality', () => {
       return label?.textContent?.includes('completed') && !label?.textContent?.includes('completed_max_rounds')
     })
     expect(completedCheckbox).toBeDefined()
-    await completedCheckbox!.setChecked(true)
+    await checkInput(completedCheckbox!)
 
     expect(wrapper.text()).toContain('#1')
     expect(wrapper.text()).not.toContain('#2')
@@ -547,7 +555,7 @@ describe('Filter functionality', () => {
       return label?.textContent?.trim().startsWith('failed')
     })
     expect(failedCheckbox).toBeDefined()
-    await failedCheckbox!.setChecked(true)
+    await checkInput(failedCheckbox!)
 
     expect(wrapper.text()).toContain('No runs match the current filters.')
     expect(wrapper.text()).not.toContain('#1')
@@ -566,7 +574,7 @@ describe('Filter functionality', () => {
       const label = cb.element.closest('label')
       return label?.textContent?.includes('completed') && !label?.textContent?.includes('completed_max_rounds')
     })
-    await completedCheckbox!.setChecked(true)
+    await checkInput(completedCheckbox!)
 
     // Only run #1 visible
     expect(wrapper.text()).toContain('#1')
@@ -592,7 +600,7 @@ describe('Filter functionality', () => {
       const label = cb.element.closest('label')
       return label?.textContent?.includes('completed') && !label?.textContent?.includes('completed_max_rounds')
     })
-    await completedCheckbox!.setChecked(true)
+    await checkInput(completedCheckbox!)
     expect(wrapper.text()).not.toContain('#2')
 
     const clearAll = wrapper.find('.optimizer-history__clear-all')
@@ -653,8 +661,8 @@ describe('Compare functionality', () => {
       const label = cb.element.closest('label')
       return label?.classList.contains('optimizer-history__run-checkbox-label')
     })
-    await runCheckboxes[0].setChecked(true)
-    await runCheckboxes[1].setChecked(true)
+    await checkInput(runCheckboxes[0])
+    await checkInput(runCheckboxes[1])
 
     expect(wrapper.find('.optimizer-history__compare-bar').exists()).toBe(true)
     const btn = wrapper.find('.optimizer-history__compare-btn')
@@ -670,8 +678,8 @@ describe('Compare functionality', () => {
     const wrapper = mountHistoryMulti(runs)
 
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
-    await runCheckboxes[0].setChecked(true)
-    await runCheckboxes[1].setChecked(true)
+    await checkInput(runCheckboxes[0])
+    await checkInput(runCheckboxes[1])
 
     await wrapper.find('.optimizer-history__compare-btn').trigger('click')
 
@@ -691,8 +699,8 @@ describe('Compare functionality', () => {
     const wrapper = mountHistoryMulti(runs)
 
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
-    await runCheckboxes[0].setChecked(true)
-    await runCheckboxes[1].setChecked(true)
+    await checkInput(runCheckboxes[0])
+    await checkInput(runCheckboxes[1])
     await wrapper.find('.optimizer-history__compare-btn').trigger('click')
 
     const highlighted = wrapper.findAll('.optimizer-history__compare-highlight')
@@ -704,8 +712,8 @@ describe('Compare functionality', () => {
     const wrapper = mountHistoryMulti(runs)
 
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
-    await runCheckboxes[0].setChecked(true)
-    await runCheckboxes[1].setChecked(true)
+    await checkInput(runCheckboxes[0])
+    await checkInput(runCheckboxes[1])
     await wrapper.find('.optimizer-history__compare-btn').trigger('click')
 
     // Compare panel visible
@@ -725,7 +733,7 @@ describe('Compare functionality', () => {
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
     // Select first 4
     for (let i = 0; i < 4; i++) {
-      await runCheckboxes[i].setChecked(true)
+      await checkInput(runCheckboxes[i])
     }
 
     // 5th checkbox should be disabled
@@ -743,8 +751,8 @@ describe('Filter-Compare integration', () => {
 
     // Select both runs for compare
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
-    await runCheckboxes[0].setChecked(true)
-    await runCheckboxes[1].setChecked(true)
+    await checkInput(runCheckboxes[0])
+    await checkInput(runCheckboxes[1])
 
     // Both selected — compare button should be enabled
     const btn = wrapper.find('.optimizer-history__compare-btn')
@@ -755,7 +763,7 @@ describe('Filter-Compare integration', () => {
       const label = cb.element.closest('label')
       return label?.textContent?.includes('completed') && !label?.textContent?.includes('completed_max_rounds')
     })
-    await completedCheckbox!.setChecked(true)
+    await checkInput(completedCheckbox!)
 
     // Only 1 run selected now — compare button disabled (AC-21: bar still visible but button disabled)
     const btn2 = wrapper.find('.optimizer-history__compare-btn')
@@ -767,15 +775,15 @@ describe('Filter-Compare integration', () => {
     const wrapper = mountHistoryMulti(runs)
 
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
-    await runCheckboxes[0].setChecked(true)
-    await runCheckboxes[1].setChecked(true)
+    await checkInput(runCheckboxes[0])
+    await checkInput(runCheckboxes[1])
     await wrapper.find('.optimizer-history__compare-btn').trigger('click')
 
     // Panel open
     expect(wrapper.find('.optimizer-history__compare-table').exists()).toBe(true)
 
     // Deselect one run
-    await runCheckboxes[1].setChecked(false)
+    await checkInput(runCheckboxes[1], false)
 
     // Panel closed
     expect(wrapper.find('.optimizer-history__compare-table').exists()).toBe(false)
@@ -792,8 +800,8 @@ describe('formatDuration in compare panel', () => {
     ]
     const wrapper = mountHistoryMulti(runs)
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
-    await runCheckboxes[0].setChecked(true)
-    await runCheckboxes[1].setChecked(true)
+    await checkInput(runCheckboxes[0])
+    await checkInput(runCheckboxes[1])
     await wrapper.find('.optimizer-history__compare-btn').trigger('click')
     const rows = wrapper.findAll('.optimizer-history__compare-table tr')
     const durationRow = rows.find((r) => r.text().includes('Duration'))
@@ -807,8 +815,8 @@ describe('formatDuration in compare panel', () => {
     ]
     const wrapper = mountHistoryMulti(runs)
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
-    await runCheckboxes[0].setChecked(true)
-    await runCheckboxes[1].setChecked(true)
+    await checkInput(runCheckboxes[0])
+    await checkInput(runCheckboxes[1])
     await wrapper.find('.optimizer-history__compare-btn').trigger('click')
     const rows = wrapper.findAll('.optimizer-history__compare-table tr')
     const durationRow = rows.find((r) => r.text().includes('Duration'))
@@ -826,8 +834,8 @@ describe('accuracyGain in compare panel', () => {
     ]
     const wrapper = mountHistoryMulti(runs)
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
-    await runCheckboxes[0].setChecked(true)
-    await runCheckboxes[1].setChecked(true)
+    await checkInput(runCheckboxes[0])
+    await checkInput(runCheckboxes[1])
     await wrapper.find('.optimizer-history__compare-btn').trigger('click')
     const rows = wrapper.findAll('.optimizer-history__compare-table tr')
     const gainRow = rows.find((r) => r.text().includes('Accuracy Gain'))
@@ -843,8 +851,8 @@ describe('accuracyGain in compare panel', () => {
     runs[1].rounds = [{ round_number: 1, accuracy: 0.75, prompt_version_id: 2, failed_case_count: 0, kept: true, eval_run_id: null }]
     const wrapper = mountHistoryMulti(runs)
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
-    await runCheckboxes[0].setChecked(true)
-    await runCheckboxes[1].setChecked(true)
+    await checkInput(runCheckboxes[0])
+    await checkInput(runCheckboxes[1])
     await wrapper.find('.optimizer-history__compare-btn').trigger('click')
     const rows = wrapper.findAll('.optimizer-history__compare-table tr')
     const gainRow = rows.find((r) => r.text().includes('Accuracy Gain'))
@@ -863,8 +871,8 @@ describe('compare highlight logic', () => {
     ]
     const wrapper = mountHistoryMulti(runs)
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
-    await runCheckboxes[0].setChecked(true)
-    await runCheckboxes[1].setChecked(true)
+    await checkInput(runCheckboxes[0])
+    await checkInput(runCheckboxes[1])
     await wrapper.find('.optimizer-history__compare-btn').trigger('click')
     const highlights = wrapper.findAll('.optimizer-history__compare-highlight')
     const testAccuracyHighlights = highlights.filter((h) => {
@@ -881,8 +889,8 @@ describe('compare highlight logic', () => {
     ]
     const wrapper = mountHistoryMulti(runs)
     const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
-    await runCheckboxes[0].setChecked(true)
-    await runCheckboxes[1].setChecked(true)
+    await checkInput(runCheckboxes[0])
+    await checkInput(runCheckboxes[1])
     await wrapper.find('.optimizer-history__compare-btn').trigger('click')
     const rows = wrapper.findAll('.optimizer-history__compare-table tr')
     const testRow = rows.find((r) => r.text().includes('Test Accuracy'))
