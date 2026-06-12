@@ -40,6 +40,208 @@ watch(
   },
 )
 
+// ── Filter state ─────────────────────────────────────────────────────────────
+const ALL_STATUSES = [
+  'running',
+  'evaluating',
+  'completed',
+  'completed_max_rounds',
+  'failed',
+  'cancelled',
+  'cancelling',
+] as const
+
+const filterStatuses = ref<Set<string>>(new Set())
+const filterOptimizerModels = ref<Set<string>>(new Set())
+const filterEvaluatorModels = ref<Set<string>>(new Set())
+const filterAccuracyMin = ref<number | null>(null)
+const filterAccuracyMax = ref<number | null>(null)
+const filterDateStart = ref<string>('')
+const filterDateEnd = ref<string>('')
+
+const uniqueOptimizerModels = computed(() =>
+  [...new Set(props.runs.map((r) => r.optimizer_model).filter((m): m is string => Boolean(m)))].sort(),
+)
+
+const uniqueEvaluatorModels = computed(() =>
+  [...new Set(props.runs.map((r) => r.evaluator_model).filter((m): m is string => Boolean(m)))].sort(),
+)
+
+const activeFilterCount = computed(() => {
+  let n = 0
+  if (filterStatuses.value.size > 0) n++
+  if (filterOptimizerModels.value.size > 0) n++
+  if (filterEvaluatorModels.value.size > 0) n++
+  if (filterAccuracyMin.value != null || filterAccuracyMax.value != null) n++
+  if (filterDateStart.value || filterDateEnd.value) n++
+  return n
+})
+
+const filteredRuns = computed(() => {
+  return props.runs.filter((run) => {
+    if (filterStatuses.value.size > 0 && !filterStatuses.value.has(run.status)) return false
+    if (filterOptimizerModels.value.size > 0 && !filterOptimizerModels.value.has(run.optimizer_model ?? ''))
+      return false
+    if (filterEvaluatorModels.value.size > 0 && !filterEvaluatorModels.value.has(run.evaluator_model ?? ''))
+      return false
+    if (filterAccuracyMin.value != null || filterAccuracyMax.value != null) {
+      if (run.test_accuracy == null) return false
+      if (filterAccuracyMin.value != null && run.test_accuracy < filterAccuracyMin.value) return false
+      if (filterAccuracyMax.value != null && run.test_accuracy > filterAccuracyMax.value) return false
+    }
+    if (filterDateStart.value) {
+      if (new Date(run.started_at) < new Date(filterDateStart.value)) return false
+    }
+    if (filterDateEnd.value) {
+      const endDate = new Date(filterDateEnd.value)
+      endDate.setDate(endDate.getDate() + 1)
+      if (new Date(run.started_at) >= endDate) return false
+    }
+    return true
+  })
+})
+
+function clearFilter(
+  dimension: 'status' | 'optimizerModel' | 'evaluatorModel' | 'accuracy' | 'date',
+): void {
+  if (dimension === 'status') filterStatuses.value = new Set()
+  else if (dimension === 'optimizerModel') filterOptimizerModels.value = new Set()
+  else if (dimension === 'evaluatorModel') filterEvaluatorModels.value = new Set()
+  else if (dimension === 'accuracy') {
+    filterAccuracyMin.value = null
+    filterAccuracyMax.value = null
+  } else if (dimension === 'date') {
+    filterDateStart.value = ''
+    filterDateEnd.value = ''
+  }
+}
+
+function clearAllFilters(): void {
+  filterStatuses.value = new Set()
+  filterOptimizerModels.value = new Set()
+  filterEvaluatorModels.value = new Set()
+  filterAccuracyMin.value = null
+  filterAccuracyMax.value = null
+  filterDateStart.value = ''
+  filterDateEnd.value = ''
+}
+
+function toggleSetValue(set: Set<string>, value: string): Set<string> {
+  const next = new Set(set)
+  if (next.has(value)) next.delete(value)
+  else next.add(value)
+  return next
+}
+
+// ── Compare state ─────────────────────────────────────────────────────────────
+const MAX_COMPARE = 4
+const compareSelectedIds = ref<Set<number>>(new Set())
+const comparePanel = ref(false)
+const compareTip = ref('')
+
+const compareSelectedRuns = computed(() =>
+  [...compareSelectedIds.value]
+    .map((id) => props.runs.find((r) => r.optimizer_run_id === id))
+    .filter((r): r is OptimizerRun => r != null),
+)
+
+watch(filteredRuns, (visible) => {
+  const visibleIds = new Set(visible.map((r) => r.optimizer_run_id))
+  const next = new Set([...compareSelectedIds.value].filter((id) => visibleIds.has(id)))
+  if (next.size !== compareSelectedIds.value.size) {
+    compareSelectedIds.value = next
+    if (next.size < 2 && comparePanel.value) {
+      comparePanel.value = false
+      compareTip.value = '請至少選取 2 個 runs 進行比較'
+      setTimeout(() => {
+        compareTip.value = ''
+      }, 3000)
+    }
+  }
+})
+
+function toggleCompare(runId: number, event: Event): void {
+  event.stopPropagation()
+  const current = compareSelectedIds.value
+  if (current.has(runId)) {
+    const next = new Set(current)
+    next.delete(runId)
+    compareSelectedIds.value = next
+    if (next.size < 2) comparePanel.value = false
+  } else if (current.size < MAX_COMPARE) {
+    compareSelectedIds.value = new Set([...current, runId])
+  }
+}
+
+function removeFromCompare(runId: number): void {
+  const next = new Set(compareSelectedIds.value)
+  next.delete(runId)
+  compareSelectedIds.value = next
+  if (next.size < 2) {
+    comparePanel.value = false
+    if (next.size === 1) {
+      compareTip.value = '請至少選取 2 個 runs 進行比較'
+      setTimeout(() => {
+        compareTip.value = ''
+      }, 3000)
+    }
+  }
+}
+
+function formatCompareAccuracy(value: number | null | undefined): string {
+  if (value == null) return '—'
+  return `${(value * 100).toFixed(1)}%`
+}
+
+function compareMaxField(field: 'best_accuracy' | 'test_accuracy' | 'accuracy_gain'): number | null {
+  const values = compareSelectedRuns.value.map((run) => {
+    if (field === 'accuracy_gain') {
+      const b = run.baseline_accuracy
+      const best = bestRoundAccuracy(run)
+      return b != null && best != null ? best - b : null
+    }
+    return field === 'best_accuracy' ? bestRoundAccuracy(run) : (run[field] ?? null)
+  })
+  const nums = values.filter((v): v is number => v != null)
+  return nums.length > 0 ? Math.max(...nums) : null
+}
+
+function isCompareMax(run: OptimizerRun, field: 'best_accuracy' | 'test_accuracy' | 'accuracy_gain'): boolean {
+  const max = compareMaxField(field)
+  if (max == null) return false
+  let val: number | null
+  if (field === 'accuracy_gain') {
+    const b = run.baseline_accuracy
+    const best = bestRoundAccuracy(run)
+    val = b != null && best != null ? best - b : null
+  } else {
+    val = field === 'best_accuracy' ? bestRoundAccuracy(run) : (run[field] ?? null)
+  }
+  return val != null && val === max
+}
+
+function accuracyGain(run: OptimizerRun): number | null {
+  const b = run.baseline_accuracy
+  const best = bestRoundAccuracy(run)
+  return b != null && best != null ? best - b : null
+}
+
+function formatDuration(startedAt: string, finishedAt: string | null | undefined): string {
+  if (!finishedAt) return '—'
+  const ms = new Date(finishedAt).getTime() - new Date(startedAt).getTime()
+  if (!Number.isFinite(ms) || ms < 0) return '—'
+  const totalSec = Math.floor(ms / 1000)
+  const m = Math.floor(totalSec / 60)
+  const s = totalSec % 60
+  return m > 0 ? `${m}m ${s}s` : `${s}s`
+}
+
+function formatGain(gain: number | null): string {
+  if (gain == null) return '—'
+  const pct = (gain * 100).toFixed(1)
+  return gain >= 0 ? `+${pct}%` : `${pct}%`
+}
+
 function formatPercent(value: number | null | undefined): string {
   if (value == null) return 'n/a'
   return `${(value * 100).toFixed(1)}%`
@@ -209,47 +411,246 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
 </script>
 
 <template>
-  <section class="optimizer-history">
-    <UiCard class="optimizer-history__list-card">
-      <div class="optimizer-history__panel-head">
-        <UiEyebrow>Runs</UiEyebrow>
-        <span v-if="loading" class="optimizer-history__muted">Loading</span>
-      </div>
-      <div v-if="runs.length === 0" class="optimizer-history__empty">
-        No optimizer runs yet.
-      </div>
-      <button
-        v-for="run in runs"
-        v-else
-        :key="run.optimizer_run_id"
-        class="optimizer-history__run-item"
-        :class="{ 'optimizer-history__run-item--active': selectedRun?.optimizer_run_id === run.optimizer_run_id }"
-        type="button"
-        @click="$emit('selectRun', run.optimizer_run_id)"
-      >
-        <div class="optimizer-history__run-item-head">
-          <span class="num">#{{ run.optimizer_run_id }}</span>
-          <span class="optimizer-history__status-chip" :class="`optimizer-history__status-chip--${run.status}`">
-            {{ run.status }}
-          </span>
+  <div class="optimizer-history__wrapper">
+    <section class="optimizer-history">
+      <UiCard class="optimizer-history__list-card">
+        <div class="optimizer-history__panel-head">
+          <UiEyebrow>Runs</UiEyebrow>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span v-if="compareSelectedIds.size > 0" class="optimizer-history__muted">
+              已選取 {{ compareSelectedIds.size }} 個
+            </span>
+            <span v-if="loading" class="optimizer-history__muted">Loading</span>
+          </div>
         </div>
-        <div v-if="run.optimizer_model || run.evaluator_model" class="optimizer-history__model-badges">
-          <span v-if="run.optimizer_model" class="optimizer-history__badge optimizer-history__badge--opt">
-            opt: {{ run.optimizer_model.split('/').pop() }}
-          </span>
-          <span v-if="run.evaluator_model" class="optimizer-history__badge optimizer-history__badge--eval">
-            eval: {{ run.evaluator_model.split('/').pop() }}
-          </span>
+
+        <!-- Filter Bar -->
+        <div class="optimizer-history__filter-bar">
+          <!-- Status filter -->
+          <details class="optimizer-history__filter-group">
+            <summary class="optimizer-history__filter-summary">
+              Status
+              <span v-if="filterStatuses.size > 0" class="optimizer-history__filter-badge">{{ filterStatuses.size }}</span>
+            </summary>
+            <div class="optimizer-history__filter-options">
+              <label
+                v-for="status in ALL_STATUSES"
+                :key="status"
+                class="optimizer-history__filter-option"
+              >
+                <input
+                  type="checkbox"
+                  :checked="filterStatuses.has(status)"
+                  @change="filterStatuses = toggleSetValue(filterStatuses, status)"
+                />
+                {{ status }}
+                <span class="optimizer-history__filter-count">{{ props.runs.filter((r) => r.status === status).length }}</span>
+              </label>
+            </div>
+          </details>
+
+          <!-- Optimizer Model filter -->
+          <details v-if="uniqueOptimizerModels.length > 0" class="optimizer-history__filter-group">
+            <summary class="optimizer-history__filter-summary">
+              Optimizer Model
+              <span v-if="filterOptimizerModels.size > 0" class="optimizer-history__filter-badge">{{ filterOptimizerModels.size }}</span>
+            </summary>
+            <div class="optimizer-history__filter-options">
+              <label
+                v-for="model in uniqueOptimizerModels"
+                :key="model"
+                class="optimizer-history__filter-option"
+              >
+                <input
+                  type="checkbox"
+                  :checked="filterOptimizerModels.has(model)"
+                  @change="filterOptimizerModels = toggleSetValue(filterOptimizerModels, model)"
+                />
+                {{ model.split('/').pop() }}
+                <span class="optimizer-history__filter-count">{{ props.runs.filter((r) => r.optimizer_model === model).length }}</span>
+              </label>
+            </div>
+          </details>
+
+          <!-- Evaluator Model filter -->
+          <details v-if="uniqueEvaluatorModels.length > 0" class="optimizer-history__filter-group">
+            <summary class="optimizer-history__filter-summary">
+              Evaluator Model
+              <span v-if="filterEvaluatorModels.size > 0" class="optimizer-history__filter-badge">{{ filterEvaluatorModels.size }}</span>
+            </summary>
+            <div class="optimizer-history__filter-options">
+              <label
+                v-for="model in uniqueEvaluatorModels"
+                :key="model"
+                class="optimizer-history__filter-option"
+              >
+                <input
+                  type="checkbox"
+                  :checked="filterEvaluatorModels.has(model)"
+                  @change="filterEvaluatorModels = toggleSetValue(filterEvaluatorModels, model)"
+                />
+                {{ model.split('/').pop() }}
+                <span class="optimizer-history__filter-count">{{ props.runs.filter((r) => r.evaluator_model === model).length }}</span>
+              </label>
+            </div>
+          </details>
+
+          <!-- Test Accuracy range -->
+          <details class="optimizer-history__filter-group">
+            <summary class="optimizer-history__filter-summary">
+              Test Accuracy
+              <span v-if="filterAccuracyMin != null || filterAccuracyMax != null" class="optimizer-history__filter-badge">1</span>
+            </summary>
+            <div class="optimizer-history__filter-options optimizer-history__filter-options--range">
+              <label class="optimizer-history__filter-range-label">
+                Min
+                <input
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  :value="filterAccuracyMin ?? ''"
+                  placeholder="0.00"
+                  @input="filterAccuracyMin = ($event.target as HTMLInputElement).value ? Number(($event.target as HTMLInputElement).value) : null"
+                />
+              </label>
+              <label class="optimizer-history__filter-range-label">
+                Max
+                <input
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  :value="filterAccuracyMax ?? ''"
+                  placeholder="1.00"
+                  @input="filterAccuracyMax = ($event.target as HTMLInputElement).value ? Number(($event.target as HTMLInputElement).value) : null"
+                />
+              </label>
+            </div>
+          </details>
+
+          <!-- Date range -->
+          <details class="optimizer-history__filter-group">
+            <summary class="optimizer-history__filter-summary">
+              Started At
+              <span v-if="filterDateStart || filterDateEnd" class="optimizer-history__filter-badge">1</span>
+            </summary>
+            <div class="optimizer-history__filter-options optimizer-history__filter-options--range">
+              <label class="optimizer-history__filter-range-label">
+                From
+                <input type="date" v-model="filterDateStart" />
+              </label>
+              <label class="optimizer-history__filter-range-label">
+                To
+                <input type="date" v-model="filterDateEnd" />
+              </label>
+            </div>
+          </details>
         </div>
-        <div class="optimizer-history__acc-flow">
-          <span class="num">{{ formatPercent(run.baseline_accuracy) }}</span>
-          <span class="optimizer-history__acc-arrow">to</span>
-          <span class="num optimizer-history__best-accuracy">{{ formatPercent(bestRoundAccuracy(run)) }}</span>
-          <span class="optimizer-history__acc-arrow">to</span>
-          <span class="num">{{ formatPercent(run.test_accuracy) }}</span>
+
+        <!-- Active filter chips -->
+        <div class="optimizer-history__filter-chips" :class="{ 'optimizer-history__filter-chips--inactive': activeFilterCount === 0 }">
+          <template v-if="activeFilterCount > 0">
+            <span class="optimizer-history__filter-chip-label">{{ activeFilterCount }} filter{{ activeFilterCount > 1 ? 's' : '' }} active</span>
+            <span v-if="filterStatuses.size > 0" class="optimizer-history__chip">
+              Status: {{ [...filterStatuses].join(', ') }}
+              <button class="optimizer-history__chip-close" @click="clearFilter('status')">×</button>
+            </span>
+            <span v-if="filterOptimizerModels.size > 0" class="optimizer-history__chip">
+              Opt model: {{ [...filterOptimizerModels].map((m) => m.split('/').pop()).join(', ') }}
+              <button class="optimizer-history__chip-close" @click="clearFilter('optimizerModel')">×</button>
+            </span>
+            <span v-if="filterEvaluatorModels.size > 0" class="optimizer-history__chip">
+              Eval model: {{ [...filterEvaluatorModels].map((m) => m.split('/').pop()).join(', ') }}
+              <button class="optimizer-history__chip-close" @click="clearFilter('evaluatorModel')">×</button>
+            </span>
+            <span v-if="filterAccuracyMin != null || filterAccuracyMax != null" class="optimizer-history__chip">
+              Accuracy: {{ filterAccuracyMin != null ? formatPercent(filterAccuracyMin) : '—' }} to {{ filterAccuracyMax != null ? formatPercent(filterAccuracyMax) : '—' }}
+              <button class="optimizer-history__chip-close" @click="clearFilter('accuracy')">×</button>
+            </span>
+            <span v-if="filterDateStart || filterDateEnd" class="optimizer-history__chip">
+              Date: {{ filterDateStart || '—' }} to {{ filterDateEnd || '—' }}
+              <button class="optimizer-history__chip-close" @click="clearFilter('date')">×</button>
+            </span>
+          </template>
+          <button
+            class="optimizer-history__clear-all"
+            :disabled="activeFilterCount === 0"
+            @click="clearAllFilters"
+          >Clear all filters</button>
         </div>
-      </button>
-    </UiCard>
+
+        <!-- Compare bar -->
+        <div v-if="filteredRuns.length > 0 || compareSelectedIds.size > 0" class="optimizer-history__compare-bar">
+          <button
+            class="optimizer-history__compare-btn"
+            :disabled="compareSelectedIds.size < 2"
+            @click="compareSelectedIds.size >= 2 && (comparePanel = !comparePanel)"
+          >
+            {{ comparePanel && compareSelectedIds.size >= 2 ? 'Hide comparison' : `Compare Selected (${compareSelectedIds.size})` }}
+          </button>
+          <span v-if="compareSelectedIds.size > 0" class="optimizer-history__muted">{{ compareSelectedIds.size }} selected</span>
+        </div>
+        <div v-if="compareTip" class="optimizer-history__compare-tip">{{ compareTip }}</div>
+
+        <!-- Run list -->
+        <div v-if="props.runs.length === 0" class="optimizer-history__empty">
+          No optimizer runs yet.
+        </div>
+        <div v-else-if="filteredRuns.length === 0" class="optimizer-history__empty">
+          No runs match the current filters.
+        </div>
+        <template v-else>
+          <div
+            v-for="run in filteredRuns"
+            :key="run.optimizer_run_id"
+            class="optimizer-history__run-item"
+            :class="{
+              'optimizer-history__run-item--active': selectedRun?.optimizer_run_id === run.optimizer_run_id,
+              'optimizer-history__run-item--selected': compareSelectedIds.has(run.optimizer_run_id),
+            }"
+          >
+            <label
+              class="optimizer-history__run-checkbox-label"
+              :title="compareSelectedIds.size >= MAX_COMPARE && !compareSelectedIds.has(run.optimizer_run_id) ? '最多可比較 4 個 runs' : ''"
+            >
+              <input
+                type="checkbox"
+                :checked="compareSelectedIds.has(run.optimizer_run_id)"
+                :disabled="compareSelectedIds.size >= MAX_COMPARE && !compareSelectedIds.has(run.optimizer_run_id)"
+                @change="toggleCompare(run.optimizer_run_id, $event)"
+              />
+            </label>
+            <button
+              class="optimizer-history__run-item-body"
+              type="button"
+              @click="$emit('selectRun', run.optimizer_run_id)"
+            >
+              <div class="optimizer-history__run-item-head">
+                <span class="num">#{{ run.optimizer_run_id }}</span>
+                <span class="optimizer-history__status-chip" :class="`optimizer-history__status-chip--${run.status}`">
+                  {{ run.status }}
+                </span>
+              </div>
+              <div v-if="run.optimizer_model || run.evaluator_model" class="optimizer-history__model-badges">
+                <span v-if="run.optimizer_model" class="optimizer-history__badge optimizer-history__badge--opt">
+                  opt: {{ run.optimizer_model.split('/').pop() }}
+                </span>
+                <span v-if="run.evaluator_model" class="optimizer-history__badge optimizer-history__badge--eval">
+                  eval: {{ run.evaluator_model.split('/').pop() }}
+                </span>
+              </div>
+              <div class="optimizer-history__acc-flow">
+                <span class="num">{{ formatPercent(run.baseline_accuracy) }}</span>
+                <span class="optimizer-history__acc-arrow">to</span>
+                <span class="num optimizer-history__best-accuracy">{{ formatPercent(bestRoundAccuracy(run)) }}</span>
+                <span class="optimizer-history__acc-arrow">to</span>
+                <span class="num">{{ formatPercent(run.test_accuracy) }}</span>
+              </div>
+            </button>
+          </div>
+        </template>
+      </UiCard>
 
     <UiCard class="optimizer-history__detail">
       <template v-if="selectedRun">
@@ -650,6 +1051,99 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
       </div>
     </UiCard>
   </section>
+
+  <!-- Compare panel: full width, below the grid -->
+  <UiCard v-if="comparePanel && compareSelectedRuns.length >= 2" class="optimizer-history__compare-panel">
+    <div class="optimizer-history__panel-head">
+      <UiEyebrow>Run Comparison</UiEyebrow>
+      <button class="optimizer-history__compare-close" @click="comparePanel = false">Close ×</button>
+    </div>
+    <div class="optimizer-history__compare-table-wrap">
+      <table class="optimizer-history__compare-table">
+        <thead>
+          <tr>
+            <th class="optimizer-history__compare-row-label">Field</th>
+            <th v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="optimizer-history__compare-col-head">
+              <span class="num">#{{ run.optimizer_run_id }}</span>
+              <button class="optimizer-history__compare-remove" @click="removeFromCompare(run.optimizer_run_id)">×</button>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="optimizer-history__compare-row-label">Status</td>
+            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id">
+              <span class="optimizer-history__status-chip" :class="`optimizer-history__status-chip--${run.status}`">{{ run.status }}</span>
+            </td>
+          </tr>
+          <tr>
+            <td class="optimizer-history__compare-row-label">Started</td>
+            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">{{ formatDate(run.started_at) }}</td>
+          </tr>
+          <tr>
+            <td class="optimizer-history__compare-row-label">Finished</td>
+            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">{{ formatDate(run.finished_at) }}</td>
+          </tr>
+          <tr>
+            <td class="optimizer-history__compare-row-label">Duration</td>
+            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">{{ formatDuration(run.started_at, run.finished_at) }}</td>
+          </tr>
+          <tr>
+            <td class="optimizer-history__compare-row-label">Max Rounds</td>
+            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">{{ run.max_rounds ?? '—' }}</td>
+          </tr>
+          <tr>
+            <td class="optimizer-history__compare-row-label">Target Accuracy</td>
+            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">{{ formatPercent(run.target_accuracy) }}</td>
+          </tr>
+          <tr>
+            <td class="optimizer-history__compare-row-label">Optimizer Model</td>
+            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id">{{ run.optimizer_model ?? '—' }}</td>
+          </tr>
+          <tr>
+            <td class="optimizer-history__compare-row-label">Evaluator Model</td>
+            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id">{{ run.evaluator_model ?? '—' }}</td>
+          </tr>
+          <tr>
+            <td class="optimizer-history__compare-row-label">Baseline Accuracy</td>
+            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">{{ formatCompareAccuracy(run.baseline_accuracy) }}</td>
+          </tr>
+          <tr>
+            <td class="optimizer-history__compare-row-label">Best Accuracy</td>
+            <td
+              v-for="run in compareSelectedRuns"
+              :key="run.optimizer_run_id"
+              class="num"
+              :class="{ 'optimizer-history__compare-highlight': isCompareMax(run, 'best_accuracy') }"
+            >{{ formatCompareAccuracy(bestRoundAccuracy(run)) }}</td>
+          </tr>
+          <tr>
+            <td class="optimizer-history__compare-row-label">Test Accuracy</td>
+            <td
+              v-for="run in compareSelectedRuns"
+              :key="run.optimizer_run_id"
+              class="num"
+              :class="{ 'optimizer-history__compare-highlight': isCompareMax(run, 'test_accuracy') }"
+            >{{ formatCompareAccuracy(run.test_accuracy) }}</td>
+          </tr>
+          <tr>
+            <td class="optimizer-history__compare-row-label">Accuracy Gain</td>
+            <td
+              v-for="run in compareSelectedRuns"
+              :key="run.optimizer_run_id"
+              class="num"
+              :class="{ 'optimizer-history__compare-highlight': isCompareMax(run, 'accuracy_gain') }"
+            >{{ formatGain(accuracyGain(run)) }}</td>
+          </tr>
+          <tr>
+            <td class="optimizer-history__compare-row-label">Rounds</td>
+            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">{{ run.round_count ?? run.rounds?.length ?? '—' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </UiCard>
+</div>
 </template>
 
 <style scoped>
@@ -707,27 +1201,49 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
 
 .optimizer-history__run-item {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-direction: row;
+  align-items: stretch;
   width: 100%;
   border: 0;
   border-bottom: 1px solid var(--border-subtle);
-  padding: 10px 14px;
   background: transparent;
   color: var(--fg-2);
+  transition: background var(--dur-fast);
+}
+
+.optimizer-history__run-item--selected {
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.optimizer-history__run-item:last-child {
+  border-bottom: none;
+}
+
+.optimizer-history__run-checkbox-label {
+  display: flex;
+  align-items: center;
+  padding: 10px 8px 10px 12px;
+  cursor: pointer;
+}
+
+.optimizer-history__run-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  border: 0;
+  padding: 10px 14px 10px 6px;
+  background: transparent;
+  color: inherit;
   cursor: pointer;
   text-align: left;
   transition: background var(--dur-fast);
 }
 
-.optimizer-history__run-item:hover,
-.optimizer-history__run-item--active {
+.optimizer-history__run-item:hover .optimizer-history__run-item-body,
+.optimizer-history__run-item--active .optimizer-history__run-item-body {
   background: var(--bg-2);
   color: var(--fg-0);
-}
-
-.optimizer-history__run-item:last-child {
-  border-bottom: none;
 }
 
 .optimizer-history__run-item-head,
@@ -1231,5 +1747,283 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
 .optimizer-history__section-label--minor {
   font-size: 10px;
   margin-bottom: 0;
+}
+
+/* ── Filter Bar ─────────────────────────────────────────────── */
+.optimizer-history__wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.optimizer-history__filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.optimizer-history__filter-group {
+  position: relative;
+}
+
+.optimizer-history__filter-summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 4px 10px;
+  color: var(--fg-3);
+  cursor: pointer;
+  font-size: 11px;
+  list-style: none;
+  user-select: none;
+}
+
+.optimizer-history__filter-summary:hover {
+  background: var(--bg-2);
+}
+
+.optimizer-history__filter-badge {
+  border-radius: var(--r-pill);
+  padding: 1px 5px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.optimizer-history__filter-options {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 10;
+  min-width: 180px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 6px 0;
+  background: var(--bg-0);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.optimizer-history__filter-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  color: var(--fg-2);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.optimizer-history__filter-option:hover {
+  background: var(--bg-2);
+}
+
+.optimizer-history__filter-count {
+  margin-left: auto;
+  color: var(--fg-4);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.optimizer-history__filter-options--range {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+}
+
+.optimizer-history__filter-range-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-3);
+  font-size: 11px;
+}
+
+.optimizer-history__filter-range-label input {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 3px 6px;
+  background: var(--bg-2);
+  color: var(--fg-2);
+  font-size: 11px;
+  width: 90px;
+}
+
+/* ── Active chips ────────────────────────────────────────────── */
+.optimizer-history__filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-1);
+}
+
+.optimizer-history__filter-chip-label {
+  color: var(--fg-4);
+  font-size: 11px;
+}
+
+.optimizer-history__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-pill);
+  padding: 2px 8px;
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.optimizer-history__chip-close {
+  border: none;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.optimizer-history__clear-all {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 2px 8px;
+  background: transparent;
+  color: var(--fg-4);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.optimizer-history__clear-all:hover:not(:disabled) {
+  background: var(--bg-2);
+  color: var(--fg-2);
+}
+
+.optimizer-history__clear-all:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.optimizer-history__filter-chips--inactive {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+/* ── Compare tip ─────────────────────────────────────────────── */
+.optimizer-history__compare-tip {
+  padding: 6px 14px;
+  color: var(--fg-3);
+  font-size: 11px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* ── Compare bar ─────────────────────────────────────────────── */
+.optimizer-history__compare-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-1);
+}
+
+.optimizer-history__compare-btn {
+  border: 1px solid var(--accent);
+  border-radius: var(--r-sm);
+  padding: 5px 12px;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.optimizer-history__compare-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+}
+
+.optimizer-history__compare-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Compare panel ───────────────────────────────────────────── */
+.optimizer-history__compare-panel {
+  margin-top: 0;
+}
+
+.optimizer-history__compare-close {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--fg-3);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.optimizer-history__compare-table-wrap {
+  overflow-x: auto;
+}
+
+.optimizer-history__compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.optimizer-history__compare-table th,
+.optimizer-history__compare-table td {
+  border: 1px solid var(--border-subtle);
+  padding: 7px 12px;
+  text-align: left;
+  min-width: 140px;
+}
+
+.optimizer-history__compare-table th {
+  background: var(--bg-2);
+  color: var(--fg-4);
+  font-weight: 500;
+}
+
+.optimizer-history__compare-row-label {
+  min-width: 140px;
+  background: var(--bg-2);
+  color: var(--fg-4);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.optimizer-history__compare-col-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.optimizer-history__compare-highlight {
+  background: var(--action-rebuild-soft);
+  color: var(--action-rebuild);
+  font-weight: 700;
+}
+
+.optimizer-history__compare-remove {
+  border: none;
+  padding: 0;
+  background: transparent;
+  color: var(--fg-4);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  margin-left: auto;
 }
 </style>

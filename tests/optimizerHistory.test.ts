@@ -461,3 +461,432 @@ describe('OptimizerHistory', () => {
     expect(wrapper.text()).not.toContain('Per-action deltas')
   })
 })
+
+// ── Filter & Compare tests ────────────────────────────────────────────────────
+
+function makeMultiRun(overrides: Partial<OptimizerRun>, id: number): OptimizerRun {
+  return {
+    optimizer_run_id: id,
+    status: 'completed',
+    max_rounds: 3,
+    target_accuracy: 0.8,
+    started_at: '2026-06-01T10:00:00.000Z',
+    finished_at: '2026-06-01T10:15:00.000Z',
+    baseline_eval_run_id: null,
+    rounds: [],
+    ...overrides,
+  }
+}
+
+function mountHistoryMulti(runs: OptimizerRun[], selectedRun: OptimizerRun | null = null) {
+  return mount(OptimizerHistory, {
+    props: { runs, selectedRun, loading: false },
+    global: {
+      stubs: {
+        UiCard: { template: '<div><slot /></div>' },
+        UiEyebrow: { template: '<span><slot /></span>' },
+        UiSpinner: { template: '<span />' },
+        NuxtLink: {
+          props: ['to'],
+          template: '<a :href="to"><slot /></a>',
+        },
+      },
+    },
+  })
+}
+
+describe('Filter functionality', () => {
+  it('shows all runs when no filters applied', () => {
+    const runs = [
+      makeMultiRun({ status: 'completed' }, 1),
+      makeMultiRun({ status: 'failed' }, 2),
+      makeMultiRun({ status: 'running' }, 3),
+    ]
+    const wrapper = mountHistoryMulti(runs)
+
+    expect(wrapper.text()).toContain('#1')
+    expect(wrapper.text()).toContain('#2')
+    expect(wrapper.text()).toContain('#3')
+    expect(wrapper.text()).not.toContain('No runs match the current filters.')
+  })
+
+  it('filters by status (OR logic within status)', async () => {
+    const runs = [
+      makeMultiRun({ status: 'completed' }, 1),
+      makeMultiRun({ status: 'failed' }, 2),
+      makeMultiRun({ status: 'running' }, 3),
+    ]
+    const wrapper = mountHistoryMulti(runs)
+
+    // Check 'completed' status checkbox
+    const checkboxes = wrapper.findAll('input[type="checkbox"]')
+    // Status checkboxes come first in ALL_STATUSES order
+    // Find the one for 'completed' (index 2 in ALL_STATUSES: running, evaluating, completed)
+    const completedCheckbox = checkboxes.find((cb) => {
+      const label = cb.element.closest('label')
+      return label?.textContent?.includes('completed') && !label?.textContent?.includes('completed_max_rounds')
+    })
+    expect(completedCheckbox).toBeDefined()
+    await completedCheckbox!.setChecked(true)
+
+    expect(wrapper.text()).toContain('#1')
+    expect(wrapper.text()).not.toContain('#2')
+    expect(wrapper.text()).not.toContain('#3')
+  })
+
+  it('shows empty state when filter matches nothing', async () => {
+    const runs = [
+      makeMultiRun({ status: 'completed' }, 1),
+      makeMultiRun({ status: 'completed' }, 2),
+    ]
+    const wrapper = mountHistoryMulti(runs)
+
+    // Check 'failed' status — no runs have this status
+    const failedCheckbox = wrapper.findAll('input[type="checkbox"]').find((cb) => {
+      const label = cb.element.closest('label')
+      return label?.textContent?.trim().startsWith('failed')
+    })
+    expect(failedCheckbox).toBeDefined()
+    await failedCheckbox!.setChecked(true)
+
+    expect(wrapper.text()).toContain('No runs match the current filters.')
+    expect(wrapper.text()).not.toContain('#1')
+    expect(wrapper.text()).not.toContain('#2')
+  })
+
+  it('clears individual filter dimension via chip', async () => {
+    const runs = [
+      makeMultiRun({ status: 'completed' }, 1),
+      makeMultiRun({ status: 'failed' }, 2),
+    ]
+    const wrapper = mountHistoryMulti(runs)
+
+    // Filter by completed
+    const completedCheckbox = wrapper.findAll('input[type="checkbox"]').find((cb) => {
+      const label = cb.element.closest('label')
+      return label?.textContent?.includes('completed') && !label?.textContent?.includes('completed_max_rounds')
+    })
+    await completedCheckbox!.setChecked(true)
+
+    // Only run #1 visible
+    expect(wrapper.text()).toContain('#1')
+    expect(wrapper.text()).not.toContain('#2')
+
+    // Click clear button on the status chip
+    const clearBtn = wrapper.find('.optimizer-history__chip-close')
+    await clearBtn.trigger('click')
+
+    // Both runs visible again
+    expect(wrapper.text()).toContain('#1')
+    expect(wrapper.text()).toContain('#2')
+  })
+
+  it('clears all filters via clear all button', async () => {
+    const runs = [
+      makeMultiRun({ status: 'completed' }, 1),
+      makeMultiRun({ status: 'failed' }, 2),
+    ]
+    const wrapper = mountHistoryMulti(runs)
+
+    const completedCheckbox = wrapper.findAll('input[type="checkbox"]').find((cb) => {
+      const label = cb.element.closest('label')
+      return label?.textContent?.includes('completed') && !label?.textContent?.includes('completed_max_rounds')
+    })
+    await completedCheckbox!.setChecked(true)
+    expect(wrapper.text()).not.toContain('#2')
+
+    const clearAll = wrapper.find('.optimizer-history__clear-all')
+    await clearAll.trigger('click')
+
+    expect(wrapper.text()).toContain('#1')
+    expect(wrapper.text()).toContain('#2')
+  })
+
+  it('excludes runs with null test_accuracy when accuracy filter is active', async () => {
+    const runs = [
+      makeMultiRun({ test_accuracy: 0.85 }, 1),
+      makeMultiRun({ test_accuracy: null }, 2),
+      makeMultiRun({ test_accuracy: 0.6 }, 3),
+    ]
+    const wrapper = mountHistoryMulti(runs)
+
+    const minInput = wrapper.find('input[type="number"][placeholder="0.00"]')
+    await minInput.setValue('0.70')
+    await minInput.trigger('input')
+
+    expect(wrapper.text()).toContain('#1')
+    expect(wrapper.text()).not.toContain('#2')
+    expect(wrapper.text()).not.toContain('#3')
+  })
+
+  it('shows null-accuracy runs when no accuracy filter is active', () => {
+    const runs = [
+      makeMultiRun({ test_accuracy: 0.85 }, 1),
+      makeMultiRun({ test_accuracy: null }, 2),
+    ]
+    const wrapper = mountHistoryMulti(runs)
+
+    expect(wrapper.text()).toContain('#1')
+    expect(wrapper.text()).toContain('#2')
+  })
+})
+
+describe('Compare functionality', () => {
+  it('shows compare bar with disabled button when fewer than 2 runs selected', () => {
+    const runs = [makeMultiRun({}, 1), makeMultiRun({}, 2)]
+    const wrapper = mountHistoryMulti(runs)
+
+    // Compare bar is always visible when runs exist (AC-21)
+    expect(wrapper.find('.optimizer-history__compare-bar').exists()).toBe(true)
+    // But the compare button should be disabled
+    const btn = wrapper.find('.optimizer-history__compare-btn')
+    expect((btn.element as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('shows compare bar with enabled button when 2+ runs selected', async () => {
+    const runs = [makeMultiRun({}, 1), makeMultiRun({}, 2)]
+    const wrapper = mountHistoryMulti(runs)
+
+    const checkboxes = wrapper.findAll('input[type="checkbox"]')
+    // Skip status filter checkboxes; find run checkboxes by label having no status text
+    const runCheckboxes = checkboxes.filter((cb) => {
+      const label = cb.element.closest('label')
+      return label?.classList.contains('optimizer-history__run-checkbox-label')
+    })
+    await runCheckboxes[0].setChecked(true)
+    await runCheckboxes[1].setChecked(true)
+
+    expect(wrapper.find('.optimizer-history__compare-bar').exists()).toBe(true)
+    const btn = wrapper.find('.optimizer-history__compare-btn')
+    expect((btn.element as HTMLButtonElement).disabled).toBe(false)
+    expect(wrapper.text()).toContain('2 selected')
+  })
+
+  it('shows comparison panel with correct fields when Compare button clicked', async () => {
+    const runs = [
+      makeMultiRun({ baseline_accuracy: 0.5, test_accuracy: 0.7 }, 1),
+      makeMultiRun({ baseline_accuracy: 0.6, test_accuracy: 0.8 }, 2),
+    ]
+    const wrapper = mountHistoryMulti(runs)
+
+    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    await runCheckboxes[0].setChecked(true)
+    await runCheckboxes[1].setChecked(true)
+
+    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+
+    expect(wrapper.find('.optimizer-history__compare-table').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Run Comparison')
+    expect(wrapper.text()).toContain('Baseline Accuracy')
+    expect(wrapper.text()).toContain('Test Accuracy')
+    expect(wrapper.text()).toContain('Best Accuracy')
+    expect(wrapper.text()).toContain('Accuracy Gain')
+  })
+
+  it('highlights max test accuracy in comparison panel', async () => {
+    const runs = [
+      makeMultiRun({ test_accuracy: 0.7 }, 1),
+      makeMultiRun({ test_accuracy: 0.85 }, 2),
+    ]
+    const wrapper = mountHistoryMulti(runs)
+
+    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    await runCheckboxes[0].setChecked(true)
+    await runCheckboxes[1].setChecked(true)
+    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+
+    const highlighted = wrapper.findAll('.optimizer-history__compare-highlight')
+    expect(highlighted.length).toBeGreaterThan(0)
+  })
+
+  it('removes run from comparison when remove button clicked', async () => {
+    const runs = [makeMultiRun({}, 1), makeMultiRun({}, 2)]
+    const wrapper = mountHistoryMulti(runs)
+
+    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    await runCheckboxes[0].setChecked(true)
+    await runCheckboxes[1].setChecked(true)
+    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+
+    // Compare panel visible
+    expect(wrapper.find('.optimizer-history__compare-table').exists()).toBe(true)
+
+    // Click remove on first run column
+    await wrapper.find('.optimizer-history__compare-remove').trigger('click')
+
+    // Panel hidden (< 2 runs)
+    expect(wrapper.find('.optimizer-history__compare-table').exists()).toBe(false)
+  })
+
+  it('limits selection to 4 runs (MAX_COMPARE)', async () => {
+    const runs = [1, 2, 3, 4, 5].map((id) => makeMultiRun({}, id))
+    const wrapper = mountHistoryMulti(runs)
+
+    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    // Select first 4
+    for (let i = 0; i < 4; i++) {
+      await runCheckboxes[i].setChecked(true)
+    }
+
+    // 5th checkbox should be disabled
+    expect((runCheckboxes[4].element as HTMLInputElement).disabled).toBe(true)
+  })
+})
+
+describe('Filter-Compare integration', () => {
+  it('clears selected runs that are filtered out', async () => {
+    const runs = [
+      makeMultiRun({ status: 'completed' }, 1),
+      makeMultiRun({ status: 'failed' }, 2),
+    ]
+    const wrapper = mountHistoryMulti(runs)
+
+    // Select both runs for compare
+    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    await runCheckboxes[0].setChecked(true)
+    await runCheckboxes[1].setChecked(true)
+
+    // Both selected — compare button should be enabled
+    const btn = wrapper.find('.optimizer-history__compare-btn')
+    expect((btn.element as HTMLButtonElement).disabled).toBe(false)
+
+    // Now filter to only 'completed' — run #2 (failed) gets filtered out
+    const completedCheckbox = wrapper.findAll('input[type="checkbox"]').find((cb) => {
+      const label = cb.element.closest('label')
+      return label?.textContent?.includes('completed') && !label?.textContent?.includes('completed_max_rounds')
+    })
+    await completedCheckbox!.setChecked(true)
+
+    // Only 1 run selected now — compare button disabled (AC-21: bar still visible but button disabled)
+    const btn2 = wrapper.find('.optimizer-history__compare-btn')
+    expect((btn2.element as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('closes compare panel when selected runs drop below 2', async () => {
+    const runs = [makeMultiRun({}, 1), makeMultiRun({}, 2)]
+    const wrapper = mountHistoryMulti(runs)
+
+    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    await runCheckboxes[0].setChecked(true)
+    await runCheckboxes[1].setChecked(true)
+    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+
+    // Panel open
+    expect(wrapper.find('.optimizer-history__compare-table').exists()).toBe(true)
+
+    // Deselect one run
+    await runCheckboxes[1].setChecked(false)
+
+    // Panel closed
+    expect(wrapper.find('.optimizer-history__compare-table').exists()).toBe(false)
+  })
+})
+
+// ── AC-36: formatDuration 邊界情況 ────────────────────────────────────────────
+
+describe('formatDuration in compare panel', () => {
+  it('shows — when finished_at is null', async () => {
+    const runs = [
+      makeMultiRun({ finished_at: null }, 1),
+      makeMultiRun({ finished_at: null }, 2),
+    ]
+    const wrapper = mountHistoryMulti(runs)
+    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    await runCheckboxes[0].setChecked(true)
+    await runCheckboxes[1].setChecked(true)
+    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+    const rows = wrapper.findAll('.optimizer-history__compare-table tr')
+    const durationRow = rows.find((r) => r.text().includes('Duration'))
+    expect(durationRow?.text()).toContain('—')
+  })
+
+  it('calculates duration correctly for finished runs', async () => {
+    const runs = [
+      makeMultiRun({ started_at: '2026-06-01T10:00:00.000Z', finished_at: '2026-06-01T10:02:30.000Z' }, 1),
+      makeMultiRun({ started_at: '2026-06-01T10:00:00.000Z', finished_at: '2026-06-01T10:02:30.000Z' }, 2),
+    ]
+    const wrapper = mountHistoryMulti(runs)
+    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    await runCheckboxes[0].setChecked(true)
+    await runCheckboxes[1].setChecked(true)
+    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+    const rows = wrapper.findAll('.optimizer-history__compare-table tr')
+    const durationRow = rows.find((r) => r.text().includes('Duration'))
+    expect(durationRow?.text()).toContain('2m 30s')
+  })
+})
+
+// ── AC-37: accuracyGain 邊界情況 ──────────────────────────────────────────────
+
+describe('accuracyGain in compare panel', () => {
+  it('shows — when baseline_accuracy is null', async () => {
+    const runs = [
+      makeMultiRun({ baseline_accuracy: null, best_accuracy: 0.8 }, 1),
+      makeMultiRun({ baseline_accuracy: null, best_accuracy: 0.7 }, 2),
+    ]
+    const wrapper = mountHistoryMulti(runs)
+    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    await runCheckboxes[0].setChecked(true)
+    await runCheckboxes[1].setChecked(true)
+    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+    const rows = wrapper.findAll('.optimizer-history__compare-table tr')
+    const gainRow = rows.find((r) => r.text().includes('Accuracy Gain'))
+    expect(gainRow?.text()).toContain('—')
+  })
+
+  it('calculates positive gain correctly', async () => {
+    const runs = [
+      makeMultiRun({ baseline_accuracy: 0.5 }, 1),
+      makeMultiRun({ baseline_accuracy: 0.6 }, 2),
+    ]
+    runs[0].rounds = [{ round_number: 1, accuracy: 0.8, prompt_version_id: 1, failed_case_count: 0, kept: true, eval_run_id: null }]
+    runs[1].rounds = [{ round_number: 1, accuracy: 0.75, prompt_version_id: 2, failed_case_count: 0, kept: true, eval_run_id: null }]
+    const wrapper = mountHistoryMulti(runs)
+    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    await runCheckboxes[0].setChecked(true)
+    await runCheckboxes[1].setChecked(true)
+    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+    const rows = wrapper.findAll('.optimizer-history__compare-table tr')
+    const gainRow = rows.find((r) => r.text().includes('Accuracy Gain'))
+    expect(gainRow?.text()).toContain('+30.0%')
+    expect(gainRow?.text()).toContain('+15.0%')
+  })
+})
+
+// ── AC-38: compareMaxField 邊界情況 ──────────────────────────────────────────
+
+describe('compare highlight logic', () => {
+  it('does not highlight any cell when all test accuracies are null', async () => {
+    const runs = [
+      makeMultiRun({ test_accuracy: null }, 1),
+      makeMultiRun({ test_accuracy: null }, 2),
+    ]
+    const wrapper = mountHistoryMulti(runs)
+    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    await runCheckboxes[0].setChecked(true)
+    await runCheckboxes[1].setChecked(true)
+    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+    const highlights = wrapper.findAll('.optimizer-history__compare-highlight')
+    const testAccuracyHighlights = highlights.filter((h) => {
+      const row = h.element.closest('tr')
+      return row?.textContent?.includes('Test Accuracy')
+    })
+    expect(testAccuracyHighlights).toHaveLength(0)
+  })
+
+  it('highlights all cells when all have same max value', async () => {
+    const runs = [
+      makeMultiRun({ test_accuracy: 0.8 }, 1),
+      makeMultiRun({ test_accuracy: 0.8 }, 2),
+    ]
+    const wrapper = mountHistoryMulti(runs)
+    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    await runCheckboxes[0].setChecked(true)
+    await runCheckboxes[1].setChecked(true)
+    await wrapper.find('.optimizer-history__compare-btn').trigger('click')
+    const rows = wrapper.findAll('.optimizer-history__compare-table tr')
+    const testRow = rows.find((r) => r.text().includes('Test Accuracy'))
+    const highlights = testRow?.findAll('.optimizer-history__compare-highlight') ?? []
+    expect(highlights).toHaveLength(2)
+  })
+})
