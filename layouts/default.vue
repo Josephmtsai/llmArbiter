@@ -1,7 +1,6 @@
 <script setup lang="ts">
-const { init } = useTheme()
+// Theme restore lives in app.vue so it also covers layouts/auth.vue.
 const sidebarOpen = useState('mobile:sidebarOpen', () => false)
-onMounted(init)
 </script>
 
 <template>

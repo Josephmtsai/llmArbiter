@@ -11,7 +11,20 @@ export default defineNuxtConfig({
 
   app: {
     head: {
-      htmlAttrs: { 'data-theme': 'dark' },
+      // data-theme is not declared here: app.vue binds it to the theme ref.
+      // A constant at this level competes with that binding for the same
+      // attribute. The server-rendered default is still 'dark' via useState.
+      script: [
+        {
+          // Runs before first paint so a restored 'light' theme never flashes
+          // dark. Hardcoded constant, no user input - not an XSS surface
+          // (CLAUDE.md §3). localStorage access itself throws when the browser
+          // blocks site data, hence the try/catch.
+          innerHTML:
+            "try{var t=localStorage.getItem('arb-theme');" +
+            "if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}",
+        },
+      ],
       link: [
         {
           rel: 'preconnect',

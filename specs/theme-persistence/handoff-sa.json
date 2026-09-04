@@ -1,0 +1,16 @@
+{
+  "from": "sa",
+  "to": "developer",
+  "feature": "theme-persistence",
+  "status": "ready",
+  "summary": "修正重新整理後主題不會從 localStorage 還原的問題：app.vue 的 useHead 把 data-theme 寫死為 dark，覆蓋了 useTheme().init() 還原的值",
+  "artifacts": [
+    "specs/theme-persistence/spec.md",
+    "specs/theme-persistence/tasks.md"
+  ],
+  "assumptions": [
+    "unhead 是 data-theme 的唯一 source of truth；useTheme 不再直接碰 DOM。",
+    "inline head script 內容為寫死常數字串，不含任何使用者輸入，不構成 XSS 面（CLAUDE.md §3）。",
+    "不新增『跟隨系統主題』選項，維持現有的 dark/light 二元切換。"
+  ]
+}

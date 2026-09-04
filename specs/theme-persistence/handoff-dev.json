@@ -1,0 +1,62 @@
+{
+  "from": "developer",
+  "to": "reviewer",
+  "feature": "theme-persistence",
+  "status": "ready",
+  "summary": "data-theme 改由 app.vue 綁定 theme ref（unhead 單一 source of truth），useTheme 交出 DOM 控制權並加上 localStorage 存取防護，nuxt.config 加入 pre-paint inline script 消除閃爍；新增 8 個 useTheme 測試",
+  "changed_files": [
+    "app.vue",
+    "composables/useTheme.ts",
+    "layouts/default.vue",
+    "nuxt.config.ts",
+    "vitest.config.ts",
+    "tests/useTheme.test.ts"
+  ],
+  "ac_ref": "specs/theme-persistence/tasks.md",
+  "deviations": [
+    {
+      "what": "onMounted(init) 從 layouts/default.vue 移到 app.vue，因此 layouts/default.vue 也在變更清單中（SA 包未列此檔）",
+      "why": "layouts/auth.vue 從來沒呼叫過 init()，/login 這類頁面根本不會還原主題。app.vue 是所有 route 共同掛載的唯一位置。"
+    },
+    {
+      "what": "移除 nuxt.config.ts app.head 的 htmlAttrs: { 'data-theme': 'dark' }（SA 包未提及此處）",
+      "why": "這是第三份寫死值，會與 app.vue 的 ref 綁定搶同一個屬性。SSR 預設值改由 useState('theme', () => 'dark') 提供，行為不變。"
+    },
+    {
+      "what": "vitest.config.ts 新增 nuxt-import-meta-flags transform plugin",
+      "why": "Vitest 的 define 選項不會替換 import.meta.client/server（已用探針測試證實回傳 undefined）。沒有這個 plugin，所有 client-only 分支永遠不執行，測試會『通過』但實際沒覆蓋到任何東西。"
+    },
+    {
+      "what": "coverage thresholds 從 41/41/51/78 提高到 42/42/53/78",
+      "why": "tooling-baseline AD-6 的 ratchet 規則：floor(measured) - 2，只升不降。實測 lines 44.12 / statements 44.12 / functions 55.14 / branches 80.51。branches 維持 78（floor(80.51)-2 = 78）。"
+    },
+    {
+      "what": "useTheme 移除 `as Theme | null` 型別斷言，改為 runtime 驗證",
+      "why": "localStorage 可能被使用者或其他程式寫入任意字串，斷言會讓非法值直接進入 state。改為只接受 'light' / 'dark'。"
+    }
+  ],
+  "ac_results": {
+    "AC-1.1": "PASS",
+    "AC-1.2": "PASS",
+    "AC-2.1": "PASS",
+    "AC-2.2": "PASS",
+    "AC-2.3": "PASS",
+    "AC-3.1": "PASS - CDP MutationObserver 實測：document-start(null) -> mutation 'light'(t=20ms) -> DOMContentLoaded 'light' -> load 'light'，全程零次寫入 dark",
+    "AC-3.2": "PARTIAL - 主題部分通過（維持 dark、useTheme 無例外）；頁面渲染部分不通過，Nuxt 仍顯示 500。根因為 nuxt-auth-utils 在 app init 無防護呼叫 localStorage.getItem('temp-nuxt-auth-utils-popup')。已 stash 本次 5 個檔案重新 build 跑同一測試，結果完全相同，證明為既有缺陷、非本次變更造成。詳見 spec.md。",
+    "AC-4.1": "PASS - 8 個測試，涵蓋三個指定情境外另加：unhead 未被繞過的回歸守衛、非法儲存值、site data 被封鎖時 init/toggle 皆不拋出、多次呼叫共享 state",
+    "AC-4.2": "PASS - 門檻不降反升",
+    "AC-4.3": "PASS"
+  },
+  "gates": {
+    "lint:check": "exit 0 - 10 problems (0 errors, 10 warnings)，皆為既有的 vue/no-static-inline-styles，見 tooling-baseline OQ-2",
+    "vue-tsc": "exit 0 - 0 error TS",
+    "test": "exit 0 - 8 files / 95 tests passed",
+    "test:coverage": "exit 0 - 44.12 / 80.51 / 55.14 / 44.12 vs 門檻 42/42/53/78",
+    "build": "exit 0 - Build complete"
+  },
+  "verification_method": "release build (pnpm build + node .output/server) 搭配 headless Chrome + CDP。用 Page.addScriptToEvaluateOnNewDocument 在任何頁面 script 執行前掛上 MutationObserver（觀察 document、subtree、attributeFilter data-theme），取得從 document-start 到 load 的完整 data-theme 時間軸，而非只看最終狀態。四個情境（存 light / 無值 / 存 dark / 封鎖 site data）皆實測。",
+  "open_items": [
+    "AC-E2E-3（切換鈕圖示與 data-theme 一致）未驗證：切換鈕在 components/AppTopbar.vue，需登入，/decisions 與 /settings 無憑證時回 302。",
+    "建議另開 issue 處理 nuxt-auth-utils 在 site data 被封鎖時的未防護 localStorage 存取。"
+  ]
+}
