@@ -14,7 +14,8 @@ const arrowFocalId = `${uid}-arrow-focal`
     viewBox="0 0 1000 656"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    :aria-labelledby="`${titleId} ${descId}`"
+    :aria-labelledby="titleId"
+    :aria-describedby="descId"
   >
     <title :id="titleId">Optimizer run lifecycle</title>
     <desc :id="descId">Flowchart of one optimizer run: snapshot the validation set and measure the baseline, loop rounds of candidate generation and gating until the target accuracy or max rounds is reached, score the best prompt on the held-out test snapshot, then hand off to the operator activation gate.</desc>

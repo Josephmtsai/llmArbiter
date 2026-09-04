@@ -97,9 +97,9 @@ total_pool_size = 12000
 actions = 5
 cases_per_action = 2400
 
-train = 10400 total = 2080 per action
-val   =   800 total =  160 per action
-test  =   800 total =  160 per action
+train = 7200 total = 1440 per action
+val   = 2400 total =  480 per action
+test  = 2400 total =  480 per action
 ```
 
 The expanded pool mixes synthetic cases with public-log-derived cases from

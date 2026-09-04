@@ -17,17 +17,17 @@
 }
 
 .gd-meta {
-  fill: var(--fg-3);
+  fill: var(--fg-2);
   font-family: var(--font-mono);
 }
 
 .gd-label {
-  fill: var(--fg-3);
+  fill: var(--fg-2);
   font-family: var(--font-mono);
 }
 
 .gd-label--focal {
-  fill: var(--warning);
+  fill: var(--warning-strong);
 }
 
 .gd-label--http {
@@ -42,7 +42,7 @@
 }
 
 .gd-legend {
-  fill: var(--fg-3);
+  fill: var(--fg-2);
 }
 
 .gd-callout {
@@ -64,7 +64,7 @@
 
 .gd-node--focal {
   fill: var(--warning-soft);
-  stroke: var(--warning);
+  stroke: var(--warning-strong);
 }
 
 .gd-node--ui {
@@ -85,7 +85,7 @@
 }
 
 .gd-edge--focal {
-  stroke: var(--warning);
+  stroke: var(--warning-strong);
 }
 
 .gd-edge--http {
@@ -97,7 +97,7 @@
 }
 
 .gd-marker--focal {
-  fill: var(--warning);
+  fill: var(--warning-strong);
 }
 
 .gd-marker--http {
@@ -116,7 +116,7 @@
 }
 
 .gd-ribbon--focal {
-  fill: var(--warning);
+  fill: var(--warning-strong);
   fill-opacity: 0.45;
 }
 
@@ -147,4 +147,11 @@
 .gd-fragment--frame {
   fill: var(--fg-3);
   fill-opacity: 0.04;
+}
+
+/* The legend chip stands for the frame above, so it carries the same border,
+   but a 4% wash is invisible at 16x10 - it gets a heavier one to read at size. */
+.gd-fragment--swatch {
+  fill: var(--fg-3);
+  fill-opacity: 0.12;
 }

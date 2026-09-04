@@ -12,7 +12,8 @@ const descId = `${uid}-desc`
     viewBox="0 0 1000 792"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    :aria-labelledby="`${titleId} ${descId}`"
+    :aria-labelledby="titleId"
+    :aria-describedby="descId"
   >
     <title :id="titleId">Eval pool split and optimizer snapshot usage</title>
     <desc :id="descId">Sankey showing the 12,000-case eval pool splitting into train, validation and test, and how one optimizer run scores only a 200-case validation snapshot and a 400-case test snapshot while the rest is curated or held in reserve.</desc>

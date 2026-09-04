@@ -68,7 +68,10 @@ describe('pages/guide.vue', () => {
     expect(html).not.toContain('guidesplitdiagram')
     expect(html).not.toContain('guideloopdiagram')
     expect(html).not.toContain('10,400')
-    expect(html).not.toMatch(/\b800\b/)
+    // The retired split diagram showed 800 for both val and test. Scope the
+    // check to the data-splits section so unrelated 800s cannot trip it.
+    const splits = mountPage().find('#data-splits').html()
+    expect(splits).not.toMatch(/\b800\b/)
   })
 
   it('keeps the two-gate heading and explains G0 in the Fig. 3 caption', () => {

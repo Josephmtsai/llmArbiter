@@ -147,7 +147,8 @@ const descId = `${uid}-desc`
   viewBox="0 0 1000 656"
   xmlns="http://www.w3.org/2000/svg"
   role="img"
-  :aria-labelledby="`${titleId} ${descId}`"
+  :aria-labelledby="titleId"
+  :aria-describedby="descId"
 >
   <title :id="titleId">Optimizer run lifecycle</title>
   <desc :id="descId">…verbatim from source…</desc>
@@ -203,24 +204,26 @@ selectors are prefixed `gd-` and touch nothing outside the diagrams.
 | `.gd-label--focal` | PASS, TEST_ACCURACY | `#eb6c36` | `fill: var(--warning)` |
 | `.gd-label--http` | POST /OPTIMIZER/RUN | `#2e5aa8` | `fill: var(--accent)` |
 | `.gd-label--knockout` | any edge label that had a knockout rect | rect `#f5f5f5` | `paint-order: stroke; stroke: var(--bg-1); stroke-width: 4px; stroke-linejoin: round` |
-| `.gd-legend` | 9px legend text | `#4f5d75` Geist | `fill: var(--fg-3)` |
+| `.gd-legend` | 9px legend text | `#4f5d75` Geist | `fill: var(--fg-2)` |
 | `.gd-callout` | Sankey italic serif line | Instrument Serif italic 14px | `fill: var(--fg-2); font-style: italic` (sans; the app has no serif) |
 | `.gd-node` | step rects, decision polygons, start/end pills, legend swatches | `#ffffff` / stroke `#2d3142` | `fill: var(--bg-2); stroke: var(--border-strong); stroke-width: 1` |
 | `.gd-node--store` | PostgreSQL box, "Persisted state" swatch, sequence PostgreSQL actor | `rgba(45,49,66,.05)` / `#4f5d75` | `fill: var(--bg-3); stroke: var(--border)` |
-| `.gd-node--focal` | Operator activation gate, Kept, "only path / only outcome" swatches | `rgba(235,108,54,.08)` / `#eb6c36` | `fill: var(--warning-soft); stroke: var(--warning)` |
+| `.gd-node--focal` | Operator activation gate, Kept, "only path / only outcome" swatches | `rgba(235,108,54,.08)` / `#eb6c36` | `fill: var(--warning-soft); stroke: var(--warning-strong)` |
 | `.gd-node--ui` | Operator UI actor | `rgba(79,93,117,.10)` / `#7a8399` | `fill: var(--accent-soft); stroke: var(--accent)` |
 | `.gd-node--model` | Optimizer LLM, Evaluator actors | `rgba(45,49,66,.03)` / `rgba(45,49,66,.30)` | `fill: var(--bg-inset); stroke: var(--border)` |
 | `.gd-edge` | solid arrows, self-call path, loop-back path, legend arrow swatches | `#4f5d75` 1.2 | `fill: none; stroke: var(--fg-3); stroke-width: 1.2` |
-| `.gd-edge--focal` | DONE→test-set, PASS→Kept, TEST_ACCURACY return | `#eb6c36` | `stroke: var(--warning)` |
+| `.gd-edge--focal` | DONE→test-set, PASS→Kept, TEST_ACCURACY return | `#eb6c36` | `stroke: var(--warning-strong)` |
 | `.gd-edge--http` | POST /optimizer/run | `#2e5aa8` | `stroke: var(--accent)` |
-| `.gd-marker`, `.gd-marker--focal`, `.gd-marker--http` | marker polygons | `#4f5d75` / `#eb6c36` / `#2e5aa8` | `fill: var(--fg-3)` / `var(--warning)` / `var(--accent)` |
+| `.gd-marker`, `.gd-marker--focal`, `.gd-marker--http` | marker polygons | `#4f5d75` / `#eb6c36` / `#2e5aa8` | `fill: var(--fg-3)` / `var(--warning-strong)` / `var(--accent)` |
 | `.gd-rule` | legend divider lines | `rgba(45,49,66,.10)` | `stroke: var(--border-subtle); stroke-width: .8` |
 | `.gd-ribbon` | Sankey ordinary ribbons + legend swatch | `rgba(79,93,117,.18)` | `fill: var(--fg-3); fill-opacity: .22` |
-| `.gd-ribbon--focal` | Sankey scored ribbons + legend swatch | `rgba(235,108,54,.28)` | `fill: var(--warning); fill-opacity: .45` |
+| `.gd-ribbon--focal` | Sankey scored ribbons + legend swatch | `rgba(235,108,54,.28)` | `fill: var(--warning-strong); fill-opacity: .45` |
 | `.gd-bar` | Sankey node bars | `#2d3142` | `fill: var(--fg-1)` |
 | `.gd-lifeline` | sequence lifelines | `rgba(45,49,66,.20)` dashed | `stroke: var(--border-strong); stroke-width: 1` |
 | `.gd-activation` | sequence activation bars | `rgba(45,49,66,.06)` / `#4f5d75` | `fill: var(--bg-3); stroke: var(--fg-3); stroke-width: .8` |
-| `.gd-fragment` | LOOP frame, LOOP tag box, legend swatch | `rgba(45,49,66,.02)` / `rgba(45,49,66,.22)` | `fill: var(--bg-inset); stroke: var(--border); stroke-width: 1` |
+| `.gd-fragment` | LOOP tag box, legend swatch | `rgba(45,49,66,.02)` / `rgba(45,49,66,.22)` | `fill: var(--bg-inset); stroke: var(--border); stroke-width: 1` |
+| `.gd-fragment--frame` | LOOP frame rect only | same border, no fill | `fill: var(--fg-3); fill-opacity: .04` — the frame spans the lifelines, so an opaque fill would paint over them |
+| `.gd-fragment--swatch` | legend chip for the LOOP frame | same border | `fill: var(--fg-3); fill-opacity: .12` — a 4% wash is invisible at 16x10 |
 
 Dark and light themes both work automatically because every colour is a token from
 `design-tokens.css`; nothing in the diagrams is a raw hex/rgba value (enforced by test).
@@ -271,7 +274,7 @@ page test follows that pattern; Nuxt auto-imports used by `pages/guide.vue` (`re
 
 - `tests/guideDiagrams.test.ts` — one `describe` per diagram component (data-driven over the
   four imports): renders exactly one `svg[role="img"]`; has a non-empty `<title>` and
-  `<desc>`; `aria-labelledby` lists both ids and both ids resolve inside the svg; markup
+  `<desc>`; `aria-labelledby` is the title id and `aria-describedby` is the desc id, both resolving inside the svg; markup
   contains no `<script`, no `font-family=`, no hex colour (`/#[0-9a-f]{3,8}\b/i`) and no
   `rgba(`; every `url(#…)` reference resolves to a `<marker>` id in the same svg. Plus one
   test that mounts a wrapper rendering the same diagram twice and asserts the two `<title>`
@@ -297,5 +300,8 @@ page test follows that pattern; Nuxt auto-imports used by `pages/guide.vue` (`re
 ## Non-goals
 - No change to optimizer behaviour, API calls, stores, or any route.
 - No new fonts, no Google Fonts link changes, no serif face.
-- `docs/art/auto-optimizer-flow.html` is left untouched (it remains the geometry source).
+- `docs/art/auto-optimizer-flow.html` stays the standalone editorial deliverable and the
+  geometry source. It is now tracked in git. Layout defects found while porting (the LOOP
+  frame collision) are fixed in both places so the two do not diverge; its palette stays the
+  diagram-design skin and is not expected to match the app tokens.
 - No SVG-internal label translation, no animation, no interactivity in the diagrams.

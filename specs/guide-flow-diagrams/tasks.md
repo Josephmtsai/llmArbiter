@@ -20,7 +20,8 @@ Create the stylesheet with exactly the classes in the spec's token map (`.gd`, `
 `.gd-legend`, `.gd-callout`, `.gd-node`, `.gd-node--store`, `.gd-node--focal`,
 `.gd-node--ui`, `.gd-node--model`, `.gd-edge`, `.gd-edge--focal`, `.gd-edge--http`,
 `.gd-marker`, `.gd-marker--focal`, `.gd-marker--http`, `.gd-rule`, `.gd-ribbon`,
-`.gd-ribbon--focal`, `.gd-bar`, `.gd-lifeline`, `.gd-activation`, `.gd-fragment`).
+`.gd-ribbon--focal`, `.gd-bar`, `.gd-lifeline`, `.gd-activation`, `.gd-fragment`,
+`.gd-fragment--frame`, `.gd-fragment--swatch`).
 Every colour value is a `var(--…)` from `design-tokens.css`; no hex/rgba literals.
 Register it in `nuxt.config.ts` `css` immediately after `design-tokens.css`.
 
@@ -60,7 +61,7 @@ Port `#pool-sankey` (source lines 171–235) following the spec's porting rules 
 - No `<defs>` content is needed (source has an empty `<defs>`; omit it).
 
 ### AC
-- [ ] AC-3.1: One `svg[role="img"]` with `<title>` and `<desc>`; `aria-labelledby` resolves to both.
+- [ ] AC-3.1: One `svg[role="img"]` with `<title>` and `<desc>`; `aria-labelledby` is the title id and `aria-describedby` is the desc id, and both resolve inside the svg.
 - [ ] AC-3.2: Numbers visible in the SVG: 12,000 · 2,400 per action · 7,200 · 60% · 2,400 · 20% (×2) · 200 · 40/action · 400 · 80/action · 4,200 · "600 of 12,000".
 - [ ] AC-3.3: Component markup contains no `fill=`/`stroke=`/`font-family=` attribute with a literal colour or font, and no `<script`.
 
@@ -114,8 +115,10 @@ Port `#round-seq` (source lines 523–649):
 - viewBox `0 0 1000 752`; `<title>` "Optimizer run message sequence"; `<desc>` verbatim.
 - Markers `${uid}-arrow`, `${uid}-arrow-focal`, `${uid}-arrow-http` (all three are used).
 - Lifelines → `gd-lifeline` (keep `stroke-dasharray="3,3"`); activation bars → `gd-activation`;
-  LOOP frame rect and LOOP tag rect → `gd-fragment` (keep the tag rect — it is a framed box,
-  not a knockout); LOOP text and guard text → `gd-label`.
+  LOOP frame rect → `gd-fragment gd-fragment--frame` (translucent: it spans the lifelines);
+  LOOP tag rect → `gd-fragment` (opaque — it is a framed box, not a knockout); legend chip →
+  `gd-fragment gd-fragment--swatch`; LOOP text → `gd-label`; guard text →
+  `gd-label gd-label--knockout` (it crosses the Optimizer LLM lifeline).
 - Messages: `POST /OPTIMIZER/RUN` line → `gd-edge gd-edge--http`, label → `gd-label gd-label--http gd-label--knockout`;
   `TEST_ACCURACY` line → `gd-edge gd-edge--focal`, label → `gd-label gd-label--focal gd-label--knockout`;
   all other message labels → `gd-label gd-label--knockout`; return arrows keep `stroke-dasharray="5,4"`.
@@ -169,8 +172,10 @@ imports, `describe/it/expect` from vitest).
 `guideDiagrams.test.ts` — iterate over
 `[GuidePoolSankey, GuideRunFlowDiagram, GuideRoundFlowDiagram, GuideRunSequenceDiagram]`:
 - exactly one `svg[role="img"]`;
-- `title` and `desc` exist with non-empty text; `aria-labelledby` equals `"<titleId> <descId>"` and both ids exist in the svg;
-- `wrapper.html()` does not match `/<script/i`, `/font-family=/`, `/#[0-9a-f]{3,8}\b/i`, `/rgba?\(/`;
+- `title` and `desc` exist with non-empty text; `aria-labelledby` equals the title id,
+  `aria-describedby` equals the desc id, and both ids exist in the svg;
+- `wrapper.html()` does not match `/<script/i`, `/font-family=/` or `/rgba?\(/`, and does not
+  match `/#[0-9a-f]{3,8}\b/i` once `url(#…)` references are stripped out;
 - every `url(#X)` in the html has a matching `id="X"` on a `<marker>`;
 - a wrapper component rendering the same diagram twice yields two different `<title>` ids.
 
@@ -201,11 +206,14 @@ Run and fix until clean:
 
 ### AC
 - [ ] AC-9.1: `pnpm vue-tsc --noEmit` exits 0 (no `any`, no `@ts-expect-error` added).
-- [ ] AC-9.2: `pnpm lint` exits 0.
+- [ ] AC-9.2: `pnpm lint` exits 0. **Blocked repo-wide** — see `chore/eslint-flat-config`;
+  the repo has never carried an ESLint config, so this gate is dead until that lands.
 - [ ] AC-9.3: `pnpm exec vitest run` exits 0.
 - [ ] AC-9.4: At 375px width the page body has no horizontal scrollbar; each figure scrolls horizontally inside its own frame.
-- [ ] AC-9.5: In both themes every diagram is legible: node fills contrast with the frame, arrows and labels visible, knockout labels are not struck through by their arrow, focal elements (activation gate, Kept, PASS, TEST_ACCURACY, scored ribbons) use the amber `--warning` family.
-- [ ] AC-9.6: `docs/art/auto-optimizer-flow.html` is unchanged (`git diff --stat -- docs/art` is empty).
+- [ ] AC-9.5: In both themes every diagram is legible: node fills contrast with the frame, arrows and labels visible, knockout labels are not struck through by their arrow, focal elements (activation gate, Kept, PASS, TEST_ACCURACY, scored ribbons) use the amber `--warning` family. Text and hairlines that carry meaning use `--warning-strong`, since `--warning` is only 2.85:1 in the light theme.
+- [ ] AC-9.6: `docs/art/auto-optimizer-flow.html` is committed and stays in sync with the
+  ported components for *geometry*: any layout defect fixed in a component is fixed there too.
+  Its palette stays the diagram-design skin and does not follow the app tokens.
 
 ---
 

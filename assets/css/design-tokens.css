@@ -79,6 +79,9 @@
   --success: #22c55e;
   --success-soft: rgba(34, 197, 94, 0.14);
   --warning: #eab308;
+  /* Text-safe amber: --warning is bright enough on the dark ground, so
+     the strong variant matches it here and only darkens in light mode. */
+  --warning-strong: #eab308;
   --warning-soft: rgba(234, 179, 8, 0.14);
   --danger: #ef4444;
   --danger-soft: rgba(239, 68, 68, 0.14);
@@ -157,6 +160,9 @@
   --success: #16a34a;
   --success-soft: rgba(22, 163, 74, 0.1);
   --warning: #ca8a04;
+  /* #ca8a04 is only 2.85:1 on the light ground - too low for small text
+     or hairline strokes, so accents that carry meaning use this instead. */
+  --warning-strong: #8a5a00;
   --warning-soft: rgba(202, 138, 4, 0.1);
   --danger: #dc2626;
   --danger-soft: rgba(220, 38, 38, 0.1);

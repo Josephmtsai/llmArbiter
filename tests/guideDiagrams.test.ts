@@ -54,7 +54,10 @@ describe.each(diagrams)('$name', ({ name, component, title }) => {
     const descId = descEl.attributes('id')
     expect(titleId).toBeTruthy()
     expect(descId).toBeTruthy()
-    expect(svg.attributes('aria-labelledby')).toBe(`${titleId} ${descId}`)
+    // The title is the accessible name; the long desc is the description,
+    // so it must not be concatenated into aria-labelledby.
+    expect(svg.attributes('aria-labelledby')).toBe(titleId)
+    expect(svg.attributes('aria-describedby')).toBe(descId)
     expect(svg.find(`[id="${titleId}"]`).exists()).toBe(true)
     expect(svg.find(`[id="${descId}"]`).exists()).toBe(true)
   })
@@ -70,7 +73,9 @@ describe.each(diagrams)('$name', ({ name, component, title }) => {
     const html = mount(component).html()
     expect(html).not.toMatch(/<script/i)
     expect(html).not.toMatch(/font-family=/)
-    expect(html).not.toMatch(/#[0-9a-f]{3,8}\b/i)
+    // Strip url(#id) references first - their # is a fragment, not a colour.
+    const withoutRefs = html.replace(/url\(#[^)]*\)/g, '')
+    expect(withoutRefs).not.toMatch(/#[0-9a-f]{3,8}\b/i)
     expect(html).not.toMatch(/rgba?\(/)
     expect(html).not.toMatch(/\sstyle=/)
   })

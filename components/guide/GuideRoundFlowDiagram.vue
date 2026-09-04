@@ -14,7 +14,8 @@ const arrowFocalId = `${uid}-arrow-focal`
     viewBox="0 0 1000 792"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    :aria-labelledby="`${titleId} ${descId}`"
+    :aria-labelledby="titleId"
+    :aria-describedby="descId"
   >
     <title :id="titleId">Optimizer round gates</title>
     <desc :id="descId">Flowchart of one optimizer round: the optimizer LLM analyzes failures and generates a candidate, gate G0 validates its structure, the candidate is evaluated on the fixed validation snapshot, gate G1 requires overall accuracy to improve and gate G2 requires protected actions to stay within tolerance; outcomes are kept, rejected or skipped.</desc>

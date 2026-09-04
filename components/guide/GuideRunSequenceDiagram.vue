@@ -15,7 +15,8 @@ const arrowHttpId = `${uid}-arrow-http`
     viewBox="0 0 1000 752"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    :aria-labelledby="`${titleId} ${descId}`"
+    :aria-labelledby="titleId"
+    :aria-describedby="descId"
   >
     <title :id="titleId">Optimizer run message sequence</title>
     <desc :id="descId">Sequence diagram of an optimizer run: the operator UI starts the run, the optimizer task measures the baseline with the evaluator, then loops asking the optimizer LLM for an analysis and candidate, evaluating the candidate, applying the keep or reject gates and persisting the round, and finally scores the best prompt on the test snapshot.</desc>
@@ -42,7 +43,7 @@ const arrowHttpId = `${uid}-arrow-http`
     <rect class="gd-fragment gd-fragment--frame" x="252" y="268" width="672" height="272" rx="4" />
     <rect class="gd-fragment" x="252" y="268" width="40" height="16" rx="2" />
     <text class="gd-label" x="272" y="280" font-size="8" text-anchor="middle" letter-spacing="0.12em">LOOP</text>
-    <text class="gd-label" x="344" y="300" font-size="8" letter-spacing="0.04em">[round N · until accuracy ≥ target or N = max_rounds]</text>
+    <text class="gd-label gd-label--knockout" x="344" y="300" font-size="8" letter-spacing="0.04em">[round N · until accuracy ≥ target or N = max_rounds]</text>
 
     <!-- Activation bars -->
     <rect class="gd-activation" x="96" y="120" width="8" height="44" />
@@ -128,7 +129,7 @@ const arrowHttpId = `${uid}-arrow-http`
     <text class="gd-legend" x="348" y="728" font-size="9">HTTP call</text>
     <line class="gd-edge gd-edge--focal" x1="440" y1="724" x2="460" y2="724" :marker-end="`url(#${arrowFocalId})`" />
     <text class="gd-legend" x="468" y="728" font-size="9">Headline result</text>
-    <rect class="gd-fragment" x="580" y="720" width="16" height="10" rx="2" />
+    <rect class="gd-fragment gd-fragment--swatch" x="580" y="720" width="16" height="10" rx="2" />
     <text class="gd-legend" x="604" y="728" font-size="9">Loop fragment (one round)</text>
   </svg>
 </template>
