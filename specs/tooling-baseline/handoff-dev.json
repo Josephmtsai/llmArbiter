@@ -1,0 +1,117 @@
+{
+  "from": "developer",
+  "to": "codex-reviewer",
+  "feature": "tooling-baseline",
+  "status": "ready",
+  "summary": "補齊 CLAUDE.md 宣告但從未生效的工具鏈：ESLint 9 flat config、Prettier、husky + lint-staged、Vitest coverage 門檻、CI lint 步驟，並完成 baseline 修正（lint:check 0 error）",
+  "changed_files": [
+    "eslint.config.js",
+    ".prettierrc",
+    ".prettierignore",
+    "package.json",
+    "pnpm-lock.yaml",
+    ".husky/pre-commit",
+    ".husky/pre-push",
+    "vitest.config.ts",
+    ".github/workflows/ci.yml",
+    "Dockerfile",
+    "specs/tooling-baseline/spec.md",
+    "pages/settings.vue",
+    "pages/decisions.vue",
+    "39 個檔案的 prettier/eslint --fix 自動重排（commit 4483ed1，含 components/ pages/ composables/ utils/ tests/ types/ layouts/ assets/css/）"
+  ],
+  "ac_ref": "specs/tooling-baseline/tasks.md",
+  "commits": [
+    "fbd9993 chore: add eslint flat config, prettier config and lint scripts (Task 1-3, 5)",
+    "4483ed1 chore: apply eslint/prettier baseline (Task 4，獨立 commit 依 AC-4.6)",
+    "69eafec chore: wire husky, lint-staged, coverage thresholds and CI lint (Task 6-8)"
+  ],
+  "deviations": [
+    {
+      "id": "D1",
+      "task": "Task 2",
+      "spec_says": "eslint-config-prettier 放在 tseslint.config() 最後",
+      "did": "移到 preset 之後、自訂規則之前",
+      "why": "eslint-config-prettier 也會關掉 max-len 與 vue/max-len。照 spec 放最後時 --print-config 顯示兩條規則 severity=0，AD-7 的 100 字元限制完全沒生效，AC-2.4 無法通過。移動後 vue/html-indent、vue/max-attributes-per-line、vue/html-self-closing 仍為 0（AC-3.3 通過）。"
+    },
+    {
+      "id": "D2",
+      "task": "Task 2",
+      "spec_says": "max-len 與 vue/max-len 都套用在 **/*.{ts,vue,js,mjs}",
+      "did": "max-len 只套 .ts/.js/.mjs，vue/max-len 只套 .vue",
+      "why": "基礎 max-len 把 SFC 當純文字讀，template 與 style 區塊完全不受 ignoreHTMLAttributeValues / ignoreHTMLTextContents 影響，同一行被兩條規則各報一次。照 spec 寫是 319 個 max-len error（307 個在 .vue），拆開後是 12 + 12。"
+    },
+    {
+      "id": "D3",
+      "task": "Task 2",
+      "spec_says": "pluginVue.configs['flat/strongly-recommended']",
+      "did": "pluginVue.configs['flat/strongly-recommended-error']",
+      "why": "eslint-plugin-vue 10 把 essential / strongly-recommended / recommended 的預設 severity 改為 warn，另出 -error 變體。CLAUDE.md §2 要求 priority A & B「必須通過」，而 AC-4.1 明訂 warning 可有，用 warn 版本等於這些規則不擋任何東西。實測 0 個違規，改 error 不影響基線。"
+    },
+    {
+      "id": "D4",
+      "task": "Task 3",
+      "spec_says": ".prettierrc 五個選項",
+      "did": "額外加 \"endOfLine\": \"auto\"",
+      "why": "repo 的 core.autocrlf=true 且沒有 .gitattributes，工作目錄所有檔案都是 CRLF。Prettier 預設 endOfLine: \"lf\" 會把 139 個檔案全部重寫，其中 100 個純粹是換行符差異；git 提交時又轉回 CRLF，導致 prettier --check 永遠紅燈。改 auto 後實際需重排的是 39 個檔案。CI（Linux, LF）同樣通過。"
+    },
+    {
+      "id": "D5",
+      "task": "Task 1 / Task 6",
+      "spec_says": "lint-staged@^17（17.4.1）",
+      "did": "lint-staged@^15（15.5.2）",
+      "why": "lint-staged 16 起硬性要求 Git >= 2.32.0，本機是 git 2.30.1.windows.1，pre-commit hook 每次都以 'lint-staged requires at least Git version 2.32.0' 中止，等於 hook 完全不能用。15.5.2 沒有這個檢查。SA 在 spec 只確認了 Node >= 20.17，沒有檢查 Git 版本需求。**建議另外升級本機 Git 到 >= 2.32 後再回到 ^17**（2.30.1 是 2021 年的版本）。",
+      "needs_decision": true
+    },
+    {
+      "id": "D6",
+      "task": "Task 7",
+      "spec_says": "thresholds lines 20 / statements 20 / functions 45 / branches 70",
+      "did": "lines 41 / statements 41 / functions 51 / branches 78",
+      "why": "設定 include 後重新量測為 43.73 / 43.73 / 53.43 / 80.14。AD-6 的 ratchet 規則是「量測值向下取整 − 2，只升不降」，套用後即為 41/41/51/78。維持 20 的話覆蓋率掉一半門檻也不會紅燈，與 spec In Scope 第 7 點「只鎖住現況不倒退」矛盾。"
+    },
+    {
+      "id": "D7",
+      "task": "Task 2",
+      "spec_says": "（未列）",
+      "did": "額外加 vue/no-v-html: 'error'",
+      "why": "CLAUDE.md §2/§3 明文禁止未 sanitize 的 v-html，但 flat/strongly-recommended 不含這條規則。專案目前 0 處使用，設 error 不造成基線違規。"
+    }
+  ],
+  "manual_fixes": [
+    {
+      "files": ["pages/settings.vue", "pages/decisions.vue"],
+      "issue": "Prettier 的 semi: false 會把 inline event handler 內用分號分隔的多個敘述拆成換行且不補分號，Vue template compiler 無法解析。pnpm build 失敗，但 pnpm vue-tsc 與 pnpm test 都不會發現（只有 build 會炸）。",
+      "fix": "3 處全部改為 <script setup> 內的具名 handler，行為不變：settings.vue onRuleToggle(rule, $event)、decisions.vue prevPage() / nextPage()。"
+    }
+  ],
+  "verification": {
+    "pnpm lint:check": "exit 0 — 0 error / 10 warning（全部是 vue/no-static-inline-styles，OQ-2 決議保留為 warn）",
+    "pnpm vue-tsc": "exit 0",
+    "pnpm test": "exit 0 — 7 files / 87 tests passed，一次跑完不進 watch",
+    "pnpm test:watch": "確認進入 watch 模式（45 秒後仍執行中）",
+    "pnpm build": "exit 0 — 4.84 MB (1.07 MB gzip)",
+    "pnpm test:coverage": "exit 0 — lines 43.73 / branches 80.14 / functions 53.43 / statements 43.73，產出 coverage/lcov.info",
+    "pnpm install --frozen-lockfile": "exit 0",
+    "AC-2.2/2.3/2.4": "以暫時檔驗證 no-console、no-explicit-any、max-len 皆回報 error",
+    "AC-2.6": "eslint components/ui/UiButton.vue 無 no-undef",
+    "AC-6.1": "git config core.hooksPath = .husky/_",
+    "AC-6.2": "含 console.log 的 utils/acProbe.ts 被 pre-commit 擋下，訊息含 no-console，HEAD 未變",
+    "AC-6.3": "含分號與雙引號的檔案 commit 成功，提交內容已被 Prettier 改為無分號 + 單引號",
+    "AC-6.4": "只改一個 .txt 時 vitest run --changed 印出 'No test files found, exiting with code 0'，commit 成功",
+    "AC-6.5": "複製 package.json/lockfile 到無 .git 的暫存目錄，HUSKY=0 pnpm install --frozen-lockfile exit 0（輸出 'HUSKY=0 skip install'）",
+    "AC-6.6": "注入型別錯誤後以 husky 實際使用的 sh -e 執行 .husky/pre-push，exit 2 且未進到 pnpm test 步驟",
+    "AC-6.7": "eslint . 掃描結果中 .husky 檔案數 = 0",
+    "AC-7.1": "coverage text 報表只列 components/ composables/ middleware/ pages/ server/ stores/ utils/",
+    "AC-7.2": "暫時把 lines 改 99 → exit 1 且訊息 'ERROR: Coverage for lines (43.73%) does not meet global threshold (99%)'，改回後 exit 0",
+    "AC-8.1/8.3": "未驗證 — 需推上 GitHub 才能跑 CI，本次未 push"
+  },
+  "not_verified": [
+    "AC-8.1 與 AC-8.3 需要實際 push 到 GitHub 觀察 Actions，依 CLAUDE.md §7 QA 完成後才回報使用者、不自動 merge/deploy，故未 push。"
+  ],
+  "observations": [
+    "清除了 repo 根目錄下的 --port/ 目錄（751K，是 `nuxt dev --port` 打錯時 Nuxt 把 --port 當 rootDir 產生的 .nuxt 輸出）。未被 git 追蹤也未被 .gitignore 排除，會被 eslint 掃到。",
+    "本機 Git 為 2.30.1.windows.1（2021 年），建議升級：除了擋住 lint-staged 17，這個版本也早於多個 Git 安全性修補。",
+    "非本次範圍：重新整理頁面後主題不會從 localStorage 還原（app.vue 的 useHead htmlAttrs 寫死 dark，覆蓋了 layouts/default.vue 的 onMounted(init)）。已在 specs/guide-flow-diagrams/handoff-dev.json 記錄，待另開 fix/theme-persist branch 處理。"
+  ]
+}
