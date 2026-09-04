@@ -19,8 +19,9 @@ export default tseslint.config(
   },
   ...tseslint.configs.recommended,
   // strongly-recommended == Vue 3 style guide priority A + B (CLAUDE.md §2), which
-  // says they "必須通過" - so the -error variant, since eslint-plugin-vue 10 ships
-  // the plain preset at warn severity and warnings do not fail the gate.
+  // says they "必須通過" - so the -error variant. In eslint-plugin-vue 10 the
+  // priority-A rules already ship as errors, but the 25-rule priority-B increment
+  // ships at warn, and warnings do not fail the gate.
   // Priority C stays off so `eslint-config-prettier` has nothing to fight.
   ...pluginVue.configs['flat/strongly-recommended-error'],
   // Prettier owns formatting, so this switches off every stylistic preset rule
@@ -41,7 +42,7 @@ export default tseslint.config(
       // XSS: CLAUDE.md §3 bans v-html on unsanitised input. There are zero uses
       // today, so an outright error keeps it that way.
       'vue/no-v-html': 'error',
-      'vue/no-static-inline-styles': 'warn', // OQ-2; 29 pre-existing inline styles
+      'vue/no-static-inline-styles': 'warn', // OQ-2; 10 pre-existing static inline styles
     },
   },
   {

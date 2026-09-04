@@ -1,6 +1,6 @@
 {
   "from": "developer",
-  "to": "codex-reviewer",
+  "to": "qa",
   "feature": "tooling-baseline",
   "status": "ready",
   "summary": "補齊 CLAUDE.md 宣告但從未生效的工具鏈：ESLint 9 flat config、Prettier、husky + lint-staged、Vitest coverage 門檻、CI lint 步驟，並完成 baseline 修正（lint:check 0 error）",
@@ -46,7 +46,7 @@
       "task": "Task 2",
       "spec_says": "pluginVue.configs['flat/strongly-recommended']",
       "did": "pluginVue.configs['flat/strongly-recommended-error']",
-      "why": "eslint-plugin-vue 10 把 essential / strongly-recommended / recommended 的預設 severity 改為 warn，另出 -error 變體。CLAUDE.md §2 要求 priority A & B「必須通過」，而 AC-4.1 明訂 warning 可有，用 warn 版本等於這些規則不擋任何東西。實測 0 個違規，改 error 不影響基線。"
+      "why": "實測 eslint-plugin-vue 10.10.0：flat/essential 是 85 條全部 error（priority A 本來就會擋）；flat/strongly-recommended 是 110 條，其中 85 條 error + priority B 增量的 25 條為 warn（例如 vue/require-default-prop）。CLAUDE.md §2 要求 priority A & B「必須通過」，而 AC-4.1 明訂 warning 可有，所以只有 priority B 那 25 條需要 -error 變體才會擋。實測 0 個違規，改 error 不影響基線。"
     },
     {
       "id": "D4",
@@ -109,6 +109,27 @@
   "not_verified": [
     "AC-8.1 與 AC-8.3 需要實際 push 到 GitHub 觀察 Actions，依 CLAUDE.md §7 QA 完成後才回報使用者、不自動 merge/deploy，故未 push。"
   ],
+  "review": {
+    "reviewer": "independent substitute reviewer (fresh context, no knowledge of the implementation)",
+    "why_not_codex": "Codex CLI 已是最新發布版 0.153.3，但 ~/.codex/config.toml 釘的 gpt-5.6-sol 是桌面版專屬模型，CLI 回 'requires a newer version of Codex'；改試 gpt-5.1-codex-max / gpt-5-codex / gpt-5.1-codex / codex-mini-latest 全部回 'not supported when using Codex with a ChatGPT account'。CLAUDE.md §7 的 codex-reviewer gate 目前無法以 CLI 滿足，改以獨立審查代替，未跳過 gate。",
+    "verdict": "PASS",
+    "blockers": 0,
+    "majors": 0,
+    "minors": 8,
+    "reformat_neutrality": "審查者未採信 diff，改以兩個 detached worktree 從 fbd9993 重跑 prettier --write + eslint --fix，結果與 4483ed1 位元組相同（僅差 3 處已申報的手動修正與手寫的 Baseline Log），並證實 eslint --fix 完全沒有改動任何檔案；再以 @vue/compiler-dom 對 27 個 .vue 逐一產生 element/attribute/directive/interpolation/raw-text 指紋比對，節點數全等，18 處非文字差異與 104 處純空白差異全部證明語意等價；.ts 與 <script setup> 以 ts.transpileModule 比對 0 處語意差異。",
+    "fixed_before_qa": [
+      "Minor 1 — D3 的 why 誤稱 essential/strongly-recommended/recommended 預設全改為 warn。實測 10.10.0：essential 85 條全 error，只有 strongly-recommended 的 priority-B 增量 25 條是 warn。已改寫（本檔 D3）。",
+      "Minor 2 — eslint.config.js 註解寫「29 pre-existing inline styles」，但 29 是 grep style=\" 的數量，其中 23 個是動態 :style 綁定、該規則不會報；實際觸發 10 次（spec.md 的 Baseline Log 記的 10 才對）。已改為 10。"
+    ],
+    "backlog": [
+      "Minor 3 — .husky/pre-commit / pre-push 沒有自己的 set -e，目前正確是因為 husky 9 的 .husky/_/h 以 sh -e 執行 hook。建議各加一行 set -e，把保證變成本地的而非繼承的。",
+      "Minor 4 — vue/no-v-html 與 vue/no-static-inline-styles 宣告在 **/*.{ts,vue,js,mjs}，在非 .vue 檔上是死規則，建議收斂到 **/*.vue。",
+      "Minor 5 — utils/logger.ts override 指向尚不存在的檔案（silent-failure-elimination 才會建立）。目前 codebase 0 處 console.*，no-console: error 無需例外。刻意保留，記錄以免日後被誤認為疏漏。",
+      "Minor 6 — 沒有 .gitattributes，配上 endOfLine: auto 與 eslint-config-prettier 關掉的 linebreak-style，等於整條工具鏈都不管換行符。現階段 auto 是對的，長久解是加 * text=auto 後再改回 endOfLine: lf。",
+      "Minor 7 — 覆蓋率門檻是在本機 Node v22.19.0 量的，CI 釘 Node 20（package.json engines 也是 20.19.x）。v8 coverage 由 V8 推導範圍，branches 只有 2.14 分、lines 只有 2.73 分餘裕，第一次 push 時要特別盯 coverage 步驟；日後量測應統一在 20.19.x。",
+      "Minor 8 — .gitignore 沒有防止 --port/ 這類誤植根目錄再次出現的 pattern。"
+    ]
+  },
   "observations": [
     "清除了 repo 根目錄下的 --port/ 目錄（751K，是 `nuxt dev --port` 打錯時 Nuxt 把 --port 當 rootDir 產生的 .nuxt 輸出）。未被 git 追蹤也未被 .gitignore 排除，會被 eslint 掃到。",
     "本機 Git 為 2.30.1.windows.1（2021 年），建議升級：除了擋住 lint-staged 17，這個版本也早於多個 Git 安全性修補。",
