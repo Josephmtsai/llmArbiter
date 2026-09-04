@@ -1,0 +1,27 @@
+{
+  "from": "sa",
+  "to": "developer",
+  "feature": "auth-hardening",
+  "status": "ready",
+  "summary": "強化登入流程：login route 輸入驗證與 timing-safe 比對、啟動時斷言 NUXT_AUTH_PASSWORD、in-memory 登入 rate limit、useApi 全域 401 攔截並保留 redirect、useAuthStore 誠實回報 logout 失敗與錯誤分類，並補上 Vitest 測試。",
+  "artifacts": [
+    "specs/auth-hardening/spec.md",
+    "specs/auth-hardening/tasks.md"
+  ],
+  "assumptions": [
+    "Railway 目前只跑單一 Nitro instance，in-memory Map rate limit 足夠，不需 Redis 等外部 store；若未來水平擴展需另開 feature。",
+    "Railway 反向代理會設定 X-Forwarded-For，getRequestIP(event, { xForwardedFor: true }) 能取得真實 client IP；取不到時所有請求共用 'unknown' key。",
+    "nuxt build 不執行 Nitro plugin，因此 server/plugins/assert-config.ts 不會讓 CI build 因缺 env 失敗；只有 runtime 啟動時檢查。",
+    ".env.example 已提供 ≥ 32 字元的 NUXT_AUTH_PASSWORD placeholder，本機開發者依 README 複製 .env 後即可通過啟動斷言。",
+    "所有瀏覽器端 /api/arbiter/* 呼叫都經由 composables/useApi.ts 的 $fetch.create 實例，因此 onResponseError 可攔到全部 401；若有繞過 useApi 的直接 $fetch 呼叫不在本 feature 範圍。",
+    "在 $fetch interceptor 內可以取得 Nuxt app context（useRoute / useAuthStore / navigateTo）；若 Developer 實測取不到，改為在 useApi() 內先取得再於閉包使用（tasks.md Task 7 備註）。",
+    "Rate limit 固定為每 IP 每 60 秒 5 次，成功與失敗登入都計入，常數寫在 login route，不放 runtimeConfig。",
+    "Open-redirect 防護只接受以 / 開頭、不以 // 開頭、不含反斜線、且非 /login 的相對路徑；不做路由白名單。",
+    "Vitest 測試 store 時以 vi.stubGlobal 模擬 Nuxt 全域 $fetch 與 useRequestHeaders，不引入 @nuxt/test-utils。",
+    "nuxt-auth-utils 版本維持 0.5.29 不升級；session cookie 設定不變。"
+  ],
+  "human_gate": {
+    "decision": "approved",
+    "date": "2026-09-05"
+  }
+}

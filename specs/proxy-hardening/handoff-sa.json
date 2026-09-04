@@ -1,0 +1,27 @@
+{
+  "from": "sa",
+  "to": "developer",
+  "feature": "proxy-hardening",
+  "status": "ready",
+  "summary": "強化 server/api/arbiter/[...].ts proxy：request header 白名單（僅 content-type/accept + X-API-Key）、不轉發上游 Set-Cookie、method allowlist（GET/POST/PATCH/DELETE，其餘 405）、path prefix allowlist（其餘 404，含 ../ 與 // 拒絕）、30s upstream timeout（504 upstream-timeout / 502 upstream-unreachable 且 redact API key）、query 序列化跳過 null/undefined；所有判斷抽成 server/utils/proxyPolicy.ts 純函式並以 Vitest 覆蓋",
+  "artifacts": [
+    "specs/proxy-hardening/spec.md",
+    "specs/proxy-hardening/tasks.md"
+  ],
+  "assumptions": [
+    "h3 1.15.11 的 proxyRequest 一律 mergeHeaders(getProxyRequestHeaders(event), ...) 且 mergeHeaders 只會 set 不會 delete，因此無法用 proxyRequest 做 header 白名單；選擇以 $fetch.raw + sendStream 自行實作最小 proxy（Option C），捨棄 proxyRequest / sendProxy",
+    "使用 $fetch.raw 而非 globalThis.fetch，以符合 CLAUDE.md §3「API 呼叫統一透過 $fetch」；並明確設 retry: 0、ignoreResponseError: true 保留上游 4xx/5xx 狀態碼 passthrough",
+    "允許的 path 第一段為 analyze, decisions, config, cases, evaluate, eval-pool, review-queue, optimizer, health（來源：composables/useApi.ts 全部端點）；比對以 segment 為單位（healthz 不算 health）",
+    "允許的 method 為 GET/POST/PATCH/DELETE（useApi.ts 僅使用這四種）；HEAD/OPTIONS 也回 405，因 useApi 不使用且瀏覽器同源請求不需 preflight",
+    "上游回應只轉發 content-type；set-cookie、content-length、content-encoding 及其他 header 一律丟棄（現行行為已丟棄 content-length/content-encoding）",
+    "request body 維持現行 buffered（readRawBody）行為，不做 streamRequest",
+    "timeout 30_000 ms 為固定常數 UPSTREAM_TIMEOUT_MS，不透過 runtimeConfig 設定（YAGNI）；/analyze 與 /optimizer/run 若上游處理超過 30s 會被截斷為 504，需人工確認後端這兩個端點的實際回應時間不超過 30s",
+    "502 訊息含底層錯誤訊息（可能含上游 base URL，不含 key）；redactSecret 對 config.apiKey 做硬性遮罩；不把 cause 附在 createError 上",
+    "getUserSession 401 檢查完全不動（屬 auth-hardening 範圍）；不修改 useApi.ts、types/api.ts、任何頁面；README 的 proxy 範例更新列為 out of scope",
+    "tests/proxyPolicy.test.ts 以相對路徑 import server/utils/proxyPolicy，該模組不得使用任何 Nitro/h3 auto-import"
+  ],
+  "human_gate": {
+    "decision": "approved",
+    "date": "2026-09-05"
+  }
+}

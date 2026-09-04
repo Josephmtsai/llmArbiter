@@ -1,0 +1,30 @@
+{
+  "from": "sa",
+  "to": "developer",
+  "feature": "tooling-baseline",
+  "status": "ready",
+  "summary": "補齊 CLAUDE.md 宣告但從未生效的工具鏈：ESLint flat config（vue strongly-recommended + typescript-eslint + prettier）、.prettierrc 依現況（無分號/單引號/100 字元）、husky + lint-staged（pre-commit lint-staged + 相關測試，pre-push vue-tsc + 全量測試）、vitest coverage thresholds 起點 20/20/45/70 並訂 ratchet 規則、CI 加 lint:check 與 coverage、scripts 改 vitest run；rsbuild / Tailwind / pre-commit 拆分三個文件與現況不符處列為 Open Questions 交 Human Gate。",
+  "artifacts": [
+    "specs/tooling-baseline/spec.md",
+    "specs/tooling-baseline/tasks.md"
+  ],
+  "assumptions": [
+    "採 eslint-plugin-vue + typescript-eslint + eslint-config-prettier（3 個直接依賴），不用 @nuxt/eslint；理由是 lint 與 pre-commit 不應依賴 nuxt prepare 產生的 .nuxt/ 目錄（AD-1）",
+    "Prettier 設 semi:false / singleQuote:true / trailingComma:all / printWidth:100 / tabWidth:2，全部依 grep 實測現況（.ts 與 .vue script 0 行分號、全單引號），不會造成分號或引號的大規模 reformat；printWidth 100 預期重排約 150 行 script 與部分 template，獨立成一個 chore commit（AD-3）",
+    "vue/multi-word-component-names 在 pages/**、layouts/**、app.vue 關閉，因 Nuxt 路由檔名無法改（AD-2）",
+    "pre-commit 只跑 lint-staged + vitest run --changed，vue-tsc 與全量測試放 pre-push（AD-4 Option 1）；與 CLAUDE.md §5「四步全在 pre-commit」不同，需 Human Gate 決定（OQ-3），選 Option 1 則另開 docs commit 改 CLAUDE.md/AGENTS.md",
+    "Dockerfile build stage 加 ENV HUSKY=0，因 .dockerignore 排除 .git/ 且 pnpm install 在 COPY . . 之前執行（AD-5）",
+    "coverage include 限定 pages/components/composables/stores/utils/server/middleware，thresholds 起點 lines 20 / statements 20 / functions 45 / branches 70；設定 include 後分母改變，Developer 必須重新量測，低於門檻時以量測值向下取整減 2 為準並記錄在 Baseline Log（AD-6）",
+    "max-len 與 vue/max-len 開 ignoreUrls/ignoreStrings/ignoreTemplateLiterals/ignoreRegExpLiterals（vue 另加 ignoreHTMLAttributeValues/ignoreHTMLTextContents），現有 398 行超長多為字串與 template class 串（AD-7）",
+    "任一 ESLint 規則首次違規 > 50 處者暫降 warn 並記錄；SA 預估 vue/require-default-prop（約 23 處）不會超過門檻，需以最小改動修正",
+    "vue/no-static-inline-styles 以 warn 納入（OQ-2 SA 建議），29 處既有 inline style 不在本 feature 清理",
+    "utils/logger.ts 的 no-console override 先寫入 eslint.config.js，該檔由 silent-failure-elimination feature 建立；ESLint 對不存在的檔案 pattern 不報錯",
+    "不修改 CLAUDE.md / AGENTS.md / README.md；rsbuild（OQ-1，建議刪除規則）與 Tailwind（OQ-2，建議改寫規則符合現況）留給 Human Gate",
+    "依賴版本以 2026-09-04 pnpm view 為準：eslint-plugin-vue 10.10.0、typescript-eslint 8.69.0、eslint-config-prettier 10.1.8、husky 9.1.7、lint-staged 17.4.1；若 eslint-plugin-vue 的 flat config key 名稱有異動，以套件 README 為準並在 handoff-dev.json 註記",
+    "CI 不加 prettier --check、不上傳 coverage 到外部服務（Out of Scope）"
+  ],
+  "human_gate": {
+    "decision": "approved",
+    "date": "2026-09-05"
+  }
+}

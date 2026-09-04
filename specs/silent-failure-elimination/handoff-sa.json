@@ -1,0 +1,27 @@
+{
+  "from": "sa",
+  "to": "developer",
+  "feature": "silent-failure-elimination",
+  "status": "ready",
+  "summary": "新增 utils/logger.ts 與 utils/apiError.ts，將 14 個 silent catch 逐一指定處置（顯示錯誤 / logger.warn / 連續失敗 5 次停止輪詢），並用 parseApiError 取代 12 處手寫 instanceof Error 與 extractOptimizerError；Settings 與 Cases 新增 role=\"alert\" 錯誤區塊、saveRule 失敗回滾、deleteCase 加 confirm 且失敗不移除列",
+  "artifacts": [
+    "specs/silent-failure-elimination/spec.md",
+    "specs/silent-failure-elimination/tasks.md"
+  ],
+  "assumptions": [
+    "utils/logger.ts 是全專案唯一允許直接呼叫 console.* 的檔案；client 端 production 只輸出 warn/error",
+    "parseApiError 訊息優先序為 data.message → data.detail（字串或 FastAPI 422 陣列）→ e.message → fallback；status 取自 e.status / e.statusCode / e.response.status",
+    "不引入 toast 或全域錯誤 store；每頁維持自己的 error ref（YAGNI）",
+    "輪詢失敗停止採固定間隔、連續 5 次失敗即停，不做 exponential backoff；usePolling 抽取留給 shared-polling-and-routes",
+    "saveRule 回滾以載入時與成功儲存後的快照 Map 為準，template 的 @change=\"saveRule(rule)\" 契約不變",
+    "Cases 刪除確認使用 window.confirm，與 [run_id].vue 既有做法一致，不新增 modal 元件",
+    "useAuthStore.login/check、AppSidebar healthCheck/selectProvider、useApi.ts 的 409/404 狀態碼對應屬於刻意行為，維持不變；logout 失敗仍清除本地登入狀態",
+    "不改任何 server/api/** 檔案；401 全域攔截與 proxy 錯誤整形分別屬於 auth-hardening 與 proxy-hardening，兩者與本 spec 觸碰不同檔案、可任意順序合併",
+    "所有新增錯誤元素使用 role=\"alert\" 與 design-tokens.css 既有 --danger / --warning token，禁止 inline style",
+    "新增測試：tests/logger.test.ts、tests/apiError.test.ts、tests/settingsSaveRule.test.ts，加上至少一個 fake-timer 輪詢停止測試"
+  ],
+  "human_gate": {
+    "decision": "approved",
+    "date": "2026-09-05"
+  }
+}
