@@ -5,7 +5,7 @@
 ## 1. 環境與依賴管理 (Environment)
 - **Runtime**: Node.js 20+，透過 `.nvmrc` 或 `.node-version` 管理。
 - **Package Manager**: 統一使用 **pnpm**。
-- **Build Tool**: **rsbuild**，搭配 Nuxt.js rsbuild 整合。
+- **Build Tool**: Nuxt 預設的 **Vite** builder。（rsbuild 從未安裝或設定，2026-09-05 依 tooling-baseline Human Gate 決議移除該規則。）
 - **Dependencies**:
   - 核心依賴記錄於 `package.json`，鎖定版本使用 `pnpm-lock.yaml`。
   - 禁止混用 npm / yarn / pnpm。
@@ -20,7 +20,7 @@
   - `tsconfig.json` 啟用 `strict: true`。
   - 所有 composables、props、emits 必須有完整型別。
   - 嚴禁使用 `any`。若第三方庫限制，須加 `// @ts-expect-error` 並加註釋說明。
-  - 驗證: `pnpm vue-tsc --noEmit`。
+  - 驗證: `pnpm vue-tsc`（script 已含 `nuxt prepare && vue-tsc --noEmit`）。
 - **禁令**:
   - 嚴禁 `console.log()`，請用統一的 logger utility。
   - 嚴禁 `v-html` 使用未 sanitize 的輸入。
@@ -51,9 +51,10 @@
 - **Pinia**:
   - Store 使用 Composition API 風格，`defineStore` with setup function。
   - 禁止在 store 外部直接 mutate state。
-- **Tailwind CSS**:
-  - 禁止 inline style，優先使用 Tailwind utility classes。
-  - 自訂 token 統一寫入 `tailwind.config.ts`，避免魔術數字。
+- **樣式 (Styling)**:
+  - 樣式優先使用 `assets/css/design-tokens.css` 的 CSS 變數搭配 scoped CSS —— 這是全站目前的實際作法。
+  - 禁止 inline style。ESLint `vue/no-static-inline-styles` 目前設為 `warn`，既有違規清理完畢後再升為 `error`。
+  - Tailwind 僅用於 layout utility；自訂 token 統一寫入 `tailwind.config.ts`，避免魔術數字。
   - 響應式斷點遵循 mobile-first 原則。
 
 ## 5. 測試與提交 (CI/CD & Git)
@@ -61,14 +62,16 @@
   - 新功能必含測試，目標覆蓋率 80%+。
   - 指令: `pnpm test` / `pnpm test:coverage`。
 - **Commit**: 遵循 Conventional Commits: `feat`, `fix`, `docs`, `test`, `chore`。
-- **Pre-commit**: 本地應啟用 `lint-staged` + `husky`。
-  - Hooks: ESLint fix -> Prettier format -> vue-tsc -> test。
+- **Git hooks**: 本地必須啟用 `husky` + `lint-staged`（`pnpm install` 會透過 `prepare` script 自動安裝）。
+  - `pre-commit`（快，數秒）: `lint-staged`（ESLint fix -> Prettier format）-> `vitest run --changed`
+  - `pre-push`（慢）: `pnpm vue-tsc` -> 全量 `pnpm test`
+  - 拆成兩段的理由：型別檢查與全量測試放在每次 commit 會讓開發節奏無法接受，改為 push 前把關。
 
 ## 6. Codex 與 README 工作順序
 - README 的 **Codex Task Checklist** 是目前實作順序來源；每次開始任務先確認 checklist 與實際檔案狀態是否一致。
 - 型別來源以 `types/api.ts` 與 `docs/for-claude-design.md` section D 為準。
 - API integration 遵守 README：所有 API 經由 `$fetch` / `useFetch`，並帶 `X-API-Key`。
-- Railway、rsbuild、環境變數設定依 README 內容完成。
+- Railway 與環境變數設定依 README 內容完成（rsbuild 已不在技術棧內）。
 - 若需要使用 OpenSpec workflow，優先使用已搬到 `.codex/skills` 的 `openspec-*` skills，或全域 Codex prompts `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, `/opsx:archive`。
 
 ## 7. Agent Workflow & Handoff Protocol
