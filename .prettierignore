@@ -1,0 +1,10 @@
+.nuxt/
+.output/
+node_modules/
+coverage/
+pnpm-lock.yaml
+specs/
+docs/
+openspec/
+graphify-out/
+*.md

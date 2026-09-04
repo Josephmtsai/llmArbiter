@@ -12,10 +12,13 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "lint": "eslint . --fix",
+    "lint:check": "eslint .",
     "format": "prettier --write .",
-    "test": "vitest",
-    "test:coverage": "vitest --coverage",
-    "vue-tsc": "nuxt prepare && vue-tsc --noEmit"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "vue-tsc": "nuxt prepare && vue-tsc --noEmit",
+    "prepare": "husky"
   },
   "dependencies": {
     "@pinia/nuxt": "^0.7.0",
@@ -33,10 +36,24 @@
     "@vitest/coverage-v8": "^2.1.0",
     "@vue/test-utils": "^2.4.6",
     "eslint": "^9.9.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.10.0",
+    "husky": "^9",
     "jsdom": "25.0.1",
+    "lint-staged": "^17",
     "prettier": "^3.3.0",
     "typescript": "^5.5.0",
+    "typescript-eslint": "^8.69.0",
     "vitest": "^2.1.0",
     "vue-tsc": "^2.1.6"
+  },
+  "lint-staged": {
+    "*.{ts,vue,js,mjs}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,css}": [
+      "prettier --write"
+    ]
   }
 }
