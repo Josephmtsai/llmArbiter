@@ -133,7 +133,9 @@ Prettier 的 `semi: false` 會把「同一個 inline handler 內以分號分隔�
 | `pages/decisions.vue` | `@click="page--; load()"` | `prevPage()` |
 | `pages/decisions.vue` | `@click="page++; load()"` | `nextPage()` |
 
-Coverage（設定 `include` 後重新量測）：lines __ / statements __ / functions __ / branches __
+Coverage（設定 `include` 後於 2026-09-05 重新量測）：**lines 43.73 / statements 43.73 / functions 53.43 / branches 80.14**（55 個檔案）。
+
+門檻依 AD-6 ratchet 規則取「量測值向下取整 − 2」= **lines 41 / statements 41 / functions 51 / branches 78**，高於 spec 原先預寫的 20/20/45/70。原因：`include` 縮到業務程式碼目錄後分母變小，數字比 SA 量測的 22.41% 高出一倍；若照 20 設定，覆蓋率掉一半門檻也不會紅燈，與本 feature「鎖住現況不倒退」的目的相違。已驗證把 `lines` 暫時改成 99 時 `pnpm test:coverage` 確實 exit 1。
 
 ## Open Questions（Human Gate 決定）
 

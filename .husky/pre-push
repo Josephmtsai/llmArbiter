@@ -1,0 +1,2 @@
+pnpm vue-tsc
+pnpm test
