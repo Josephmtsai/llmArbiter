@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto Prompt Optimizer · 流程總覽</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --color-paper:       #f5f5f5;
+      --color-paper-2:     #ececec;
+      --color-ink:         #2d3142;
+      --color-muted:       #4f5d75;
+      --color-soft:        #7a8399;
+      --color-rule:        rgba(45,49,66,0.12);
+      --color-rule-solid:  rgba(79,93,117,0.25);
+      --color-accent:      #eb6c36;
+      --color-accent-tint: rgba(235,108,54,0.08);
+      --color-link:        #2e5aa8;
+      --font-sans:   'Geist', 'Noto Sans TC', system-ui, sans-serif;
+      --font-serif:  'Instrument Serif', 'Noto Serif TC', 'Times New Roman', serif;
+      --font-mono:   'Geist Mono', ui-monospace, Menlo, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      min-height: 100vh;
+      padding: 3rem 2rem;
+      color: var(--color-ink);
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    .header { margin-bottom: 2.5rem; }
+
+    .header-eyebrow, .fig-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.75rem, 3vw + 1rem, 2.5rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      color: var(--color-ink);
+      margin-bottom: 0.5rem;
+    }
+
+    h2 {
+      font-family: var(--font-serif);
+      font-size: 1.5rem;
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+      margin-bottom: 0.4rem;
+    }
+
+    .subtitle {
+      font-family: var(--font-sans);
+      font-size: 1rem;
+      line-height: 1.55;
+      color: var(--color-muted);
+      max-width: 60ch;
+    }
+
+    .figure { margin-top: 3.5rem; }
+    .figure:first-of-type { margin-top: 0; }
+
+    .diagram-container {
+      background: transparent;
+      border: none;
+      padding: 0;
+      margin-top: 1.25rem;
+      overflow-x: auto;
+    }
+
+    svg { width: 100%; min-width: 900px; display: block; }
+
+    .cards {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr 0.9fr;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+    @media (max-width: 860px) { .cards { grid-template-columns: 1fr; } }
+
+    .card {
+      background: #ffffff;
+      border-radius: 6px;
+      border: 1px solid var(--color-rule);
+      padding: 1.25rem;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.875rem;
+      padding-bottom: 0.875rem;
+      border-bottom: 1px solid rgba(45,49,66,0.08);
+    }
+
+    .card-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .card-dot.ink    { background: var(--color-ink); }
+    .card-dot.muted  { background: var(--color-muted); }
+    .card-dot.coral  { background: var(--color-accent); }
+    .card-dot.link   { background: var(--color-link); }
+    .card-dot.soft   { background: var(--color-soft); }
+
+    .card h3 {
+      font-family: var(--font-sans);
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--color-ink);
+    }
+
+    .card ul { list-style: none; color: var(--color-muted); font-size: 0.8125rem; line-height: 1.55; }
+    .card li { margin-bottom: 0.3rem; padding-left: 0.875rem; position: relative; }
+    .card li::before { content: '—'; position: absolute; left: 0; color: rgba(45,49,66,0.25); font-size: 0.75rem; }
+    .card code { font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-ink); }
+
+    .card table { width: 100%; border-collapse: collapse; font-size: 0.78rem; color: var(--color-muted); }
+    .card th { font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 500; text-align: left; padding: 0 0 0.4rem; color: var(--color-soft); }
+    .card td { padding: 0.3rem 0; border-top: 1px solid rgba(45,49,66,0.08); }
+    .card td.num { text-align: right; font-family: var(--font-mono); font-size: 0.72rem; }
+    .card td.prot { color: var(--color-accent); font-weight: 500; }
+
+    .footer {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid rgba(45,49,66,0.10);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      color: var(--color-soft);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div class="header">
+      <p class="header-eyebrow">Auto Prompt Optimizer · 2026-09-04</p>
+      <h1>Auto Optimizer 流程總覽</h1>
+      <p class="subtitle">四張圖從不同高度看同一件事：測試案例（eval pool）怎麼被切分與取用、一次 optimizer run 的骨幹、每一輪候選 prompt 必須通過的三道 gate，以及各角色之間的訊息往返。</p>
+    </div>
+
+    <!-- ================================================================
+         FIG 1 · SANKEY — where the 12,000 test cases go
+         ================================================================ -->
+    <section class="figure">
+      <p class="fig-eyebrow">Fig. 1 · Sankey</p>
+      <h2>測試案例的流向：12,000 筆裡只有 600 筆會被評分</h2>
+      <p class="subtitle">帶寬等於案例數。訓練集只用於重新標記與人工審核，optimizer 從未拿它評分；驗證快照每輪重複使用，測試快照只在迴圈結束後使用一次。</p>
+      <div class="diagram-container">
+        <svg viewBox="0 0 1000 792" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="pool-sankey-title pool-sankey-desc">
+          <title id="pool-sankey-title">Eval pool split and optimizer snapshot usage</title>
+          <desc id="pool-sankey-desc">Sankey showing the 12,000-case eval pool splitting into train, validation and test, and how one optimizer run scores only a 200-case validation snapshot and a 400-case test snapshot while the rest is curated or held in reserve.</desc>
+          <defs></defs>
+          <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+          <!-- Column headers -->
+          <text x="166" y="52" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">EVAL POOL · TEST CASES</text>
+          <text x="500" y="52" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">SPLIT · 60 / 20 / 20</text>
+          <text x="806" y="52" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">USED IN ONE OPTIMIZER RUN</text>
+
+          <!-- Ordinary ribbons (k = 0.04 px per case) -->
+          <path d="M172,148 C333,148 333,108 494,108 L494,396 C333,396 333,436 172,436 Z" fill="rgba(79,93,117,0.18)"/>
+          <path d="M172,436 C333,436 333,436 494,436 L494,532 C333,532 333,532 172,532 Z" fill="rgba(79,93,117,0.18)"/>
+          <path d="M172,532 C333,532 333,572 494,572 L494,668 C333,668 333,628 172,628 Z" fill="rgba(79,93,117,0.18)"/>
+          <path d="M506,108 C653,108 653,88 800,88 L800,376 C653,376 653,396 506,396 Z" fill="rgba(79,93,117,0.18)"/>
+          <path d="M506,444 C653,444 653,464 800,464 L800,552 C653,552 653,532 506,532 Z" fill="rgba(79,93,117,0.18)"/>
+          <path d="M506,572 C653,572 653,552 800,552 L800,632 C653,632 653,652 506,652 Z" fill="rgba(79,93,117,0.18)"/>
+
+          <!-- Focal path: the cases the optimizer actually scores -->
+          <path d="M506,436 C653,436 653,416 800,416 L800,424 C653,424 653,444 506,444 Z" fill="rgba(235,108,54,0.28)"/>
+          <path d="M506,652 C653,652 653,672 800,672 L800,688 C653,688 653,668 506,668 Z" fill="rgba(235,108,54,0.28)"/>
+
+          <!-- Node bars -->
+          <rect x="160" y="148" width="12" height="480" fill="#2d3142"/>
+          <rect x="494" y="108" width="12" height="288" fill="#2d3142"/>
+          <rect x="494" y="436" width="12" height="96" fill="#2d3142"/>
+          <rect x="494" y="572" width="12" height="96" fill="#2d3142"/>
+          <rect x="800" y="88" width="12" height="288" fill="#2d3142"/>
+          <rect x="800" y="416" width="12" height="8" fill="#2d3142"/>
+          <rect x="800" y="464" width="12" height="168" fill="#2d3142"/>
+          <rect x="800" y="672" width="12" height="16" fill="#2d3142"/>
+
+          <!-- Column 1 labels -->
+          <text x="148" y="384" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="end">Eval pool</text>
+          <text x="148" y="400" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">12,000 cases</text>
+          <text x="148" y="412" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">2,400 per action</text>
+
+          <!-- Column 2 labels (centred in gutters) -->
+          <text x="500" y="88" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Train</text>
+          <text x="500" y="100" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">7,200 · 60%</text>
+          <text x="500" y="412" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Validation</text>
+          <text x="500" y="424" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">2,400 · 20%</text>
+          <text x="500" y="548" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Test</text>
+          <text x="500" y="560" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">2,400 · 20%</text>
+
+          <!-- Column 3 labels -->
+          <text x="816" y="228" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Relabel &amp; review only</text>
+          <text x="816" y="244" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace">7,200 · never scored</text>
+          <text x="816" y="416" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Val snapshot</text>
+          <text x="816" y="432" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace">200 · 40/action · fixed per run</text>
+          <text x="816" y="544" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Not drawn this run</text>
+          <text x="816" y="560" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace">4,200 · val 2,200 + test 2,000</text>
+          <text x="816" y="676" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Test snapshot</text>
+          <text x="816" y="692" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace">400 · 80/action · once after loop</text>
+
+          <!-- Legend -->
+          <line x1="30" y1="728" x2="970" y2="728" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+          <text x="30" y="744" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
+          <rect x="100" y="736" width="16" height="8" fill="rgba(79,93,117,0.18)"/>
+          <text x="124" y="744" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Split flow (cases)</text>
+          <rect x="260" y="736" width="16" height="8" fill="rgba(235,108,54,0.28)"/>
+          <text x="284" y="744" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Scored by the optimizer: 600 of 12,000</text>
+          <text x="620" y="746" fill="#4f5d75" font-size="14" font-style="italic" font-family="'Instrument Serif', serif">Only 5% of the pool is ever scored in a run.</text>
+        </svg>
+      </div>
+
+      <div class="cards">
+        <div class="card">
+          <div class="card-header"><span class="card-dot ink"></span><h3>資料池與切分</h3></div>
+          <ul>
+            <li>來源：LogChunks、Travis CI、BGL、HPC 硬體日誌，經 <code>generate_eval_pool_from_logs.py</code> 產生 12,000 筆，五種 action 各 2,400 筆。</li>
+            <li>切分固定 60 / 20 / 20；共用 <code>split_group</code> 的近似重複案例會落在同一切分，避免跨界洩漏。</li>
+            <li><code>relabel_eval_pool.py</code> 以較強模型重標；confidence &lt; 0.8 進入 review queue，人工 confirm / correct / reject 後才回到池中。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-dot coral"></span><h3>驗證快照（每輪評分）</h3></div>
+          <ul>
+            <li>run 開始時從 val split 每 action 抽 40 筆，共 200 筆，寫入 <code>val_snapshot_ids</code>。</li>
+            <li>baseline 與每一輪候選都用同一組 200 筆，跨輪 accuracy 才能直接比較。</li>
+            <li>round accuracy 與 accuracy_delta 都是「這 200 筆」的表現，不是整池。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-dot muted"></span><h3>測試快照（最終驗收）</h3></div>
+          <ul>
+            <li>迴圈結束後從 test split 每 action 抽 80 筆，共 400 筆，只評分一次。</li>
+            <li>optimizer 在整個 run 期間從未看過 test split，<code>test_accuracy</code> 是無偏的泛化估計。</li>
+            <li>驗證準確率 ≠ 測試準確率，兩者要分開解讀。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         FIG 2 · FLOWCHART — run level
+         ================================================================ -->
+    <section class="figure">
+      <p class="fig-eyebrow">Fig. 2 · Flowchart · Run level</p>
+      <h2>一次 optimizer run 的骨幹</h2>
+      <p class="subtitle">從 POST /optimizer/run 到 operator 手動啟用。每一輪的細節（候選生成與三道 gate）展開在 Fig. 3。</p>
+      <div class="diagram-container">
+        <svg viewBox="0 0 1000 656" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="run-flow-title run-flow-desc">
+          <title id="run-flow-title">Optimizer run lifecycle</title>
+          <desc id="run-flow-desc">Flowchart of one optimizer run: snapshot the validation set and measure the baseline, loop rounds of candidate generation and gating until the target accuracy or max rounds is reached, score the best prompt on the held-out test snapshot, then hand off to the operator activation gate.</desc>
+          <defs>
+            <marker id="run-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+            <marker id="run-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
+            <marker id="run-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+          </defs>
+          <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+          <!-- Arrows first -->
+          <line x1="400" y1="96" x2="400" y2="136" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#run-arrow)"/>
+          <line x1="400" y1="192" x2="400" y2="232" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#run-arrow)"/>
+          <line x1="400" y1="288" x2="400" y2="328" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#run-arrow)"/>
+          <line x1="400" y1="400" x2="400" y2="440" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#run-arrow)"/>
+          <rect x="412" y="412" width="40" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="432" y="421" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">DONE</text>
+          <line x1="400" y1="496" x2="400" y2="536" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#run-arrow-accent)"/>
+
+          <!-- Persist (dashed write) -->
+          <line x1="520" y1="260" x2="640" y2="260" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#run-arrow)"/>
+          <rect x="556" y="240" width="48" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="580" y="249" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">PERSIST</text>
+
+          <!-- Loop back: next round -->
+          <path d="M240,364 L88,364 Q80,364 80,356 L80,268 Q80,260 88,260 L280,260" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#run-arrow)"/>
+          <rect x="88" y="304" width="72" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="92" y="313" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">NEXT ROUND</text>
+
+          <!-- N1 start -->
+          <rect x="280" y="48" width="240" height="48" rx="20" fill="#f5f5f5"/>
+          <rect x="280" y="48" width="240" height="48" rx="20" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="400" y="68" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Start optimizer run</text>
+          <text x="400" y="84" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">POST /optimizer/run · max_rounds · target</text>
+
+          <!-- N2 snapshot + baseline -->
+          <rect x="280" y="136" width="240" height="56" rx="6" fill="#f5f5f5"/>
+          <rect x="280" y="136" width="240" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="400" y="160" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Snapshot val set + baseline eval</text>
+          <text x="400" y="176" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">200 fixed cases → baseline_accuracy</text>
+
+          <!-- N3 round -->
+          <rect x="280" y="232" width="240" height="56" rx="6" fill="#f5f5f5"/>
+          <rect x="280" y="232" width="240" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="400" y="256" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Round N: candidate + gates</text>
+          <text x="400" y="272" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Fig. 3 → kept / rejected / skipped</text>
+
+          <!-- Store -->
+          <rect x="640" y="232" width="160" height="56" rx="6" fill="#f5f5f5"/>
+          <rect x="640" y="232" width="160" height="56" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+          <text x="720" y="256" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">PostgreSQL</text>
+          <text x="720" y="272" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">runs · rounds · failures</text>
+
+          <!-- N4 exit decision -->
+          <polygon points="400,328 560,364 400,400 240,364" fill="#f5f5f5"/>
+          <polygon points="400,328 560,364 400,400 240,364" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="400" y="360" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Target reached or max rounds?</text>
+          <text x="400" y="376" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">accuracy ≥ target · rounds ≥ max_rounds</text>
+
+          <!-- N5 test acceptance -->
+          <rect x="280" y="440" width="240" height="56" rx="6" fill="#f5f5f5"/>
+          <rect x="280" y="440" width="240" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="400" y="464" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Test-set acceptance</text>
+          <text x="400" y="480" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">best prompt × 400 held-out → test_accuracy</text>
+
+          <!-- N6 operator gate (focal) -->
+          <rect x="280" y="536" width="240" height="48" rx="20" fill="#f5f5f5"/>
+          <rect x="280" y="536" width="240" height="48" rx="20" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+          <text x="400" y="556" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Operator activation gate</text>
+          <text x="400" y="572" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">PATCH /prompts/{id}/activate</text>
+
+          <!-- Legend -->
+          <line x1="30" y1="616" x2="970" y2="616" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+          <text x="30" y="632" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
+          <rect x="100" y="624" width="20" height="10" rx="5" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="128" y="633" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Start / end</text>
+          <rect x="220" y="624" width="16" height="10" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="244" y="633" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Step</text>
+          <polygon points="308,624 320,629 308,634 296,629" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="328" y="633" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Decision</text>
+          <rect x="400" y="624" width="16" height="10" rx="2" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+          <text x="424" y="633" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Persisted state</text>
+          <line x1="520" y1="629" x2="540" y2="629" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#run-arrow)"/>
+          <text x="548" y="633" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Write</text>
+          <rect x="600" y="624" width="20" height="10" rx="5" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+          <text x="628" y="633" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Only path that changes production</text>
+        </svg>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         FIG 3 · FLOWCHART — round level, the three gates
+         ================================================================ -->
+    <section class="figure">
+      <p class="fig-eyebrow">Fig. 3 · Flowchart · Round level</p>
+      <h2>每一輪的三道 gate：候選 prompt 怎麼變成 kept / rejected / skipped</h2>
+      <p class="subtitle">G0 在評分前擋掉結構不合法的候選；G1 要求整體驗證準確率進步；G2 要求受保護的 action 不能退步超過容差。三道全過才 kept。</p>
+      <div class="diagram-container">
+        <svg viewBox="0 0 1000 792" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="round-flow-title round-flow-desc">
+          <title id="round-flow-title">Optimizer round gates</title>
+          <desc id="round-flow-desc">Flowchart of one optimizer round: the optimizer LLM analyzes failures and generates a candidate, gate G0 validates its structure, the candidate is evaluated on the fixed validation snapshot, gate G1 requires overall accuracy to improve and gate G2 requires protected actions to stay within tolerance; outcomes are kept, rejected or skipped.</desc>
+          <defs>
+            <marker id="rnd-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+            <marker id="rnd-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
+            <marker id="rnd-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+          </defs>
+          <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+          <!-- Main-line arrows -->
+          <line x1="320" y1="88" x2="320" y2="128" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#rnd-arrow)"/>
+          <line x1="320" y1="184" x2="320" y2="220" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#rnd-arrow)"/>
+          <line x1="320" y1="300" x2="320" y2="336" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#rnd-arrow)"/>
+          <rect x="332" y="312" width="40" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="352" y="321" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">VALID</text>
+          <line x1="320" y1="392" x2="320" y2="428" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#rnd-arrow)"/>
+          <line x1="320" y1="508" x2="320" y2="540" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#rnd-arrow)"/>
+          <rect x="332" y="518" width="28" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="346" y="527" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">YES</text>
+          <line x1="320" y1="620" x2="320" y2="664" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#rnd-arrow-accent)"/>
+          <rect x="332" y="636" width="36" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="350" y="645" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">PASS</text>
+
+          <!-- Branch arrows -->
+          <line x1="480" y1="260" x2="600" y2="260" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#rnd-arrow)"/>
+          <rect x="520" y="240" width="44" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="542" y="249" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">INVALID</text>
+
+          <path d="M480,468 L712,468 Q720,468 720,476 L720,500" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#rnd-arrow)"/>
+          <rect x="572" y="448" width="48" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="596" y="457" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">NO GAIN</text>
+
+          <path d="M480,580 L712,580 Q720,580 720,572 L720,548" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#rnd-arrow)"/>
+          <rect x="560" y="560" width="72" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="596" y="569" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">REGRESSION</text>
+
+          <!-- N1 start -->
+          <rect x="200" y="40" width="240" height="48" rx="20" fill="#f5f5f5"/>
+          <rect x="200" y="40" width="240" height="48" rx="20" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="320" y="60" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Round N starts</text>
+          <text x="320" y="76" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">input: best prompt so far + its failures</text>
+
+          <!-- N2 analyze + generate -->
+          <rect x="200" y="128" width="240" height="56" rx="6" fill="#f5f5f5"/>
+          <rect x="200" y="128" width="240" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="320" y="152" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Optimizer LLM: analyze + generate</text>
+          <text x="320" y="168" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">confusion → analysis_text → candidate</text>
+
+          <!-- N3 G0 -->
+          <polygon points="320,220 480,260 320,300 160,260" fill="#f5f5f5"/>
+          <polygon points="320,220 480,260 320,300 160,260" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="320" y="256" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">G0 · Candidate valid?</text>
+          <text x="320" y="272" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">JSON · fields · actions · output contract</text>
+
+          <!-- N4 evaluate -->
+          <rect x="200" y="336" width="240" height="56" rx="6" fill="#f5f5f5"/>
+          <rect x="200" y="336" width="240" height="56" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="320" y="360" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Save inactive version + evaluate</text>
+          <text x="320" y="376" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">same 200 val cases · per-action metrics</text>
+
+          <!-- N5 G1 -->
+          <polygon points="320,428 480,468 320,508 160,468" fill="#f5f5f5"/>
+          <polygon points="320,428 480,468 320,508 160,468" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="320" y="464" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">G1 · Overall accuracy &gt; best?</text>
+          <text x="320" y="480" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">round_accuracy &gt; previous_best_accuracy</text>
+
+          <!-- N6 G2 -->
+          <polygon points="320,540 480,580 320,620 160,580" fill="#f5f5f5"/>
+          <polygon points="320,540 480,580 320,620 160,580" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="320" y="576" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">G2 · Protected actions hold?</text>
+          <text x="320" y="592" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">notify_human, send_email ±2% · trigger_* ±5%</text>
+
+          <!-- N7 kept (focal) -->
+          <rect x="200" y="664" width="240" height="48" rx="20" fill="#f5f5f5"/>
+          <rect x="200" y="664" width="240" height="48" rx="20" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+          <text x="320" y="684" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Kept → new best prompt</text>
+          <text x="320" y="700" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">kept=true · baseline for next round</text>
+
+          <!-- N8 rejected -->
+          <rect x="600" y="500" width="240" height="48" rx="20" fill="#f5f5f5"/>
+          <rect x="600" y="500" width="240" height="48" rx="20" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="720" y="520" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Rejected → previous best stays</text>
+          <text x="720" y="536" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">kept=false · reject_reason recorded</text>
+
+          <!-- N9 skipped -->
+          <rect x="600" y="236" width="240" height="48" rx="20" fill="#f5f5f5"/>
+          <rect x="600" y="236" width="240" height="48" rx="20" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="720" y="256" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Skipped → nothing tested</text>
+          <text x="720" y="272" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">skip_reason · retried once first</text>
+
+          <!-- Legend -->
+          <line x1="30" y1="752" x2="970" y2="752" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+          <text x="30" y="768" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
+          <rect x="100" y="760" width="20" height="10" rx="5" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="128" y="769" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Start / outcome</text>
+          <rect x="240" y="760" width="16" height="10" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="264" y="769" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Step</text>
+          <polygon points="328,760 340,765 328,770 316,765" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="348" y="769" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Gate</text>
+          <rect x="420" y="760" width="20" height="10" rx="5" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1"/>
+          <text x="448" y="769" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Only outcome that moves the best prompt forward</text>
+        </svg>
+      </div>
+
+      <div class="cards">
+        <div class="card">
+          <div class="card-header"><span class="card-dot ink"></span><h3>G0 · 結構驗證（評分前）</h3></div>
+          <ul>
+            <li>候選必須是可解析的結構化物件，含必要欄位、所有分類 action，以及 JSON 輸出指令。</li>
+            <li>不合法時後端先重試一次；再失敗才記錄 <code>skip_reason</code>，該輪 <code>kept=false</code>、<code>eval_run_id=null</code>。</li>
+            <li>常見原因：<code>optimizer-candidate-invalid-json</code>、<code>-missing-actions:&lt;action&gt;</code>、<code>-missing-json-contract</code>、<code>-missing-fields:&lt;field&gt;</code>、<code>-unsupported-actions:&lt;action&gt;</code>。</li>
+            <li>Skipped 不代表 prompt 變差，只代表這一輪沒有候選被測試；但仍計入 max_rounds。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-dot muted"></span><h3>G1 · 整體準確率</h3></div>
+          <ul>
+            <li><code>overall_pass = round_accuracy &gt; previous_best_accuracy</code>，在同一組 200 筆驗證快照上比較。</li>
+            <li>未通過時 <code>reject_reason</code> 記為 no overall improvement，是最常見的拒絕原因。</li>
+            <li>previous_best 是上一個 kept 的候選，若尚無 kept 則是 baseline。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-dot coral"></span><h3>G2 · 各動作回退容差</h3></div>
+          <table>
+            <thead><tr><th>Action</th><th style="text-align:right">Tolerance</th></tr></thead>
+            <tbody>
+              <tr><td class="prot">notify_human</td><td class="num">±2%</td></tr>
+              <tr><td class="prot">send_email</td><td class="num">±2%</td></tr>
+              <tr><td>trigger_rebuild</td><td class="num">±5%</td></tr>
+              <tr><td>trigger_fallback</td><td class="num">±5%</td></tr>
+              <tr><td>trigger_restart</td><td class="num">±5%</td></tr>
+            </tbody>
+          </table>
+          <ul style="margin-top:0.75rem">
+            <li><code>action_pass = action_delta ≥ −tolerance</code>；僅在該 action 的 baseline 樣本數 ≥ 10 時生效。</li>
+            <li>整體有進步也會被拒：關鍵 action 退步會讓真實事件繞過人工升級。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         FIG 4 · SEQUENCE — who talks to whom in a run
+         ================================================================ -->
+    <section class="figure">
+      <p class="fig-eyebrow">Fig. 4 · Sequence</p>
+      <h2>一次 run 的訊息往返：誰負責分析、誰負責評分、誰負責留下紀錄</h2>
+      <p class="subtitle">Optimizer LLM 與 Evaluator 是兩個不同的模型：前者只讀失敗樣本並改寫 prompt，後者只對 200 / 400 筆案例出題評分。所有輪次資料寫入 PostgreSQL。</p>
+      <div class="diagram-container">
+        <svg viewBox="0 0 1000 752" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="round-seq-title round-seq-desc">
+          <title id="round-seq-title">Optimizer run message sequence</title>
+          <desc id="round-seq-desc">Sequence diagram of an optimizer run: the operator UI starts the run, the optimizer task measures the baseline with the evaluator, then loops asking the optimizer LLM for an analysis and candidate, evaluating the candidate, applying the keep or reject gates and persisting the round, and finally scores the best prompt on the test snapshot.</desc>
+          <defs>
+            <marker id="seq-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+            <marker id="seq-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
+            <marker id="seq-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+          </defs>
+          <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+          <!-- Lifelines -->
+          <line x1="100" y1="88" x2="100" y2="688" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+          <line x1="300" y1="88" x2="300" y2="688" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+          <line x1="500" y1="88" x2="500" y2="688" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+          <line x1="700" y1="88" x2="700" y2="688" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+          <line x1="900" y1="88" x2="900" y2="688" stroke="rgba(45,49,66,0.20)" stroke-width="1" stroke-dasharray="3,3"/>
+
+          <!-- Loop fragment frame -->
+          <rect x="252" y="268" width="672" height="272" rx="4" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.22)" stroke-width="1"/>
+          <rect x="252" y="268" width="40" height="16" rx="2" fill="#f5f5f5" stroke="rgba(45,49,66,0.22)" stroke-width="1"/>
+          <text x="272" y="280" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">LOOP</text>
+          <text x="344" y="300" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.04em">[round N · until accuracy ≥ target or N = max_rounds]</text>
+
+          <!-- Activation bars -->
+          <rect x="96" y="120" width="8" height="44" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8"/>
+          <rect x="296" y="120" width="8" height="508" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8"/>
+          <rect x="496" y="320" width="8" height="44" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8"/>
+          <rect x="696" y="188" width="8" height="56" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8"/>
+          <rect x="696" y="388" width="8" height="48" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8"/>
+          <rect x="696" y="572" width="8" height="48" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8"/>
+          <rect x="896" y="504" width="8" height="16" fill="rgba(45,49,66,0.06)" stroke="#4f5d75" stroke-width="0.8"/>
+
+          <!-- m1 POST run -->
+          <line x1="104" y1="128" x2="296" y2="128" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#seq-arrow-link)"/>
+          <rect x="152" y="108" width="96" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="200" y="117" fill="#2e5aa8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">POST /OPTIMIZER/RUN</text>
+          <!-- m2 202 -->
+          <line x1="296" y1="156" x2="104" y2="156" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#seq-arrow)"/>
+          <rect x="168" y="136" width="64" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="200" y="145" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">202 · RUN_ID</text>
+
+          <!-- m3 baseline eval -->
+          <line x1="304" y1="196" x2="696" y2="196" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#seq-arrow)"/>
+          <rect x="552" y="176" width="96" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="600" y="185" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">EVAL BASELINE · 200</text>
+          <!-- m4 baseline return -->
+          <line x1="696" y1="236" x2="304" y2="236" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#seq-arrow)"/>
+          <rect x="344" y="216" width="112" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="400" y="225" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">BASELINE ACC + FAILURES</text>
+
+          <!-- m5 analyze + generate -->
+          <line x1="304" y1="328" x2="496" y2="328" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#seq-arrow)"/>
+          <rect x="352" y="308" width="96" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="400" y="317" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">ANALYZE + GENERATE</text>
+          <!-- m6 candidate return -->
+          <line x1="496" y1="356" x2="304" y2="356" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#seq-arrow)"/>
+          <rect x="348" y="336" width="104" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="400" y="345" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">ANALYSIS + CANDIDATE</text>
+
+          <!-- m7 eval candidate -->
+          <line x1="304" y1="396" x2="696" y2="396" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#seq-arrow)"/>
+          <rect x="548" y="376" width="104" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="600" y="385" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">EVAL CANDIDATE · 200</text>
+          <!-- m8 candidate return -->
+          <line x1="696" y1="428" x2="304" y2="428" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#seq-arrow)"/>
+          <rect x="356" y="408" width="88" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="400" y="417" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">ACC + PER-ACTION</text>
+
+          <!-- m9 self: gates -->
+          <path d="M304,456 L328,456 Q336,456 336,464 L336,472 Q336,480 328,480 L304,480" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#seq-arrow)"/>
+          <rect x="344" y="462" width="100" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="348" y="471" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">KEEP / REJECT GATES</text>
+
+          <!-- m10 persist round -->
+          <line x1="304" y1="512" x2="896" y2="512" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#seq-arrow)"/>
+          <rect x="744" y="492" width="112" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="800" y="501" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">INSERT ROUND + FAILURES</text>
+
+          <!-- m11 test eval -->
+          <line x1="304" y1="580" x2="696" y2="580" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#seq-arrow)"/>
+          <rect x="560" y="560" width="80" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="600" y="569" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">EVAL TEST · 400</text>
+          <!-- m12 test_accuracy (headline) -->
+          <line x1="696" y1="612" x2="304" y2="612" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#seq-arrow-accent)"/>
+          <rect x="360" y="592" width="80" height="12" rx="2" fill="#f5f5f5"/>
+          <text x="400" y="601" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">TEST_ACCURACY</text>
+
+          <!-- Actors -->
+          <rect x="28" y="40" width="144" height="48" rx="6" fill="#f5f5f5"/>
+          <rect x="28" y="40" width="144" height="48" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1"/>
+          <text x="100" y="60" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Operator UI</text>
+          <text x="100" y="76" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Nuxt · /optimizer</text>
+
+          <rect x="228" y="40" width="144" height="48" rx="6" fill="#f5f5f5"/>
+          <rect x="228" y="40" width="144" height="48" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+          <text x="300" y="60" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Optimizer task</text>
+          <text x="300" y="76" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">FastAPI · asyncio</text>
+
+          <rect x="428" y="40" width="144" height="48" rx="6" fill="#f5f5f5"/>
+          <rect x="428" y="40" width="144" height="48" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+          <text x="500" y="60" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Optimizer LLM</text>
+          <text x="500" y="76" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">OPTIMIZER_MODEL</text>
+
+          <rect x="628" y="40" width="144" height="48" rx="6" fill="#f5f5f5"/>
+          <rect x="628" y="40" width="144" height="48" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1"/>
+          <text x="700" y="60" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Evaluator</text>
+          <text x="700" y="76" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">EvalRun · Semaphore(10)</text>
+
+          <rect x="828" y="40" width="144" height="48" rx="6" fill="#f5f5f5"/>
+          <rect x="828" y="40" width="144" height="48" rx="6" fill="rgba(45,49,66,0.05)" stroke="#4f5d75" stroke-width="1"/>
+          <text x="900" y="60" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">PostgreSQL</text>
+          <text x="900" y="76" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">runs · rounds · failures</text>
+
+          <!-- Legend -->
+          <line x1="30" y1="712" x2="970" y2="712" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+          <text x="30" y="728" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEGEND</text>
+          <line x1="100" y1="724" x2="120" y2="724" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#seq-arrow)"/>
+          <text x="128" y="728" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Sync call</text>
+          <line x1="220" y1="724" x2="240" y2="724" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#seq-arrow)"/>
+          <text x="248" y="728" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Return</text>
+          <line x1="320" y1="724" x2="340" y2="724" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#seq-arrow-link)"/>
+          <text x="348" y="728" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">HTTP call</text>
+          <line x1="440" y1="724" x2="460" y2="724" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#seq-arrow-accent)"/>
+          <text x="468" y="728" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Headline result</text>
+          <rect x="580" y="720" width="16" height="10" rx="2" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.22)" stroke-width="1"/>
+          <text x="604" y="728" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Loop fragment (one round)</text>
+        </svg>
+      </div>
+
+      <div class="cards">
+        <div class="card">
+          <div class="card-header"><span class="card-dot link"></span><h3>角色分工</h3></div>
+          <ul>
+            <li><strong>Evaluator</strong>：目前 active provider（ollama / claude / codex / openrouter / nvidia），每個案例一次 LLM 呼叫，Semaphore(10) 併發，回傳 accuracy、failing_cases、confusion_matrix、per_action_metrics。</li>
+            <li><strong>Optimizer LLM</strong>：<code>OPTIMIZER_MODEL</code>（OpenRouter，預設 deepseek/deepseek-v3），只負責分析失敗與改寫 prompt，必須與 Evaluator 不同模型。</li>
+            <li>Optimizer 生成的 PromptVersion 一律 <code>is_active=false</code>，label 為 <code>optimizer-round-N</code>。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-dot muted"></span><h3>持久化（PostgreSQL）</h3></div>
+          <ul>
+            <li><code>optimizer_runs</code>：status、模型、baseline_accuracy、val_snapshot_ids、test_accuracy、finished_at。</li>
+            <li><code>optimizer_rounds</code>：accuracy、kept、confusion_matrix、analysis_text、per_action_deltas、reject_reason / skip_reason。</li>
+            <li><code>optimizer_round_failures</code>：每輪最多 50 筆失敗樣本，含 log_snippet 與 hardware_info。</li>
+            <li>service 重啟後所有 run 紀錄完整保留。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-dot coral"></span><h3>Operator 端的兩個閘</h3></div>
+          <ul>
+            <li><code>GET /optimizer/history</code> 看 val accuracy 趨勢、confusion 是否收斂、test_accuracy 是否跟上。</li>
+            <li>只有 <code>PATCH /prompts/{id}/activate</code> 會改變生產用的 active prompt；optimizer 本身不會自動啟用。</li>
+            <li><code>DELETE /optimizer/runs/{id}</code> 可取消進行中的 run；review queue 則守住標記品質這一端。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">
+      <span>llmArbiter · Auto Prompt Optimizer · 資料來源：docs/auto-prompt-architecture.md、docs/frontend-optimizer-regression-gates.md、pages/guide.vue</span>
+      <span>2026-09-04</span>
+    </div>
+
+  </div>
+</body>
+</html>

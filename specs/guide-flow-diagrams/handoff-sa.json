@@ -1,0 +1,23 @@
+{
+  "from": "sa",
+  "to": "developer",
+  "feature": "guide-flow-diagrams",
+  "status": "ready",
+  "summary": "將 docs/art/auto-optimizer-flow.html 的四張 SVG 流程圖（Sankey、run 流程圖、round 流程圖、循序圖）移植為 components/guide 下的 Vue SFC，套用 app design tokens（深/淺色主題、Inter/JetBrains Mono），以雙語 GuideFigure 框架放進 /guide 的 Data splits、Run lifecycle、Gates、Runtime flow 四個區塊，並汰換數字過期的 GuideSplitDiagram 與重複的 GuideLoopDiagram",
+  "artifacts": [
+    "specs/guide-flow-diagrams/spec.md",
+    "specs/guide-flow-diagrams/tasks.md"
+  ],
+  "assumptions": [
+    "A1: 使用者說的「三個」指三種圖型（Sankey / 流程圖 / 循序圖）；來源檔有四張 SVG（run 與 round 兩張流程圖），四張全部放上頁面，無一張與現有 UI 重複到可省略",
+    "A2: GuideSplitDiagram.vue 仍顯示舊數字 10,400/800/800（commit ea6c1b5 只修了 guide.vue），由 Sankey 取代並刪除該檔；GuideLoopDiagram.vue 內容被 run-flow + round-flow 完整涵蓋，由 run-flow 取代並刪除該檔，其唯一獨有句子（baseline 已達目標即不跑任何 round）移入 Fig. 2 caption",
+    "A3: SVG 不保留來源的 Geist / Instrument Serif / 紙色調色盤，全部映射到 design-tokens.css 的 token（coral accent → --warning 琥珀色系，link 藍 → --accent），不新增任何 Google Fonts 連結",
+    "A4: 共用 SVG class 樣式放在新的全域檔 assets/css/guide-diagrams.css（於 nuxt.config.ts css 陣列註冊），避免四個 SFC 重複同一份樣式；scoped style 無法觸及 slot 內的 SVG 子節點",
+    "A5: 圖內文字（節點、邊標籤、legend）維持英文技術用語，只有 GuideFigure 的 eyebrow / title / caption 走 t() 雙語；與既有 <code> 與 tooltip 不翻譯的政策一致",
+    "A6: run-flow 內 'PATCH /prompts/{id}/activate' 改為 'PATCH /config/prompts/{id}/activate' 以與頁面 API map 一致；其餘 SVG 文字逐字保留",
+    "A7: Gate 區塊標題維持「兩道閘」；G0 視為評分前的結構檢查（結果是 Skipped 非 Rejected），由 Fig. 3 caption 說明，不改動既有 gate cards 或 round states 文案",
+    "A8: 每個圖元件以 Vue 3.5 useId() 產生 title/desc/marker id 前綴，確保同頁多實例與 SSR 下 id 唯一",
+    "A9: 頁面測試以 vi.stubGlobal 提供 ref/computed/definePageMeta 並以名稱 stub 自動載入元件（沿用 tests/optimizerHistory.test.ts 的 NuxtLink/ClientOnly stub 模式）；專案未安裝 @nuxt/test-utils，不新增依賴",
+    "A10: 不改動 optimizer 功能、任何 route、docs/art/auto-optimizer-flow.html；不做 SVG 動畫或互動"
+  ]
+}

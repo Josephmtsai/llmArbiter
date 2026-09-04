@@ -1,0 +1,56 @@
+{
+  "from": "developer",
+  "to": "qa",
+  "feature": "guide-flow-diagrams",
+  "status": "ready",
+  "summary": "將 Auto Prompt Optimizer 的四張流程圖 (Sankey、run-level flowchart、round-level gate flowchart、sequence) 以 inline SVG Vue 元件放進 How it works 頁面，取代兩個舊的示意元件，並全面改用 design tokens 支援深淺主題；已修正 review 回報的 1 個 blocker 與 1 個 major",
+  "changed_files": [
+    "assets/css/guide-diagrams.css",
+    "components/guide/GuideFigure.vue",
+    "components/guide/GuidePoolSankey.vue",
+    "components/guide/GuideRunFlowDiagram.vue",
+    "components/guide/GuideRoundFlowDiagram.vue",
+    "components/guide/GuideRunSequenceDiagram.vue",
+    "components/guide/GuideSplitDiagram.vue (deleted)",
+    "components/guide/GuideLoopDiagram.vue (deleted)",
+    "pages/guide.vue",
+    "nuxt.config.ts",
+    "tests/guideDiagrams.test.ts",
+    "tests/guideFigure.test.ts",
+    "tests/guidePage.test.ts",
+    "docs/art/auto-optimizer-flow.html"
+  ],
+  "ac_ref": "specs/guide-flow-diagrams/tasks.md",
+  "assumptions": [
+    "四張圖全部置入（使用者說「三個」解讀為三種圖型），依 spec 的 placement table 放在 Data splits / Run lifecycle / Keep-reject gate / Runtime flow 四個 section。",
+    "依 spec 刪除 GuideSplitDiagram.vue 與 GuideLoopDiagram.vue；前者仍顯示過期的 10,400/800/800 切分數字，與頁面其他部分矛盾。",
+    "SVG 內部標籤維持英文技術術語，僅圖說 (eyebrow/title/caption) 走頁面既有的 t() 雙語機制。",
+    "圖表色彩與字體全部映射到 design-tokens.css，未新增任何 Google Fonts 連結；已驗證 18 個使用到的 token 在 light 主題區塊皆有覆寫。",
+    "修正 Fig. 4 的 LOOP fragment 標籤與 Optimizer task activation bar 重疊（實際渲染時 O 被遮住）：frame 左緣由 x=276 移到 x=252，同步修正 docs/art/auto-optimizer-flow.html。",
+    "pnpm lint 無法執行：repo 內不存在任何 eslint 設定檔（git 追蹤中 0 個 eslint config），ESLint 9 需要 eslint.config.js。此為既有問題，非本次變更造成，未自行新增設定檔。"
+  ],
+  "review_fixes": [
+    {
+      "id": "B1",
+      "severity": "blocker",
+      "finding": "Fig. 4 的 loop fragment 使用不透明的 .gd-fragment (fill: var(--bg-inset))，且該 rect 繪製順序在 lifeline 之後，會把 y=268~540 區間內的四條 lifeline 整段蓋掉。",
+      "fix": "新增 .gd-fragment--frame { fill: var(--fg-3); fill-opacity: 0.04 }，只套用在跨越 lifeline 的 loop frame rect；LOOP 標籤 tab 與 legend swatch 維持不透明。",
+      "verified": "headless Chrome 實際渲染 /guide，dark 與 light 兩種主題都確認 loop frame 內四條 lifeline 完整可見。"
+    },
+    {
+      "id": "M1",
+      "severity": "major",
+      "finding": ".gd-label 使用 var(--fg-4)，在 8px 字級上對比僅約 2.2:1 (dark) / 2.5:1 (light)，但這些標籤承載分支語意。",
+      "fix": ".gd-label fill 由 var(--fg-4) 改為 var(--fg-3)。"
+    }
+  ],
+  "verification": {
+    "pnpm test": "7 files / 87 tests passed (含新增 28 個)",
+    "pnpm vue-tsc": "passed, no type errors",
+    "pnpm lint": "FAILED to run - no eslint config file exists in the repo (pre-existing)",
+    "visual": "dev server (localhost:3111) 以 headless Chrome 渲染 /guide，dark 主題全頁截圖 + light 主題 (透過 CDP 切換 data-theme) 全頁截圖，四張圖皆正常，Fig. 4 loop 區域經放大檢視確認無遮蓋"
+  },
+  "observations": [
+    "非本次範圍的既有問題：重新整理頁面後主題不會從 localStorage 還原。localStorage 的 arb-theme 為 light 時，reload 後 document.documentElement 的 data-theme 仍是 dark（app.vue 的 useHead htmlAttrs 寫死 dark，layouts/default.vue 的 onMounted(init) 未能覆蓋）。未修改，僅回報。"
+  ]
+}

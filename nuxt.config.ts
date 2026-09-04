@@ -32,6 +32,7 @@ export default defineNuxtConfig({
 
   css: [
     '~/assets/css/design-tokens.css',
+    '~/assets/css/guide-diagrams.css',
     '@vueform/slider/themes/default.css',
     '@vuepic/vue-datepicker/dist/main.css',
   ],

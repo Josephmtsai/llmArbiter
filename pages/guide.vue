@@ -349,9 +349,21 @@ const ui = computed(() => ({
   dataSplitsHeading: t({ en: 'Pool splits vs optimizer snapshot sizes', zh: '資料池分割 vs 最佳化器快照大小' }),
   flowEyebrow: t({ en: 'Flow diagram', zh: '流程圖' }),
   flowHeading: t({ en: 'The full optimizer flow in one picture', zh: '一張圖看懂完整最佳化器流程' }),
-  loopEyebrow: t({ en: 'Optimizer loop', zh: '最佳化迴圈' }),
-  loopHeading: t({ en: 'Step-by-step: from snapshot to kept or rejected', zh: '逐步說明：從快照到保留或拒絕' }),
-  loopDesc: t({ en: 'Each optimizer run works through these steps in order. Both gates must pass for a round to be kept.', zh: '每次最佳化執行依序執行以下步驟。輪次必須同時通過兩道閘才能被保留。' }),
+  loopEyebrow: t({ en: 'Run lifecycle', zh: '執行生命週期' }),
+  loopHeading: t({ en: 'One run, start to finish: from snapshot to test accuracy', zh: '一次執行從頭到尾：從快照到測試準確率' }),
+  loopDesc: t({ en: 'Every optimizer run follows this backbone. Rounds repeat until the target accuracy is reached or max_rounds is exhausted; only the operator can activate the result.', zh: '每次最佳化執行都遵循這條骨幹。輪次會重複直到達到目標準確率或用盡 max_rounds；只有操作員能啟用結果。' }),
+  figPoolEyebrow: t({ en: 'Fig. 1 · Sankey', zh: '圖 1 · Sankey' }),
+  figPoolTitle: t({ en: 'Where the 12,000 test cases go: only 600 are ever scored', zh: '測試案例的流向：12,000 筆裡只有 600 筆會被評分' }),
+  figPoolCaption: t({ en: 'Ribbon width equals case count. The train split is used only for relabeling and review — the optimizer never scores it. The validation snapshot is reused every round; the test snapshot is scored once after the loop ends.', zh: '帶寬等於案例數。訓練集只用於重新標記與人工審核，最佳化器從未拿它評分；驗證快照每輪重複使用，測試快照只在迴圈結束後使用一次。' }),
+  figRunEyebrow: t({ en: 'Fig. 2 · Flowchart · Run level', zh: '圖 2 · 流程圖 · Run 層級' }),
+  figRunTitle: t({ en: 'The backbone of one optimizer run', zh: '一次 optimizer run 的骨幹' }),
+  figRunCaption: t({ en: 'From POST /optimizer/run to manual activation by the operator. If the baseline already meets the target, the loop exits before any candidate round. The inside of each round — candidate generation and the three gates — is expanded in Fig. 3.', zh: '從 POST /optimizer/run 到 operator 手動啟用。若基準已達目標，迴圈不會產生任何候選輪次就直接結束。每一輪的細節（候選生成與三道 gate）展開在圖 3。' }),
+  figRoundEyebrow: t({ en: 'Fig. 3 · Flowchart · Round level', zh: '圖 3 · 流程圖 · Round 層級' }),
+  figRoundTitle: t({ en: 'Inside one round: how a candidate becomes kept, rejected, or skipped', zh: '每一輪的三道 gate：候選 prompt 怎麼變成 kept / rejected / skipped' }),
+  figRoundCaption: t({ en: 'G0 is a structural pre-check that runs before scoring — a candidate that fails it is Skipped, not Rejected. G1 requires overall validation accuracy to improve; G2 requires protected actions to stay within tolerance. Those two are the keep/reject gates detailed below.', zh: 'G0 在評分前擋掉結構不合法的候選——未通過者記為 Skipped 而非 Rejected。G1 要求整體驗證準確率進步；G2 要求受保護的 action 不能退步超過容差。這兩道就是下方詳述的保留／拒絕閘。' }),
+  figSeqEyebrow: t({ en: 'Fig. 4 · Sequence', zh: '圖 4 · 循序圖' }),
+  figSeqTitle: t({ en: 'Who talks to whom in a run: analysis, scoring, and record-keeping', zh: '一次 run 的訊息往返：誰負責分析、誰負責評分、誰負責留下紀錄' }),
+  figSeqCaption: t({ en: 'The Optimizer LLM and the Evaluator are two different models: the former only reads failures and rewrites the prompt; the latter only scores the 200 / 400 cases. Every round is written to PostgreSQL.', zh: 'Optimizer LLM 與 Evaluator 是兩個不同的模型：前者只讀失敗樣本並改寫 prompt，後者只對 200 / 400 筆案例出題評分。所有輪次資料寫入 PostgreSQL。' }),
   gateEyebrow: t({ en: 'Keep / reject gate', zh: '保留 / 拒絕閘' }),
   gateHeading: t({ en: 'The two gates a candidate must pass', zh: '候選提示必須通過的兩道閘' }),
   toleranceLabel: t({ en: 'Regression tolerance', zh: '回退容差' }),
@@ -447,7 +459,7 @@ const ui = computed(() => ({
     </section>
 
     <!-- ── Data split diagram ─────────────────────────────────── -->
-    <section class="arb-guide__section">
+    <section id="data-splits" class="arb-guide__section">
       <div class="arb-guide__section-head">
         <UiEyebrow>{{ ui.dataSplitsEyebrow }}</UiEyebrow>
         <h2 class="arb-guide__heading">{{ ui.dataSplitsHeading }}</h2>
@@ -455,7 +467,9 @@ const ui = computed(() => ({
           {{ lang === 'en' ? 'The full pool has 12,000 cases, but the optimizer never evaluates all of them per round. A ' : '完整資料池有 12,000 筆案例，但最佳化器每輪不評估全部。每次執行開始時抽取一組 ' }}<GuideTooltip text="A fixed set of 200 validation cases (40 per action) sampled once at run start. Every round in the same run uses the same 200 cases — so accuracy numbers across rounds are directly comparable.">{{ lang === 'en' ? 'validation snapshot' : '200 筆驗證快照' }}</GuideTooltip>{{ lang === 'en' ? ' of 200 cases is sampled once when a run starts and used for every candidate round. The held-out test snapshot (400 cases) is only evaluated once after the loop ends. Cases sharing a ' : '（每動作 40 筆），用於所有候選輪次。保留測試快照（400 筆）只在迴圈結束後評估一次。共享 ' }}<GuideTooltip text="A deduplication key. Cases sharing a split_group are assigned to the same data split to prevent near-duplicate leakage across train/val/test boundaries.">split_group</GuideTooltip>{{ lang === 'en' ? ' key are assigned to the same data split to prevent near-duplicate leakage across train, validation, and test boundaries.' : ' 鍵的案例會被分配到同一資料集，防止近似重複案例洩漏。' }}
         </p>
       </div>
-      <GuideSplitDiagram />
+      <GuideFigure :eyebrow="ui.figPoolEyebrow" :title="ui.figPoolTitle" :caption="ui.figPoolCaption">
+        <GuidePoolSankey />
+      </GuideFigure>
     </section>
 
     <!-- ── Flow diagram (lanes) ───────────────────────────────── -->
@@ -493,17 +507,19 @@ const ui = computed(() => ({
     </section>
 
     <!-- ── Loop diagram ───────────────────────────────────────── -->
-    <section class="arb-guide__section">
+    <section id="run-lifecycle" class="arb-guide__section">
       <div class="arb-guide__section-head">
         <UiEyebrow>{{ ui.loopEyebrow }}</UiEyebrow>
         <h2 class="arb-guide__heading">{{ ui.loopHeading }}</h2>
         <p class="arb-guide__desc">{{ ui.loopDesc }}</p>
       </div>
-      <GuideLoopDiagram />
+      <GuideFigure :eyebrow="ui.figRunEyebrow" :title="ui.figRunTitle" :caption="ui.figRunCaption">
+        <GuideRunFlowDiagram />
+      </GuideFigure>
     </section>
 
     <!-- ── Keep/Reject Gate section ──────────────────────────── -->
-    <section class="arb-guide__section">
+    <section id="gates" class="arb-guide__section">
       <div class="arb-guide__section-head">
         <UiEyebrow>{{ ui.gateEyebrow }}</UiEyebrow>
         <h2 class="arb-guide__heading">{{ ui.gateHeading }}</h2>
@@ -511,6 +527,10 @@ const ui = computed(() => ({
           <code>kept = overall_pass AND all(action_pass)</code> — {{ lang === 'en' ? 'both gates must pass simultaneously. Passing Gate 1 alone is not enough if a protected action regressed.' : '兩道閘必須同時通過。若受保護動作回退，單獨通過閘 1 並不夠。' }}
         </p>
       </div>
+
+      <GuideFigure :eyebrow="ui.figRoundEyebrow" :title="ui.figRoundTitle" :caption="ui.figRoundCaption">
+        <GuideRoundFlowDiagram />
+      </GuideFigure>
 
       <div class="arb-guide__gate-grid">
         <UiCard v-for="gate in gateCards" :key="gate.num" class="arb-guide__gate-card">
@@ -600,11 +620,15 @@ const ui = computed(() => ({
     </section>
 
     <!-- ── Runtime flow (timeline) ───────────────────────────── -->
-    <section class="arb-guide__section">
+    <section id="runtime-flow" class="arb-guide__section">
       <div class="arb-guide__section-head">
         <UiEyebrow>{{ ui.runtimeEyebrow }}</UiEyebrow>
         <h2 class="arb-guide__heading">{{ ui.runtimeHeading }}</h2>
       </div>
+
+      <GuideFigure :eyebrow="ui.figSeqEyebrow" :title="ui.figSeqTitle" :caption="ui.figSeqCaption">
+        <GuideRunSequenceDiagram />
+      </GuideFigure>
 
       <div class="arb-guide__timeline">
         <article v-for="step in flowSteps" :key="step.eyebrow" class="arb-guide__step">
