@@ -61,7 +61,7 @@ async function deleteRun(run: EvalRun) {
   delete deleteErrors.value[run.run_id]
   try {
     await api.deleteEvalRun(run.run_id)
-    runs.value = runs.value.filter(r => r.run_id !== run.run_id)
+    runs.value = runs.value.filter((r) => r.run_id !== run.run_id)
   } catch (e) {
     deleteErrors.value[run.run_id] = e instanceof Error ? e.message : 'Delete failed'
   }
@@ -82,9 +82,7 @@ onMounted(load)
   <div class="arb-history">
     <div v-if="loading" class="arb-history__loading"><UiSpinner size="sm" /></div>
     <div v-else-if="error" class="arb-history__error">{{ error }}</div>
-    <div v-else-if="runs.length === 0" class="arb-history__empty">
-      No evaluation runs yet.
-    </div>
+    <div v-else-if="runs.length === 0" class="arb-history__empty">No evaluation runs yet.</div>
 
     <div v-else class="arb-history__table-wrap">
       <table class="arb-history__table">
@@ -160,14 +158,21 @@ onMounted(load)
   flex-direction: column;
   gap: 16px;
 }
-.arb-history__loading { padding: 40px; text-align: center; }
+.arb-history__loading {
+  padding: 40px;
+  text-align: center;
+}
 .arb-history__empty {
   padding: 40px;
   text-align: center;
   color: var(--fg-4);
   font-size: 13px;
 }
-.arb-history__error { padding: 12px; color: var(--action-notify); font-size: 13px; }
+.arb-history__error {
+  padding: 12px;
+  color: var(--action-notify);
+  font-size: 13px;
+}
 
 .arb-history__table-wrap {
   overflow-x: auto;
@@ -202,8 +207,12 @@ onMounted(load)
   cursor: pointer;
   transition: background var(--dur-fast);
 }
-.arb-history__row:hover td { background: var(--bg-2); }
-.arb-history__row:last-child td { border-bottom: none; }
+.arb-history__row:hover td {
+  background: var(--bg-2);
+}
+.arb-history__row:last-child td {
+  border-bottom: none;
+}
 .arb-history__acc {
   font-weight: 700;
   font-family: var(--font-mono);
@@ -241,9 +250,17 @@ onMounted(load)
   color: var(--fg-4);
   font-size: 12px;
 }
-.arb-history__date { color: var(--fg-4); }
-.num { font-family: var(--font-mono); font-size: 12px; }
-.mono { font-family: var(--font-mono); font-size: 12px; }
+.arb-history__date {
+  color: var(--fg-4);
+}
+.num {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
 .arb-history__actions {
   text-align: right;
   white-space: nowrap;
@@ -254,7 +271,9 @@ onMounted(load)
   opacity: 0;
   transition: opacity var(--dur-fast);
 }
-.arb-history__row:hover .arb-history__delete-btn { opacity: 1; }
+.arb-history__row:hover .arb-history__delete-btn {
+  opacity: 1;
+}
 .arb-history__delete-err {
   display: block;
   font-size: 11px;
@@ -263,6 +282,8 @@ onMounted(load)
 }
 
 @media (max-width: 767px) {
-  .arb-history__delete-btn { opacity: 1; }
+  .arb-history__delete-btn {
+    opacity: 1;
+  }
 }
 </style>

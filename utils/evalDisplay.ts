@@ -33,7 +33,9 @@ export function getEvalRunSourceLabel(source: EvalRunSource | null | undefined):
   return ''
 }
 
-export function getEvalRunSourceTone(source: EvalRunSource | null | undefined): EvalRunSourceTone | null {
+export function getEvalRunSourceTone(
+  source: EvalRunSource | null | undefined,
+): EvalRunSourceTone | null {
   if (source === 'pool') return 'pool'
   if (source === 'optimizer') return 'optimizer'
   if (source === 'db') return 'manual'
@@ -50,7 +52,10 @@ export function getAccuracyColor(value: number): string {
   return 'var(--action-notify)'
 }
 
-export function getRunAccuracyDisplay(run: Pick<EvalRun, 'accuracy' | 'status'>): { label: string; color: string } {
+export function getRunAccuracyDisplay(run: Pick<EvalRun, 'accuracy' | 'status'>): {
+  label: string
+  color: string
+} {
   if (run.status === 'running') {
     return {
       label: `${(run.accuracy * 100).toFixed(1)}%`,
@@ -65,12 +70,12 @@ export function getRunAccuracyDisplay(run: Pick<EvalRun, 'accuracy' | 'status'>)
 }
 
 export function countFailedResults(results: Pick<EvalRunResult, 'is_correct'>[]): number {
-  return results.filter(result => !result.is_correct).length
+  return results.filter((result) => !result.is_correct).length
 }
 
 export function averageLatencyMs(results: Pick<EvalRunResult, 'latency_ms'>[]): number | null {
   const latencies = results
-    .map(result => result.latency_ms)
+    .map((result) => result.latency_ms)
     .filter((latency): latency is number => latency != null)
   if (latencies.length === 0) return null
   return Math.round(latencies.reduce((sum, latency) => sum + latency, 0) / latencies.length)

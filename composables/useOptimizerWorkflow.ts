@@ -52,11 +52,17 @@ export function useOptimizerWorkflow() {
   const activeTab = ref<OptimizerTab>(tabFromPath(route.path))
   const stats = useState<EvalPoolStats | null>('optimizer:stats', () => null)
   const optimizerRuns = useState<OptimizerRun[]>('optimizer:runs', () => [])
-  const optimizerRunDetails = useState<Record<number, OptimizerRun>>('optimizer:runDetails', () => ({}))
+  const optimizerRunDetails = useState<Record<number, OptimizerRun>>(
+    'optimizer:runDetails',
+    () => ({}),
+  )
   const reviewItems = useState<ReviewQueueEntry[]>('optimizer:reviewItems', () => [])
   const reviewTotal = useState('optimizer:reviewTotal', () => 0)
   const prompts = useState<PromptVersion[]>('optimizer:prompts', () => [])
-  const selectedPromptId = useState<number | undefined>('optimizer:selectedPromptId', () => undefined)
+  const selectedPromptId = useState<number | undefined>(
+    'optimizer:selectedPromptId',
+    () => undefined,
+  )
 
   const loadingStats = ref(false)
   const loadingHistory = ref(false)
@@ -89,12 +95,18 @@ export function useOptimizerWorkflow() {
 
   const lowestCoverage = computed(() => (stats.value ? getLowestActionCoverage(stats.value) : null))
   const poolIsEmpty = computed(() => isEvalPoolEmpty(stats.value))
-  const activeOptimizerRun = computed(() => optimizerRuns.value.find(run => isOptimizerRunActive(run)) ?? null)
+  const activeOptimizerRun = computed(
+    () => optimizerRuns.value.find((run) => isOptimizerRunActive(run)) ?? null,
+  )
   const latestRun = computed(() => optimizerRuns.value[0] ?? null)
   const selectedRun = computed(() => {
     const id = selectedRunId.value ?? latestRun.value?.optimizer_run_id ?? null
     if (id == null) return null
-    return optimizerRunDetails.value[id] ?? optimizerRuns.value.find(run => run.optimizer_run_id === id) ?? null
+    return (
+      optimizerRunDetails.value[id] ??
+      optimizerRuns.value.find((run) => run.optimizer_run_id === id) ??
+      null
+    )
   })
   const filteredReviewItems = computed(() => {
     const query = reviewSearch.value.trim().toLowerCase()
@@ -170,7 +182,7 @@ export function useOptimizerWorkflow() {
     try {
       const res = await api.getPrompts()
       prompts.value = res.data
-      selectedPromptId.value = res.data.find(prompt => prompt.active)?.id ?? res.data[0]?.id
+      selectedPromptId.value = res.data.find((prompt) => prompt.active)?.id ?? res.data[0]?.id
     } catch {
       prompts.value = []
     } finally {
@@ -209,7 +221,10 @@ export function useOptimizerWorkflow() {
     optimizerMessage.value = null
     globalError.value = null
     try {
-      await api.startOptimizerRun({ max_rounds: Number(maxRounds.value), target_accuracy: Number(targetAccuracy.value) })
+      await api.startOptimizerRun({
+        max_rounds: Number(maxRounds.value),
+        target_accuracy: Number(targetAccuracy.value),
+      })
       optimizerMessage.value = 'Optimizer run started'
       await loadHistory(false)
     } catch (error) {
@@ -240,7 +255,10 @@ export function useOptimizerWorkflow() {
     }
   }
 
-  async function updateReview(item: ReviewQueueEntry, action: ReviewQueueMutationRequest['action']) {
+  async function updateReview(
+    item: ReviewQueueEntry,
+    action: ReviewQueueMutationRequest['action'],
+  ) {
     reviewError.value = null
     if (action === 'correct' && !correctionAction.value) {
       reviewError.value = 'Choose a corrected action'
@@ -258,7 +276,7 @@ export function useOptimizerWorkflow() {
       const message = extractOptimizerError(error)
       if (message === 'entry-not-found') {
         reviewError.value = 'Entry was already processed'
-        reviewItems.value = reviewItems.value.filter(row => row.id !== item.id)
+        reviewItems.value = reviewItems.value.filter((row) => row.id !== item.id)
         selectedReview.value = null
       } else {
         reviewError.value = message
@@ -273,11 +291,17 @@ export function useOptimizerWorkflow() {
     poolEvalRunId.value = null
     startingPoolEval.value = true
     try {
-      const res = await api.startPoolEvaluation(selectedPromptId.value, poolModel.value.trim() || undefined)
+      const res = await api.startPoolEvaluation(
+        selectedPromptId.value,
+        poolModel.value.trim() || undefined,
+      )
       poolEvalRunId.value = res.data.run_id
     } catch (error) {
       const message = extractOptimizerError(error)
-      poolEvalError.value = message === 'eval-pool-empty' ? 'Eval pool is empty. Import or review cases first.' : message
+      poolEvalError.value =
+        message === 'eval-pool-empty'
+          ? 'Eval pool is empty. Import or review cases first.'
+          : message
     } finally {
       startingPoolEval.value = false
     }
@@ -287,13 +311,20 @@ export function useOptimizerWorkflow() {
 
   // Single source of truth for run detail loading — immediate so URL-initialised
   // selectedRunId also triggers a load without waiting for a change event
-  watch(selectedRunId, (runId) => {
-    if (runId != null) void loadOptimizerRunDetail(runId)
-  }, { immediate: true })
+  watch(
+    selectedRunId,
+    (runId) => {
+      if (runId != null) void loadOptimizerRunDetail(runId)
+    },
+    { immediate: true },
+  )
 
-  watch(() => route.path, (path) => {
-    activeTab.value = tabFromPath(path)
-  })
+  watch(
+    () => route.path,
+    (path) => {
+      activeTab.value = tabFromPath(path)
+    },
+  )
 
   watch(activeTab, (tab) => {
     if (!VALID_TABS.includes(tab)) return
@@ -305,12 +336,44 @@ export function useOptimizerWorkflow() {
   onUnmounted(stopPolling)
 
   return {
-    activeTab, stats, optimizerRuns, reviewTotal, prompts, selectedPromptId,
-    loadingStats, loadingHistory, loadingRunDetail, loadingReview, loadingPrompts, globalError,
-    maxRounds, targetAccuracy, startingOptimizer, cancellingRunId, optimizerMessage,
-    reviewSearch, reviewActionFilter, selectedReview, correctionAction, reviewMutatingId, reviewError,
-    poolModel, startingPoolEval, poolEvalRunId, poolEvalError, selectedRunId,
-    lowestCoverage, poolIsEmpty, activeOptimizerRun, latestRun, selectedRun, filteredReviewItems,
-    refreshAll, startOptimizer, cancelOptimizerRun, updateReview, startPoolEvaluation,
+    activeTab,
+    stats,
+    optimizerRuns,
+    reviewTotal,
+    prompts,
+    selectedPromptId,
+    loadingStats,
+    loadingHistory,
+    loadingRunDetail,
+    loadingReview,
+    loadingPrompts,
+    globalError,
+    maxRounds,
+    targetAccuracy,
+    startingOptimizer,
+    cancellingRunId,
+    optimizerMessage,
+    reviewSearch,
+    reviewActionFilter,
+    selectedReview,
+    correctionAction,
+    reviewMutatingId,
+    reviewError,
+    poolModel,
+    startingPoolEval,
+    poolEvalRunId,
+    poolEvalError,
+    selectedRunId,
+    lowestCoverage,
+    poolIsEmpty,
+    activeOptimizerRun,
+    latestRun,
+    selectedRun,
+    filteredReviewItems,
+    refreshAll,
+    startOptimizer,
+    cancelOptimizerRun,
+    updateReview,
+    startPoolEvaluation,
   }
 }

@@ -17,7 +17,15 @@ vi.mock('@vueform/slider', () => ({
 vi.mock('@vuepic/vue-datepicker', () => ({
   VueDatePicker: {
     name: 'VueDatePicker',
-    props: ['modelValue', 'dark', 'enableTimePicker', 'autoApply', 'format', 'modelType', 'placeholder'],
+    props: [
+      'modelValue',
+      'dark',
+      'enableTimePicker',
+      'autoApply',
+      'format',
+      'modelType',
+      'placeholder',
+    ],
     emits: ['update:modelValue'],
     template: '<input class="datepicker-stub" />',
   },
@@ -179,7 +187,8 @@ describe('OptimizerHistory', () => {
             kept: false,
             eval_run_id: 91,
             failure_analysis: 'The prompt confuses restartable service failures with human review.',
-            analysis_text: 'Fallback analysis should not be displayed when failure_analysis exists.',
+            analysis_text:
+              'Fallback analysis should not be displayed when failure_analysis exists.',
             failures: [
               {
                 source_case_id: 'pool-abc',
@@ -573,7 +582,10 @@ describe('Filter functionality', () => {
     // Find the one for 'completed' (index 2 in ALL_STATUSES: running, evaluating, completed)
     const completedCheckbox = checkboxes.find((cb) => {
       const label = cb.element.closest('label')
-      return label?.textContent?.includes('completed') && !label?.textContent?.includes('completed_max_rounds')
+      return (
+        label?.textContent?.includes('completed') &&
+        !label?.textContent?.includes('completed_max_rounds')
+      )
     })
     expect(completedCheckbox).toBeDefined()
     await checkInput(completedCheckbox!)
@@ -604,16 +616,16 @@ describe('Filter functionality', () => {
   })
 
   it('clears individual filter dimension via chip', async () => {
-    const runs = [
-      makeMultiRun({ status: 'completed' }, 1),
-      makeMultiRun({ status: 'failed' }, 2),
-    ]
+    const runs = [makeMultiRun({ status: 'completed' }, 1), makeMultiRun({ status: 'failed' }, 2)]
     const wrapper = mountHistoryMulti(runs)
 
     // Filter by completed
     const completedCheckbox = wrapper.findAll('input[type="checkbox"]').find((cb) => {
       const label = cb.element.closest('label')
-      return label?.textContent?.includes('completed') && !label?.textContent?.includes('completed_max_rounds')
+      return (
+        label?.textContent?.includes('completed') &&
+        !label?.textContent?.includes('completed_max_rounds')
+      )
     })
     await checkInput(completedCheckbox!)
 
@@ -631,15 +643,15 @@ describe('Filter functionality', () => {
   })
 
   it('clears all filters via clear all button', async () => {
-    const runs = [
-      makeMultiRun({ status: 'completed' }, 1),
-      makeMultiRun({ status: 'failed' }, 2),
-    ]
+    const runs = [makeMultiRun({ status: 'completed' }, 1), makeMultiRun({ status: 'failed' }, 2)]
     const wrapper = mountHistoryMulti(runs)
 
     const completedCheckbox = wrapper.findAll('input[type="checkbox"]').find((cb) => {
       const label = cb.element.closest('label')
-      return label?.textContent?.includes('completed') && !label?.textContent?.includes('completed_max_rounds')
+      return (
+        label?.textContent?.includes('completed') &&
+        !label?.textContent?.includes('completed_max_rounds')
+      )
     })
     await checkInput(completedCheckbox!)
     expect(wrapper.text()).not.toContain('#2')
@@ -683,7 +695,9 @@ describe('Compare functionality', () => {
     const runs = [makeMultiRun({}, 1), makeMultiRun({}, 2)]
     const wrapper = mountHistoryMulti(runs)
 
-    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    const runCheckboxes = wrapper.findAll(
+      '.optimizer-history__run-checkbox-label input[type="checkbox"]',
+    )
     await checkInput(runCheckboxes[0])
 
     await openCompareTab(wrapper)
@@ -721,7 +735,9 @@ describe('Compare functionality', () => {
     ]
     const wrapper = mountHistoryMulti(runs)
 
-    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    const runCheckboxes = wrapper.findAll(
+      '.optimizer-history__run-checkbox-label input[type="checkbox"]',
+    )
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
 
@@ -736,13 +752,12 @@ describe('Compare functionality', () => {
   })
 
   it('highlights max test accuracy in comparison table', async () => {
-    const runs = [
-      makeMultiRun({ test_accuracy: 0.7 }, 1),
-      makeMultiRun({ test_accuracy: 0.85 }, 2),
-    ]
+    const runs = [makeMultiRun({ test_accuracy: 0.7 }, 1), makeMultiRun({ test_accuracy: 0.85 }, 2)]
     const wrapper = mountHistoryMulti(runs)
 
-    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    const runCheckboxes = wrapper.findAll(
+      '.optimizer-history__run-checkbox-label input[type="checkbox"]',
+    )
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
     await openCompareTab(wrapper)
@@ -755,7 +770,9 @@ describe('Compare functionality', () => {
     const runs = [makeMultiRun({}, 1), makeMultiRun({}, 2)]
     const wrapper = mountHistoryMulti(runs)
 
-    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    const runCheckboxes = wrapper.findAll(
+      '.optimizer-history__run-checkbox-label input[type="checkbox"]',
+    )
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
     await openCompareTab(wrapper)
@@ -775,7 +792,9 @@ describe('Compare functionality', () => {
     const runs = [1, 2, 3, 4, 5].map((id) => makeMultiRun({}, id))
     const wrapper = mountHistoryMulti(runs)
 
-    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    const runCheckboxes = wrapper.findAll(
+      '.optimizer-history__run-checkbox-label input[type="checkbox"]',
+    )
     // Select first 4
     for (let i = 0; i < 4; i++) {
       await checkInput(runCheckboxes[i])
@@ -788,14 +807,13 @@ describe('Compare functionality', () => {
 
 describe('Filter-Compare integration', () => {
   it('clears selected runs that are filtered out', async () => {
-    const runs = [
-      makeMultiRun({ status: 'completed' }, 1),
-      makeMultiRun({ status: 'failed' }, 2),
-    ]
+    const runs = [makeMultiRun({ status: 'completed' }, 1), makeMultiRun({ status: 'failed' }, 2)]
     const wrapper = mountHistoryMulti(runs)
 
     // Select both runs for compare
-    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    const runCheckboxes = wrapper.findAll(
+      '.optimizer-history__run-checkbox-label input[type="checkbox"]',
+    )
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
 
@@ -805,7 +823,10 @@ describe('Filter-Compare integration', () => {
     // Now filter to only 'completed' — run #2 (failed) gets filtered out
     const completedCheckbox = wrapper.findAll('input[type="checkbox"]').find((cb) => {
       const label = cb.element.closest('label')
-      return label?.textContent?.includes('completed') && !label?.textContent?.includes('completed_max_rounds')
+      return (
+        label?.textContent?.includes('completed') &&
+        !label?.textContent?.includes('completed_max_rounds')
+      )
     })
     await checkInput(completedCheckbox!)
 
@@ -820,7 +841,9 @@ describe('Filter-Compare integration', () => {
     const runs = [makeMultiRun({}, 1), makeMultiRun({}, 2)]
     const wrapper = mountHistoryMulti(runs)
 
-    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    const runCheckboxes = wrapper.findAll(
+      '.optimizer-history__run-checkbox-label input[type="checkbox"]',
+    )
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
     await openCompareTab(wrapper)
@@ -830,7 +853,9 @@ describe('Filter-Compare integration', () => {
 
     // Go back to Runs and deselect one run
     await openRunsTab(wrapper)
-    const refreshedCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    const refreshedCheckboxes = wrapper.findAll(
+      '.optimizer-history__run-checkbox-label input[type="checkbox"]',
+    )
     await checkInput(refreshedCheckboxes[1], false)
 
     // Compare tab now shows guidance instead of the table
@@ -844,12 +869,11 @@ describe('Filter-Compare integration', () => {
 
 describe('formatDuration in compare panel', () => {
   it('shows — when finished_at is null', async () => {
-    const runs = [
-      makeMultiRun({ finished_at: null }, 1),
-      makeMultiRun({ finished_at: null }, 2),
-    ]
+    const runs = [makeMultiRun({ finished_at: null }, 1), makeMultiRun({ finished_at: null }, 2)]
     const wrapper = mountHistoryMulti(runs)
-    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    const runCheckboxes = wrapper.findAll(
+      '.optimizer-history__run-checkbox-label input[type="checkbox"]',
+    )
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
     await openCompareTab(wrapper)
@@ -860,11 +884,19 @@ describe('formatDuration in compare panel', () => {
 
   it('calculates duration correctly for finished runs', async () => {
     const runs = [
-      makeMultiRun({ started_at: '2026-06-01T10:00:00.000Z', finished_at: '2026-06-01T10:02:30.000Z' }, 1),
-      makeMultiRun({ started_at: '2026-06-01T10:00:00.000Z', finished_at: '2026-06-01T10:02:30.000Z' }, 2),
+      makeMultiRun(
+        { started_at: '2026-06-01T10:00:00.000Z', finished_at: '2026-06-01T10:02:30.000Z' },
+        1,
+      ),
+      makeMultiRun(
+        { started_at: '2026-06-01T10:00:00.000Z', finished_at: '2026-06-01T10:02:30.000Z' },
+        2,
+      ),
     ]
     const wrapper = mountHistoryMulti(runs)
-    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    const runCheckboxes = wrapper.findAll(
+      '.optimizer-history__run-checkbox-label input[type="checkbox"]',
+    )
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
     await openCompareTab(wrapper)
@@ -883,7 +915,9 @@ describe('accuracyGain in compare panel', () => {
       makeMultiRun({ baseline_accuracy: null, best_accuracy: 0.7 }, 2),
     ]
     const wrapper = mountHistoryMulti(runs)
-    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    const runCheckboxes = wrapper.findAll(
+      '.optimizer-history__run-checkbox-label input[type="checkbox"]',
+    )
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
     await openCompareTab(wrapper)
@@ -897,10 +931,30 @@ describe('accuracyGain in compare panel', () => {
       makeMultiRun({ baseline_accuracy: 0.5 }, 1),
       makeMultiRun({ baseline_accuracy: 0.6 }, 2),
     ]
-    runs[0].rounds = [{ round_number: 1, accuracy: 0.8, prompt_version_id: 1, failed_case_count: 0, kept: true, eval_run_id: null }]
-    runs[1].rounds = [{ round_number: 1, accuracy: 0.75, prompt_version_id: 2, failed_case_count: 0, kept: true, eval_run_id: null }]
+    runs[0].rounds = [
+      {
+        round_number: 1,
+        accuracy: 0.8,
+        prompt_version_id: 1,
+        failed_case_count: 0,
+        kept: true,
+        eval_run_id: null,
+      },
+    ]
+    runs[1].rounds = [
+      {
+        round_number: 1,
+        accuracy: 0.75,
+        prompt_version_id: 2,
+        failed_case_count: 0,
+        kept: true,
+        eval_run_id: null,
+      },
+    ]
     const wrapper = mountHistoryMulti(runs)
-    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    const runCheckboxes = wrapper.findAll(
+      '.optimizer-history__run-checkbox-label input[type="checkbox"]',
+    )
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
     await openCompareTab(wrapper)
@@ -920,7 +974,9 @@ describe('compare highlight logic', () => {
       makeMultiRun({ test_accuracy: null }, 2),
     ]
     const wrapper = mountHistoryMulti(runs)
-    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    const runCheckboxes = wrapper.findAll(
+      '.optimizer-history__run-checkbox-label input[type="checkbox"]',
+    )
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
     await openCompareTab(wrapper)
@@ -933,12 +989,11 @@ describe('compare highlight logic', () => {
   })
 
   it('highlights all cells when all have same max value', async () => {
-    const runs = [
-      makeMultiRun({ test_accuracy: 0.8 }, 1),
-      makeMultiRun({ test_accuracy: 0.8 }, 2),
-    ]
+    const runs = [makeMultiRun({ test_accuracy: 0.8 }, 1), makeMultiRun({ test_accuracy: 0.8 }, 2)]
     const wrapper = mountHistoryMulti(runs)
-    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    const runCheckboxes = wrapper.findAll(
+      '.optimizer-history__run-checkbox-label input[type="checkbox"]',
+    )
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
     await openCompareTab(wrapper)
@@ -989,7 +1044,9 @@ describe('Sub-tab switching', () => {
     const runs = [makeMultiRun({}, 1), makeMultiRun({}, 2), makeMultiRun({}, 3)]
     const wrapper = mountHistoryMulti(runs)
 
-    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    const runCheckboxes = wrapper.findAll(
+      '.optimizer-history__run-checkbox-label input[type="checkbox"]',
+    )
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
     await checkInput(runCheckboxes[2])
@@ -1003,7 +1060,9 @@ describe('Sub-tab switching', () => {
     const runs = [makeMultiRun({}, 1), makeMultiRun({}, 2)]
     const wrapper = mountHistoryMulti(runs)
 
-    const runCheckboxes = wrapper.findAll('.optimizer-history__run-checkbox-label input[type="checkbox"]')
+    const runCheckboxes = wrapper.findAll(
+      '.optimizer-history__run-checkbox-label input[type="checkbox"]',
+    )
     await checkInput(runCheckboxes[0])
     await checkInput(runCheckboxes[1])
 
@@ -1090,10 +1149,7 @@ describe('Accuracy slider sync', () => {
   })
 
   it('treats the full range [0, 100] as no active accuracy filter', async () => {
-    const runs = [
-      makeMultiRun({ test_accuracy: 0.5 }, 1),
-      makeMultiRun({ test_accuracy: null }, 2),
-    ]
+    const runs = [makeMultiRun({ test_accuracy: 0.5 }, 1), makeMultiRun({ test_accuracy: null }, 2)]
     const wrapper = mountHistoryMulti(runs)
 
     await emitSliderUpdate(wrapper, [40, 85])

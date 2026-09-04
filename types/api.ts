@@ -367,7 +367,17 @@ export interface OptimizerRound {
   skip_reason?: string | null
   reject_reason?: string | null
   per_action_metrics?: Record<string, { total: number; correct: number; accuracy: number }> | null
-  per_action_deltas?: Record<string, { baseline_accuracy: number; candidate_accuracy: number; delta: number; baseline_total: number; candidate_total: number; tolerance: number }> | null
+  per_action_deltas?: Record<
+    string,
+    {
+      baseline_accuracy: number
+      candidate_accuracy: number
+      delta: number
+      baseline_total: number
+      candidate_total: number
+      tolerance: number
+    }
+  > | null
   error_clusters?: OptimizerErrorCluster[] | null
 }
 
@@ -412,4 +422,3 @@ export interface OptimizerCancelResponse {
   optimizer_run_id: number
   status: 'cancelling' | OptimizerRunStatus
 }
-

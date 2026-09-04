@@ -62,6 +62,12 @@ const isLg = computed(() => props.size === 'lg')
   background: currentColor;
   flex-shrink: 0;
 }
-.arb-action-badge--sm .arb-action-badge__dot { width: 6px; height: 6px; }
-.arb-action-badge--lg .arb-action-badge__dot { width: 7px; height: 7px; }
+.arb-action-badge--sm .arb-action-badge__dot {
+  width: 6px;
+  height: 6px;
+}
+.arb-action-badge--lg .arb-action-badge__dot {
+  width: 7px;
+  height: 7px;
+}
 </style>

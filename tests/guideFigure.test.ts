@@ -6,7 +6,11 @@ import GuideFigure from '../components/guide/GuideFigure.vue'
 describe('GuideFigure', () => {
   it('renders eyebrow, title and caption from props', () => {
     const wrapper = mount(GuideFigure, {
-      props: { eyebrow: 'Fig. 1 · Sankey', title: 'Where the cases go', caption: 'Ribbon width equals case count.' },
+      props: {
+        eyebrow: 'Fig. 1 · Sankey',
+        title: 'Where the cases go',
+        caption: 'Ribbon width equals case count.',
+      },
     })
 
     expect(wrapper.find('.gfig__eyebrow').text()).toBe('Fig. 1 · Sankey')

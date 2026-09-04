@@ -29,8 +29,8 @@ defineEmits<{ start: [] }>()
     <UiCard class="optimizer-pool__panel">
       <UiEyebrow>Pool evaluation</UiEyebrow>
       <p class="optimizer-pool__muted">
-        Runs the active prompt against aggregate eval pool samples using source=pool.
-        Raw pool cases stay out of this view; inspect saved run results from history.
+        Runs the active prompt against aggregate eval pool samples using source=pool. Raw pool cases
+        stay out of this view; inspect saved run results from history.
       </p>
       <UiField label="Prompt version">
         <UiSelect v-model.number="promptId" :disabled="loadingPrompts">
@@ -74,9 +74,17 @@ defineEmits<{ start: [] }>()
 </template>
 
 <style scoped>
-.optimizer-pool { max-width: 620px; }
-.optimizer-pool__panel { display: flex; flex-direction: column; gap: 14px; }
-.optimizer-pool__model-picker { margin-bottom: 6px; }
+.optimizer-pool {
+  max-width: 620px;
+}
+.optimizer-pool__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.optimizer-pool__model-picker {
+  margin-bottom: 6px;
+}
 .optimizer-pool__model-btn {
   display: inline-flex;
   align-items: center;
@@ -95,7 +103,10 @@ defineEmits<{ start: [] }>()
   white-space: nowrap;
   transition: all var(--dur-fast);
 }
-.optimizer-pool__model-btn:hover { border-color: var(--fg-3); color: var(--fg-1); }
+.optimizer-pool__model-btn:hover {
+  border-color: var(--fg-3);
+  color: var(--fg-1);
+}
 .optimizer-pool__model-btn--active {
   border-color: var(--action-rebuild);
   color: var(--action-rebuild);
@@ -112,8 +123,15 @@ defineEmits<{ start: [] }>()
   padding: 1px 4px;
   flex-shrink: 0;
 }
-.optimizer-pool__muted { margin: 0; color: var(--fg-4); font-size: 12px; }
-.optimizer-pool__wide-btn { width: 100%; justify-content: center; }
+.optimizer-pool__muted {
+  margin: 0;
+  color: var(--fg-4);
+  font-size: 12px;
+}
+.optimizer-pool__wide-btn {
+  width: 100%;
+  justify-content: center;
+}
 .optimizer-pool__error,
 .optimizer-pool__notice {
   border-radius: var(--r-sm);
@@ -134,7 +152,9 @@ defineEmits<{ start: [] }>()
   color: var(--accent);
   text-decoration: none;
 }
-.optimizer-pool__link:hover { text-decoration: underline; }
+.optimizer-pool__link:hover {
+  text-decoration: underline;
+}
 .optimizer-pool__notice-extra {
   display: block;
   margin-top: 4px;

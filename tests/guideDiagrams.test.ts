@@ -8,31 +8,67 @@ import GuideRunFlowDiagram from '../components/guide/GuideRunFlowDiagram.vue'
 import GuideRunSequenceDiagram from '../components/guide/GuideRunSequenceDiagram.vue'
 
 const diagrams = [
-  { name: 'GuidePoolSankey', component: GuidePoolSankey, title: 'Eval pool split and optimizer snapshot usage' },
+  {
+    name: 'GuidePoolSankey',
+    component: GuidePoolSankey,
+    title: 'Eval pool split and optimizer snapshot usage',
+  },
   { name: 'GuideRunFlowDiagram', component: GuideRunFlowDiagram, title: 'Optimizer run lifecycle' },
-  { name: 'GuideRoundFlowDiagram', component: GuideRoundFlowDiagram, title: 'Optimizer round gates' },
-  { name: 'GuideRunSequenceDiagram', component: GuideRunSequenceDiagram, title: 'Optimizer run message sequence' },
+  {
+    name: 'GuideRoundFlowDiagram',
+    component: GuideRoundFlowDiagram,
+    title: 'Optimizer round gates',
+  },
+  {
+    name: 'GuideRunSequenceDiagram',
+    component: GuideRunSequenceDiagram,
+    title: 'Optimizer run message sequence',
+  },
 ] as const
 
 const expectedText: Record<(typeof diagrams)[number]['name'], string[]> = {
   GuidePoolSankey: [
-    '12,000 cases', '2,400 per action', '7,200 · 60%', '2,400 · 20%', '200 · 40/action',
-    '400 · 80/action', '4,200', '600 of 12,000',
+    '12,000 cases',
+    '2,400 per action',
+    '7,200 · 60%',
+    '2,400 · 20%',
+    '200 · 40/action',
+    '400 · 80/action',
+    '4,200',
+    '600 of 12,000',
   ],
   GuideRunFlowDiagram: [
-    'Start optimizer run', 'Snapshot val set + baseline eval', 'Round N: candidate + gates',
-    'Target reached or max rounds?', 'Test-set acceptance', 'Operator activation gate',
-    'PATCH /config/prompts/{id}/activate', 'Fig. 3 → kept / rejected / skipped',
+    'Start optimizer run',
+    'Snapshot val set + baseline eval',
+    'Round N: candidate + gates',
+    'Target reached or max rounds?',
+    'Test-set acceptance',
+    'Operator activation gate',
+    'PATCH /config/prompts/{id}/activate',
+    'Fig. 3 → kept / rejected / skipped',
   ],
   GuideRoundFlowDiagram: [
-    'G0 · Candidate valid?', 'G1 · Overall accuracy > best?', 'G2 · Protected actions hold?',
-    'Kept → new best prompt', 'Rejected → previous best stays', 'Skipped → nothing tested',
+    'G0 · Candidate valid?',
+    'G1 · Overall accuracy > best?',
+    'G2 · Protected actions hold?',
+    'Kept → new best prompt',
+    'Rejected → previous best stays',
+    'Skipped → nothing tested',
     'notify_human, send_email ±2% · trigger_* ±5%',
   ],
   GuideRunSequenceDiagram: [
-    'Operator UI', 'Optimizer task', 'Optimizer LLM', 'Evaluator', 'PostgreSQL',
-    'POST /OPTIMIZER/RUN', 'EVAL BASELINE · 200', 'EVAL CANDIDATE · 200', 'KEEP / REJECT GATES',
-    'INSERT ROUND + FAILURES', 'EVAL TEST · 400', 'TEST_ACCURACY',
+    'Operator UI',
+    'Optimizer task',
+    'Optimizer LLM',
+    'Evaluator',
+    'PostgreSQL',
+    'POST /OPTIMIZER/RUN',
+    'EVAL BASELINE · 200',
+    'EVAL CANDIDATE · 200',
+    'KEEP / REJECT GATES',
+    'INSERT ROUND + FAILURES',
+    'EVAL TEST · 400',
+    'TEST_ACCURACY',
   ],
 }
 
@@ -82,12 +118,12 @@ describe.each(diagrams)('$name', ({ name, component, title }) => {
 
   it('resolves every url(#…) reference to a marker in the same svg', () => {
     const wrapper = mount(component)
-    const markerIds = wrapper.findAll('marker').map(marker => marker.attributes('id'))
-    const references = [...wrapper.html().matchAll(/url\(#([^)]+)\)/g)].map(match => match[1])
+    const markerIds = wrapper.findAll('marker').map((marker) => marker.attributes('id'))
+    const references = [...wrapper.html().matchAll(/url\(#([^)]+)\)/g)].map((match) => match[1])
     for (const reference of references) {
       expect(markerIds).toContain(reference)
     }
-    expect(markerIds.every(id => id && id.length > 0)).toBe(true)
+    expect(markerIds.every((id) => id && id.length > 0)).toBe(true)
   })
 
   it('gives two instances on the same page different ids', () => {
@@ -96,11 +132,11 @@ describe.each(diagrams)('$name', ({ name, component, title }) => {
       template: '<div><Diagram /><Diagram /></div>',
     })
     const wrapper = mount(Twice)
-    const titleIds = wrapper.findAll('title').map(el => el.attributes('id'))
+    const titleIds = wrapper.findAll('title').map((el) => el.attributes('id'))
     expect(titleIds).toHaveLength(2)
     expect(titleIds[0]).not.toBe(titleIds[1])
 
-    const markerIds = wrapper.findAll('marker').map(el => el.attributes('id'))
+    const markerIds = wrapper.findAll('marker').map((el) => el.attributes('id'))
     expect(new Set(markerIds).size).toBe(markerIds.length)
   })
 })

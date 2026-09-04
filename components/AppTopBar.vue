@@ -15,7 +15,11 @@ async function handleLogout() {
 
 <template>
   <header class="arb-topbar">
-    <button class="arb-topbar__hamburger" aria-label="Open menu" @click="sidebarOpen = !sidebarOpen">
+    <button
+      class="arb-topbar__hamburger"
+      aria-label="Open menu"
+      @click="sidebarOpen = !sidebarOpen"
+    >
       <Menu :size="20" color="var(--fg-2)" :stroke-width="1.75" />
     </button>
     <div class="arb-topbar__title-block">
@@ -24,7 +28,11 @@ async function handleLogout() {
     </div>
     <div class="arb-topbar__actions">
       <slot name="actions" />
-      <button class="arb-topbar__icon-btn" :title="theme === 'dark' ? 'Switch to light' : 'Switch to dark'" @click="toggle">
+      <button
+        class="arb-topbar__icon-btn"
+        :title="theme === 'dark' ? 'Switch to light' : 'Switch to dark'"
+        @click="toggle"
+      >
         <Sun v-if="theme === 'dark'" :size="16" color="var(--fg-3)" :stroke-width="1.75" />
         <Moon v-else :size="16" color="var(--fg-3)" :stroke-width="1.75" />
       </button>
@@ -103,11 +111,18 @@ async function handleLogout() {
   flex-shrink: 0;
   transition: background var(--dur-fast);
 }
-.arb-topbar__hamburger:hover { background: var(--bg-2); }
+.arb-topbar__hamburger:hover {
+  background: var(--bg-2);
+}
 
 @media (max-width: 767px) {
-  .arb-topbar__hamburger { display: flex; }
-  .arb-topbar { padding: 12px 16px; z-index: 201; }
+  .arb-topbar__hamburger {
+    display: flex;
+  }
+  .arb-topbar {
+    padding: 12px 16px;
+    z-index: 201;
+  }
   .arb-topbar__title {
     font-size: 16px;
     white-space: nowrap;

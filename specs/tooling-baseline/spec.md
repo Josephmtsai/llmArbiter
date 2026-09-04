@@ -105,9 +105,33 @@ CI 仍完整跑 lint:check + vue-tsc + coverage + build，作為最終防線。
 ## Baseline Log
 （Developer 填寫：首次 `pnpm lint:check` 的統計、被暫降為 `warn` 的規則與數量、重新量測的 coverage 數字。）
 
+首次 `pnpm lint:check`（Task 2/3 設定完成、任何修正之前）：**24 error / 10 warning，掃描 67 個檔案**。
+
 | 規則 | 首次違規數 | 處置 |
 |------|-----------|------|
-| _待填_ | | |
+| `max-len`（`.ts`） | 12 error | Prettier 重排後全數消失，維持 `error` |
+| `vue/max-len`（`.vue`） | 12 error | Prettier 重排後全數消失，維持 `error` |
+| `vue/no-static-inline-styles` | 10 warn | 維持 `warn`（OQ-2 決議），留待後續 feature 清理 |
+| `vue/*` priority A + B（`flat/strongly-recommended-error`） | 0 | 維持 `error` |
+| `@typescript-eslint/*` recommended | 0 | 維持預設 |
+| `no-console` / `@typescript-eslint/no-explicit-any` / `vue/no-v-html` | 0 | 維持 `error` |
+
+沒有任何規則違規數 > 50，因此**沒有規則被暫降為 `warn`**。
+
+SA 預估與實測差異：
+- 預估 `vue/require-default-prop` 約 23 處，實測 0。`flat/strongly-recommended-error` 已含此規則，專案的 optional prop 都已用 `withDefaults`。
+- 預估 398 行超長，實測只有 24 個 `max-len` 違規。AD-7 的 `ignoreStrings` / `ignoreTemplateLiterals` / `ignoreHTMLAttributeValues` / `ignoreHTMLTextContents` 排除了絕大多數。
+- 預估 29 處 inline style，實測 10 處。`vue/no-static-inline-styles` 只管靜態 `style="..."`，不管綁定的 `:style`。
+
+### Task 4 需要人工修正的項目（非 `--fix` 可自動處理）
+
+Prettier 的 `semi: false` 會把「同一個 inline handler 內以分號分隔的多個敘述」拆成換行且不補分號，Vue 的 template compiler 無法解析（`pnpm build` 失敗，但 `vue-tsc` 與 `pnpm test` 都不會發現）。共 3 處，一律改為 `<script setup>` 內的具名 handler，行為不變：
+
+| 檔案 | 原本 | 改為 |
+|------|------|------|
+| `pages/settings.vue` | `@change="rule.value = ($event.target as HTMLInputElement).checked; saveRule(rule)"` | `onRuleToggle(rule, $event)` |
+| `pages/decisions.vue` | `@click="page--; load()"` | `prevPage()` |
+| `pages/decisions.vue` | `@click="page++; load()"` | `nextPage()` |
 
 Coverage（設定 `include` 後重新量測）：lines __ / statements __ / functions __ / branches __
 

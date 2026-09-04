@@ -29,7 +29,7 @@ let loadSeq = 0
 
 const runId = computed(() => Number(route.params.run_id))
 const displayedResults = computed(() =>
-  failuresOnly.value ? results.value.filter(result => !result.is_correct) : results.value,
+  failuresOnly.value ? results.value.filter((result) => !result.is_correct) : results.value,
 )
 const failedCount = computed(() => countFailedResults(results.value))
 const averageLatency = computed(() => averageLatencyMs(results.value))
@@ -94,7 +94,10 @@ function toggleExpand(id: number) {
 }
 
 function stopPolling() {
-  if (pollTimer.value) { clearInterval(pollTimer.value); pollTimer.value = null }
+  if (pollTimer.value) {
+    clearInterval(pollTimer.value)
+    pollTimer.value = null
+  }
 }
 
 async function load() {
@@ -121,7 +124,9 @@ async function load() {
                 stopPolling()
               }
             }
-          } catch { /* keep polling */ }
+          } catch {
+            /* keep polling */
+          }
         }, 3000)
       }
     } else {
@@ -189,9 +194,7 @@ onUnmounted(stopPolling)
   <div class="arb-detail">
     <div v-if="loading" class="arb-detail__loading"><UiSpinner size="sm" /></div>
 
-    <div v-else-if="notFound" class="arb-detail__not-found">
-      Run not found.
-    </div>
+    <div v-else-if="notFound" class="arb-detail__not-found">Run not found.</div>
 
     <div v-else-if="error" class="arb-detail__error">{{ error }}</div>
 
@@ -231,7 +234,9 @@ onUnmounted(stopPolling)
           <div class="arb-detail__stat">
             <span class="arb-detail__stat-label">Correct / Total</span>
             <span class="arb-detail__stat-val num">{{ run.correct }} / {{ run.total }}</span>
-            <span v-if="liveProgressLabel" class="arb-detail__live-progress">{{ liveProgressLabel }}</span>
+            <span v-if="liveProgressLabel" class="arb-detail__live-progress">{{
+              liveProgressLabel
+            }}</span>
           </div>
           <div class="arb-detail__stat">
             <span class="arb-detail__stat-label">Timeouts</span>
@@ -282,10 +287,7 @@ onUnmounted(stopPolling)
             </tr>
           </thead>
           <tbody>
-            <template
-              v-for="result in displayedResults"
-              :key="result.test_case_id"
-            >
+            <template v-for="result in displayedResults" :key="result.test_case_id">
               <!-- Main row -->
               <tr
                 class="arb-detail__result-row"
@@ -301,7 +303,9 @@ onUnmounted(stopPolling)
                 <td>
                   <span
                     class="arb-detail__verdict"
-                    :class="result.is_correct ? 'arb-detail__verdict--pass' : 'arb-detail__verdict--fail'"
+                    :class="
+                      result.is_correct ? 'arb-detail__verdict--pass' : 'arb-detail__verdict--fail'
+                    "
                   >
                     {{ result.is_correct ? 'PASS' : 'FAIL' }}
                   </span>
@@ -335,7 +339,9 @@ onUnmounted(stopPolling)
                     <!-- Thinking -->
                     <div v-if="resultThinking(result)" class="arb-detail__panel-section">
                       <div class="arb-detail__panel-label">Thinking</div>
-                      <p class="arb-detail__panel-text arb-detail__panel-text--thinking">{{ resultThinking(result) }}</p>
+                      <p class="arb-detail__panel-text arb-detail__panel-text--thinking">
+                        {{ resultThinking(result) }}
+                      </p>
                     </div>
 
                     <!-- Log Snippet -->
@@ -351,7 +357,12 @@ onUnmounted(stopPolling)
                     </div>
 
                     <div
-                      v-if="!resultReason(result) && !resultThinking(result) && !result.log_snippet && !sourcePath(result)"
+                      v-if="
+                        !resultReason(result) &&
+                        !resultThinking(result) &&
+                        !result.log_snippet &&
+                        !sourcePath(result)
+                      "
                       class="arb-detail__panel-empty"
                     >
                       No additional detail available.
@@ -362,7 +373,9 @@ onUnmounted(stopPolling)
             </template>
 
             <tr v-if="displayedResults.length === 0">
-              <td colspan="7" class="arb-detail__empty-row">No results match the current filter.</td>
+              <td colspan="7" class="arb-detail__empty-row">
+                No results match the current filter.
+              </td>
             </tr>
           </tbody>
         </table>
@@ -385,8 +398,12 @@ onUnmounted(stopPolling)
   text-decoration: none;
   transition: color var(--dur-fast);
 }
-.arb-detail__back:hover { color: var(--fg-1); }
-.arb-detail__delete-btn { color: var(--action-notify) !important; }
+.arb-detail__back:hover {
+  color: var(--fg-1);
+}
+.arb-detail__delete-btn {
+  color: var(--action-notify) !important;
+}
 .arb-detail__delete-err-bar {
   padding: 8px 32px;
   font-size: 12px;
@@ -400,15 +417,28 @@ onUnmounted(stopPolling)
   padding: 6px 16px;
   border-bottom: 1px solid var(--border-subtle);
 }
-.arb-detail__delete-mobile { display: none; }
+.arb-detail__delete-mobile {
+  display: none;
+}
 
 @media (max-width: 767px) {
-  .arb-detail__delete-desktop { display: none !important; }
-  .arb-detail__sub-bar { display: flex; }
-  .arb-detail__delete-mobile { display: inline-flex; }
-  .arb-detail__delete-err-bar { padding: 8px 16px; }
+  .arb-detail__delete-desktop {
+    display: none !important;
+  }
+  .arb-detail__sub-bar {
+    display: flex;
+  }
+  .arb-detail__delete-mobile {
+    display: inline-flex;
+  }
+  .arb-detail__delete-err-bar {
+    padding: 8px 16px;
+  }
 }
-.arb-detail__loading { padding: 40px; text-align: center; }
+.arb-detail__loading {
+  padding: 40px;
+  text-align: center;
+}
 .arb-detail__not-found,
 .arb-detail__error {
   padding: 40px;
@@ -416,8 +446,13 @@ onUnmounted(stopPolling)
   color: var(--fg-4);
   font-size: 13px;
 }
-.arb-detail__error { color: var(--action-notify); }
-.arb-detail__summary { display: flex; flex-direction: column; }
+.arb-detail__error {
+  color: var(--action-notify);
+}
+.arb-detail__summary {
+  display: flex;
+  flex-direction: column;
+}
 .arb-detail__summary-grid {
   display: flex;
   flex-wrap: wrap;
@@ -428,7 +463,9 @@ onUnmounted(stopPolling)
   flex-direction: column;
   gap: 4px;
 }
-.arb-detail__stat--wide { flex: 1; }
+.arb-detail__stat--wide {
+  flex: 1;
+}
 .arb-detail__stat-label {
   font-size: 11px;
   font-weight: 600;
@@ -463,7 +500,10 @@ onUnmounted(stopPolling)
   color: var(--fg-3);
   background: var(--bg-2);
 }
-.arb-detail__acc { font-family: var(--font-mono); font-size: 18px; }
+.arb-detail__acc {
+  font-family: var(--font-mono);
+  font-size: 18px;
+}
 .arb-detail__stat-note {
   font-size: 11px;
   color: var(--fg-4);
@@ -530,7 +570,9 @@ onUnmounted(stopPolling)
   background: var(--bg-1);
   white-space: nowrap;
 }
-.arb-detail__th-expand { width: 28px; }
+.arb-detail__th-expand {
+  width: 28px;
+}
 .arb-detail__table td {
   padding: 10px 14px;
   color: var(--fg-2);
@@ -544,13 +586,19 @@ onUnmounted(stopPolling)
   cursor: pointer;
   transition: background var(--dur-fast);
 }
-.arb-detail__result-row:hover td { background: var(--bg-2); }
+.arb-detail__result-row:hover td {
+  background: var(--bg-2);
+}
 .arb-detail__result-row--fail td {
   background: rgba(239, 68, 68, 0.04);
   border-left: 2px solid var(--action-notify);
 }
-.arb-detail__result-row--fail td:not(:first-child) { border-left: none; }
-.arb-detail__result-row--expanded td { border-bottom: none; }
+.arb-detail__result-row--fail td:not(:first-child) {
+  border-left: none;
+}
+.arb-detail__result-row--expanded td {
+  border-bottom: none;
+}
 
 /* Chevron */
 .arb-detail__expand-chevron {
@@ -577,15 +625,24 @@ onUnmounted(stopPolling)
   color: var(--action-notify);
 }
 
-.arb-detail__confidence { font-weight: 600; }
-.arb-detail__latency { color: var(--fg-4); }
+.arb-detail__confidence {
+  font-weight: 600;
+}
+.arb-detail__latency {
+  color: var(--fg-4);
+}
 
 /* Detail panel */
-.arb-detail__panel-row td { padding: 0; border-bottom: 1px solid var(--border-subtle); }
+.arb-detail__panel-row td {
+  padding: 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
 .arb-detail__panel-row--fail td {
   border-left: 2px solid var(--action-notify);
 }
-.arb-detail__panel-cell { padding: 0 !important; }
+.arb-detail__panel-cell {
+  padding: 0 !important;
+}
 .arb-detail__panel {
   display: flex;
   flex-direction: column;
@@ -594,7 +651,11 @@ onUnmounted(stopPolling)
   background: var(--bg-1);
   border-top: 1px solid var(--border-subtle);
 }
-.arb-detail__panel-section { display: flex; flex-direction: column; gap: 4px; }
+.arb-detail__panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 .arb-detail__panel-label {
   font-size: 10px;
   font-weight: 600;
@@ -645,6 +706,12 @@ onUnmounted(stopPolling)
   padding: 24px;
   font-size: 13px;
 }
-.num { font-family: var(--font-mono); font-size: 12px; }
-.mono { font-family: var(--font-mono); font-size: 12px; }
+.num {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
 </style>

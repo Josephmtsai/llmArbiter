@@ -11,14 +11,16 @@ import {
 
 describe('optimizer state helpers', () => {
   it('polls optimizer history when a run is running', () => {
-    expect(shouldPollOptimizerHistory([{ optimizer_run_id: 7, status: 'running', finished_at: null }])).toBe(
-      true,
-    )
+    expect(
+      shouldPollOptimizerHistory([{ optimizer_run_id: 7, status: 'running', finished_at: null }]),
+    ).toBe(true)
   })
 
   it('polls optimizer history when final test evaluation is running', () => {
     expect(
-      shouldPollOptimizerHistory([{ optimizer_run_id: 8, status: 'evaluating', finished_at: null }]),
+      shouldPollOptimizerHistory([
+        { optimizer_run_id: 8, status: 'evaluating', finished_at: null },
+      ]),
     ).toBe(true)
   })
 

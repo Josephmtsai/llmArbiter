@@ -10,13 +10,45 @@ const tabs: Array<{ id: OptimizerTab; label: string; href: string }> = [
 const optimizerDefaultModel = useState<string | null>('sidebar:optimizerDefaultModel', () => null)
 
 const {
-  activeTab, stats, optimizerRuns, reviewTotal, prompts, selectedPromptId,
-  loadingStats, loadingHistory, loadingRunDetail, loadingReview, loadingPrompts, globalError,
-  maxRounds, targetAccuracy, startingOptimizer, cancellingRunId, optimizerMessage,
-  reviewSearch, reviewActionFilter, selectedReview, correctionAction, reviewMutatingId, reviewError,
-  poolModel, startingPoolEval, poolEvalRunId, poolEvalError, selectedRunId,
-  lowestCoverage, poolIsEmpty, activeOptimizerRun, latestRun, selectedRun, filteredReviewItems,
-  refreshAll, startOptimizer, cancelOptimizerRun, updateReview, startPoolEvaluation,
+  activeTab,
+  stats,
+  optimizerRuns,
+  reviewTotal,
+  prompts,
+  selectedPromptId,
+  loadingStats,
+  loadingHistory,
+  loadingRunDetail,
+  loadingReview,
+  loadingPrompts,
+  globalError,
+  maxRounds,
+  targetAccuracy,
+  startingOptimizer,
+  cancellingRunId,
+  optimizerMessage,
+  reviewSearch,
+  reviewActionFilter,
+  selectedReview,
+  correctionAction,
+  reviewMutatingId,
+  reviewError,
+  poolModel,
+  startingPoolEval,
+  poolEvalRunId,
+  poolEvalError,
+  selectedRunId,
+  lowestCoverage,
+  poolIsEmpty,
+  activeOptimizerRun,
+  latestRun,
+  selectedRun,
+  filteredReviewItems,
+  refreshAll,
+  startOptimizer,
+  cancelOptimizerRun,
+  updateReview,
+  startPoolEvaluation,
 } = useOptimizerWorkflow()
 
 function selectRun(id: number) {
@@ -41,7 +73,12 @@ function selectRun(id: number) {
           {{ tab.label }}
         </NuxtLink>
       </div>
-      <UiButton variant="secondary" size="sm" :loading="loadingStats || loadingHistory" @click="refreshAll">
+      <UiButton
+        variant="secondary"
+        size="sm"
+        :loading="loadingStats || loadingHistory"
+        @click="refreshAll"
+      >
         Refresh
       </UiButton>
     </div>

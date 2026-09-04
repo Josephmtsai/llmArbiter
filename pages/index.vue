@@ -76,7 +76,9 @@ async function fetchRecent() {
   try {
     const res = await api.getDecisions({ limit: 5 })
     if (res.status === 'success') recentDecisions.value = res.data.decisions
-  } catch { /* silent */ } finally {
+  } catch {
+    /* silent */
+  } finally {
     loadingRecent.value = false
   }
 }
@@ -106,7 +108,9 @@ onMounted(fetchRecent)
             <button
               v-if="providerDefaultModel"
               class="arb-analyze__model-btn arb-analyze__model-btn--configured"
-              :class="{ 'arb-analyze__model-btn--active': selectedQuickModel === providerDefaultModel }"
+              :class="{
+                'arb-analyze__model-btn--active': selectedQuickModel === providerDefaultModel,
+              }"
               @click="pickQuickModel(providerDefaultModel)"
             >
               {{ providerDefaultModel }}
@@ -135,12 +139,7 @@ onMounted(fetchRecent)
 
         <div class="arb-analyze__input-row">
           <UiField label="Failures in last 24h" style="width: 160px">
-            <UiInput
-              v-model.number="failCount"
-              type="number"
-              placeholder="e.g. 3"
-              :mono="true"
-            />
+            <UiInput v-model.number="failCount" type="number" placeholder="e.g. 3" :mono="true" />
           </UiField>
           <div class="arb-analyze__run-col">
             <span v-if="activeProvider && effectiveModel" class="arb-analyze__model-chip num">
@@ -204,11 +203,7 @@ onMounted(fetchRecent)
           No decisions yet.
         </div>
         <div v-else class="arb-analyze__recent-list">
-          <UiCard
-            v-for="d in recentDecisions"
-            :key="d.id"
-            class="arb-analyze__recent-item"
-          >
+          <UiCard v-for="d in recentDecisions" :key="d.id" class="arb-analyze__recent-item">
             <div class="arb-analyze__recent-row">
               <UiActionBadge :action="d.primary_action" size="sm" />
               <UiSmallMeter :value="d.confidence" />
@@ -216,7 +211,9 @@ onMounted(fetchRecent)
             <p class="arb-analyze__recent-snippet">{{ d.log_snippet }}</p>
             <div class="arb-analyze__recent-footer">
               <UiSourceBadge :source="d.source" />
-              <span class="arb-analyze__recent-time num">{{ new Date(d.created_at).toLocaleTimeString() }}</span>
+              <span class="arb-analyze__recent-time num">{{
+                new Date(d.created_at).toLocaleTimeString()
+              }}</span>
             </div>
           </UiCard>
         </div>
@@ -227,7 +224,9 @@ onMounted(fetchRecent)
           <UiEyebrow>Confidence routing</UiEyebrow>
           <NuxtLink to="/guide" class="arb-analyze__routing-guide-link">How it works →</NuxtLink>
         </div>
-        <p class="arb-analyze__routing-note">Confidence does NOT pick the action — it controls how the chosen action is executed.</p>
+        <p class="arb-analyze__routing-note">
+          Confidence does NOT pick the action — it controls how the chosen action is executed.
+        </p>
         <div class="arb-analyze__routing-list">
           <div class="arb-analyze__routing-row arb-analyze__routing-row--high">
             <span class="arb-analyze__routing-badge num">≥ 80%</span>
@@ -378,8 +377,12 @@ onMounted(fetchRecent)
   outline: none;
   transition: border-color var(--dur-fast);
 }
-.arb-analyze__model-input:focus { border-color: var(--fg-3); }
-.arb-analyze__model-input::placeholder { color: var(--fg-4); }
+.arb-analyze__model-input:focus {
+  border-color: var(--fg-3);
+}
+.arb-analyze__model-input::placeholder {
+  color: var(--fg-4);
+}
 .arb-analyze__run-col {
   display: flex;
   flex-direction: column;
@@ -488,7 +491,9 @@ onMounted(fetchRecent)
   text-decoration: none;
   font-family: var(--font-mono);
 }
-.arb-analyze__routing-guide-link:hover { text-decoration: underline; }
+.arb-analyze__routing-guide-link:hover {
+  text-decoration: underline;
+}
 .arb-analyze__routing-note {
   font-size: 11px;
   color: var(--fg-4);
@@ -508,9 +513,15 @@ onMounted(fetchRecent)
   border-radius: var(--r-sm);
   border: 1px solid var(--border-subtle);
 }
-.arb-analyze__routing-row--high { background: rgba(52, 211, 153, 0.05); }
-.arb-analyze__routing-row--mid  { background: rgba(251, 191, 36, 0.05); }
-.arb-analyze__routing-row--low  { background: rgba(248, 113, 113, 0.05); }
+.arb-analyze__routing-row--high {
+  background: rgba(52, 211, 153, 0.05);
+}
+.arb-analyze__routing-row--mid {
+  background: rgba(251, 191, 36, 0.05);
+}
+.arb-analyze__routing-row--low {
+  background: rgba(248, 113, 113, 0.05);
+}
 .arb-analyze__routing-badge {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -518,9 +529,15 @@ onMounted(fetchRecent)
   min-width: 44px;
   flex-shrink: 0;
 }
-.arb-analyze__routing-row--high .arb-analyze__routing-badge { color: var(--conf-high); }
-.arb-analyze__routing-row--mid  .arb-analyze__routing-badge { color: var(--conf-mid); }
-.arb-analyze__routing-row--low  .arb-analyze__routing-badge { color: var(--conf-low); }
+.arb-analyze__routing-row--high .arb-analyze__routing-badge {
+  color: var(--conf-high);
+}
+.arb-analyze__routing-row--mid .arb-analyze__routing-badge {
+  color: var(--conf-mid);
+}
+.arb-analyze__routing-row--low .arb-analyze__routing-badge {
+  color: var(--conf-low);
+}
 .arb-analyze__routing-label {
   font-size: 11px;
   color: var(--fg-2);

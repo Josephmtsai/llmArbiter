@@ -15,14 +15,37 @@ const route = useRoute()
 const api = useApi()
 const sidebarOpen = useState('mobile:sidebarOpen', () => false)
 
-watch(() => route.path, () => { sidebarOpen.value = false })
+watch(
+  () => route.path,
+  () => {
+    sidebarOpen.value = false
+  },
+)
 
 const NAV_ITEMS = [
   { id: 'analyze', label: 'Analyze', icon: Zap, href: '/' },
-  { id: 'decisions', label: 'Decisions', icon: ListChecks, href: '/decisions', count: null as number | null },
-  { id: 'cases', label: 'Test cases', icon: FlaskConical, href: '/cases', count: null as number | null },
+  {
+    id: 'decisions',
+    label: 'Decisions',
+    icon: ListChecks,
+    href: '/decisions',
+    count: null as number | null,
+  },
+  {
+    id: 'cases',
+    label: 'Test cases',
+    icon: FlaskConical,
+    href: '/cases',
+    count: null as number | null,
+  },
   { id: 'evaluate', label: 'Evaluate', icon: Gauge, href: '/evaluate' },
-  { id: 'eval-history', label: 'Eval history', icon: History, href: '/evaluate/history', count: null as number | null },
+  {
+    id: 'eval-history',
+    label: 'Eval history',
+    icon: History,
+    href: '/evaluate/history',
+    count: null as number | null,
+  },
   { id: 'optimizer', label: 'Auto optimizer', icon: Bot, href: '/optimizer' },
   { id: 'settings', label: 'Settings', icon: SlidersHorizontal, href: '/settings' },
   { id: 'guide', label: 'How it works', icon: BookOpen, href: '/guide' },
@@ -109,7 +132,9 @@ onMounted(() => {
   document.addEventListener('mousedown', onDocumentMousedown)
   // Close drawer when viewport widens past mobile breakpoint
   const mq = window.matchMedia('(min-width: 768px)')
-  const onResize = (e: MediaQueryListEvent) => { if (e.matches) sidebarOpen.value = false }
+  const onResize = (e: MediaQueryListEvent) => {
+    if (e.matches) sidebarOpen.value = false
+  }
   mq.addEventListener('change', onResize)
   onUnmounted(() => mq.removeEventListener('change', onResize))
 })
@@ -128,7 +153,9 @@ function isActive(href: string): boolean {
 <template>
   <aside class="arb-sidebar" :class="{ 'arb-sidebar--open': sidebarOpen }">
     <!-- Mobile close button -->
-    <button class="arb-sidebar__close-btn" aria-label="Close menu" @click="sidebarOpen = false">✕</button>
+    <button class="arb-sidebar__close-btn" aria-label="Close menu" @click="sidebarOpen = false">
+      ✕
+    </button>
 
     <!-- Brand -->
     <div class="arb-sidebar__brand">
@@ -177,22 +204,31 @@ function isActive(href: string): boolean {
       <div class="arb-sidebar__status-row">
         <span
           class="arb-sidebar__status-dot"
-          :class="apiOnline ? 'arb-sidebar__status-dot--online' : 'arb-sidebar__status-dot--offline'"
+          :class="
+            apiOnline ? 'arb-sidebar__status-dot--online' : 'arb-sidebar__status-dot--offline'
+          "
         />
         <span class="arb-sidebar__status-text">{{ apiOnline ? 'API online' : 'API offline' }}</span>
-        <span v-if="latencyMs !== null" class="arb-sidebar__status-latency num">{{ latencyMs }}ms</span>
+        <span v-if="latencyMs !== null" class="arb-sidebar__status-latency num"
+          >{{ latencyMs }}ms</span
+        >
       </div>
 
       <!-- Provider quick-switch button -->
       <button
         class="arb-sidebar__provider-btn"
-        :class="{ 'arb-sidebar__provider-btn--open': providerDropdownOpen, 'arb-sidebar__provider-btn--switching': switchingProvider }"
+        :class="{
+          'arb-sidebar__provider-btn--open': providerDropdownOpen,
+          'arb-sidebar__provider-btn--switching': switchingProvider,
+        }"
         :disabled="switchingProvider"
         @click="toggleProviderDropdown"
       >
         <span
           class="arb-sidebar__status-dot"
-          :class="activeProvider ? 'arb-sidebar__status-dot--online' : 'arb-sidebar__status-dot--offline'"
+          :class="
+            activeProvider ? 'arb-sidebar__status-dot--online' : 'arb-sidebar__status-dot--offline'
+          "
         />
         <span class="arb-sidebar__status-text">{{ activeProvider ?? '—' }}</span>
         <span class="arb-sidebar__provider-chevron">{{ providerDropdownOpen ? '▴' : '▾' }}</span>
@@ -207,7 +243,9 @@ function isActive(href: string): boolean {
           :class="{ 'arb-sidebar__provider-option--active': p === activeProvider }"
           @click="selectProvider(p)"
         >
-          <span class="arb-sidebar__provider-option-check">{{ p === activeProvider ? '✓' : '' }}</span>
+          <span class="arb-sidebar__provider-option-check">{{
+            p === activeProvider ? '✓' : ''
+          }}</span>
           <span class="num">{{ p }}</span>
         </button>
       </div>
@@ -216,7 +254,10 @@ function isActive(href: string): boolean {
       <div v-if="switchError" class="arb-sidebar__switch-error">{{ switchError }}</div>
 
       <!-- OpenRouter model label -->
-      <div v-if="activeProvider === 'openrouter'" class="arb-sidebar__status-row arb-sidebar__status-row--model">
+      <div
+        v-if="activeProvider === 'openrouter'"
+        class="arb-sidebar__status-row arb-sidebar__status-row--model"
+      >
         <span class="arb-sidebar__status-model num">{{ activeModel ?? 'default' }}</span>
       </div>
     </div>
@@ -351,7 +392,9 @@ function isActive(href: string): boolean {
   color: var(--fg-0);
   font-weight: 500;
 }
-.arb-sidebar__nav-label { flex: 1; }
+.arb-sidebar__nav-label {
+  flex: 1;
+}
 .arb-sidebar__nav-count {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -368,7 +411,9 @@ function isActive(href: string): boolean {
   gap: 6px;
   position: relative;
 }
-.arb-sidebar__spacer { flex: 1; }
+.arb-sidebar__spacer {
+  flex: 1;
+}
 .arb-sidebar__status-row {
   display: flex;
   align-items: center;
@@ -380,15 +425,25 @@ function isActive(href: string): boolean {
   border-radius: 999px;
   flex-shrink: 0;
 }
-.arb-sidebar__status-dot--online { background: var(--success); }
-.arb-sidebar__status-dot--offline { background: var(--conf-low); }
-.arb-sidebar__status-text { font-size: 11px; color: var(--fg-2); flex: 1; }
+.arb-sidebar__status-dot--online {
+  background: var(--success);
+}
+.arb-sidebar__status-dot--offline {
+  background: var(--conf-low);
+}
+.arb-sidebar__status-text {
+  font-size: 11px;
+  color: var(--fg-2);
+  flex: 1;
+}
 .arb-sidebar__status-latency {
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--fg-4);
 }
-.arb-sidebar__status-row--model { padding-left: 12px; }
+.arb-sidebar__status-row--model {
+  padding-left: 12px;
+}
 .arb-sidebar__status-model {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -409,9 +464,16 @@ function isActive(href: string): boolean {
   transition: background var(--dur-fast);
   text-align: left;
 }
-.arb-sidebar__provider-btn:hover:not(:disabled) { background: var(--bg-2); }
-.arb-sidebar__provider-btn--open { background: var(--bg-2); }
-.arb-sidebar__provider-btn--switching { opacity: 0.5; cursor: default; }
+.arb-sidebar__provider-btn:hover:not(:disabled) {
+  background: var(--bg-2);
+}
+.arb-sidebar__provider-btn--open {
+  background: var(--bg-2);
+}
+.arb-sidebar__provider-btn--switching {
+  opacity: 0.5;
+  cursor: default;
+}
 .arb-sidebar__provider-chevron {
   font-size: 9px;
   color: var(--fg-4);
@@ -430,7 +492,7 @@ function isActive(href: string): boolean {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   z-index: 100;
 }
 .arb-sidebar__provider-option {
@@ -449,8 +511,13 @@ function isActive(href: string): boolean {
   text-align: left;
   transition: background var(--dur-fast);
 }
-.arb-sidebar__provider-option:hover { background: var(--bg-2); }
-.arb-sidebar__provider-option--active { color: var(--fg-0); font-weight: 600; }
+.arb-sidebar__provider-option:hover {
+  background: var(--bg-2);
+}
+.arb-sidebar__provider-option--active {
+  color: var(--fg-0);
+  font-weight: 600;
+}
 .arb-sidebar__provider-option-check {
   width: 12px;
   font-size: 10px;
@@ -478,7 +545,10 @@ function isActive(href: string): boolean {
   border-radius: var(--r-sm);
   line-height: 1;
 }
-.arb-sidebar__close-btn:hover { color: var(--fg-1); background: var(--bg-2); }
+.arb-sidebar__close-btn:hover {
+  color: var(--fg-1);
+  background: var(--bg-2);
+}
 
 @media (max-width: 767px) {
   .arb-sidebar {

@@ -25,12 +25,14 @@ function isPromptGroup(g: EvalCompareGroup): g is EvalCompareGroupByPromptVersio
   return 'prompt_version_id' in g
 }
 
-const providerGroups = computed(() =>
-  (groups.value as EvalCompareGroup[]).filter(isProviderGroup) as EvalCompareGroupByProvider[],
+const providerGroups = computed(
+  () =>
+    (groups.value as EvalCompareGroup[]).filter(isProviderGroup) as EvalCompareGroupByProvider[],
 )
 
-const promptGroups = computed(() =>
-  (groups.value as EvalCompareGroup[]).filter(isPromptGroup) as EvalCompareGroupByPromptVersion[],
+const promptGroups = computed(
+  () =>
+    (groups.value as EvalCompareGroup[]).filter(isPromptGroup) as EvalCompareGroupByPromptVersion[],
 )
 
 const sortedProviderGroups = computed(() =>
@@ -61,9 +63,9 @@ async function fetchCompare() {
   try {
     const res = await api.getEvalCompare(activeDimension.value)
     if (res.status === 'success') {
-      groups.value = res.data.groups.map(g => ({
+      groups.value = res.data.groups.map((g) => ({
         ...g,
-        runs: g.runs.filter(r => r.source !== 'optimizer'),
+        runs: g.runs.filter((r) => r.source !== 'optimizer'),
       }))
     } else error.value = res.message
   } catch (e) {
@@ -97,12 +99,16 @@ onMounted(fetchCompare)
           class="arb-compare__toggle-btn"
           :class="{ 'arb-compare__toggle-btn--active': activeDimension === 'provider' }"
           @click="switchDimension('provider')"
-        >By provider</button>
+        >
+          By provider
+        </button>
         <button
           class="arb-compare__toggle-btn"
           :class="{ 'arb-compare__toggle-btn--active': activeDimension === 'prompt_version' }"
           @click="switchDimension('prompt_version')"
-        >By prompt version</button>
+        >
+          By prompt version
+        </button>
       </div>
     </div>
 
@@ -198,12 +204,18 @@ onMounted(fetchCompare)
                 <td class="mono">{{ group.model }}</td>
                 <td class="num">{{ group.run_count }}</td>
                 <td>
-                  <span class="arb-compare__acc" :style="{ color: accuracyColor(group.avg_accuracy) }">
+                  <span
+                    class="arb-compare__acc"
+                    :style="{ color: accuracyColor(group.avg_accuracy) }"
+                  >
                     {{ formatAccuracy(group.avg_accuracy) }}
                   </span>
                 </td>
                 <td>
-                  <span class="arb-compare__acc" :style="{ color: accuracyColor(group.best_accuracy) }">
+                  <span
+                    class="arb-compare__acc"
+                    :style="{ color: accuracyColor(group.best_accuracy) }"
+                  >
                     {{ formatAccuracy(group.best_accuracy) }}
                   </span>
                 </td>
@@ -216,9 +228,7 @@ onMounted(fetchCompare)
 
     <!-- ── By prompt version ── -->
     <template v-else>
-      <div v-if="promptGroups.length === 0" class="arb-compare__empty">
-        No evaluation data yet.
-      </div>
+      <div v-if="promptGroups.length === 0" class="arb-compare__empty">No evaluation data yet.</div>
 
       <template v-else>
         <UiCard class="arb-compare__chart-card">
@@ -248,7 +258,9 @@ onMounted(fetchCompare)
                 </div>
                 <div class="arb-compare__group-label">
                   <span class="arb-compare__group-provider">v{{ group.prompt_version_id }}</span>
-                  <span class="arb-compare__group-model">{{ group.run_count }} run{{ group.run_count !== 1 ? 's' : '' }}</span>
+                  <span class="arb-compare__group-model"
+                    >{{ group.run_count }} run{{ group.run_count !== 1 ? 's' : '' }}</span
+                  >
                 </div>
               </div>
             </div>
@@ -276,18 +288,29 @@ onMounted(fetchCompare)
   text-decoration: none;
   transition: color var(--dur-fast);
 }
-.arb-compare__back:hover { color: var(--fg-1); }
-.arb-compare__loading { padding: 40px; text-align: center; }
+.arb-compare__back:hover {
+  color: var(--fg-1);
+}
+.arb-compare__loading {
+  padding: 40px;
+  text-align: center;
+}
 .arb-compare__empty {
   padding: 40px;
   text-align: center;
   color: var(--fg-4);
   font-size: 13px;
 }
-.arb-compare__error { padding: 12px; color: var(--action-notify); font-size: 13px; }
+.arb-compare__error {
+  padding: 12px;
+  color: var(--action-notify);
+  font-size: 13px;
+}
 
 /* Dimension toggle */
-.arb-compare__toggle-wrap { display: flex; }
+.arb-compare__toggle-wrap {
+  display: flex;
+}
 .arb-compare__toggle {
   display: inline-flex;
   border: 1px solid var(--border);
@@ -457,12 +480,20 @@ onMounted(fetchCompare)
   border-bottom: 1px solid var(--border-subtle);
   white-space: nowrap;
 }
-.arb-compare__table tr:last-child td { border-bottom: none; }
+.arb-compare__table tr:last-child td {
+  border-bottom: none;
+}
 .arb-compare__acc {
   font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 700;
 }
-.num { font-family: var(--font-mono); font-size: 12px; }
-.mono { font-family: var(--font-mono); font-size: 12px; }
+.num {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
 </style>

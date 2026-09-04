@@ -45,35 +45,53 @@ defineProps<{
   border-color: var(--border) !important;
   cursor: not-allowed;
 }
-.arb-btn--md { height: 36px; padding: 0 14px; font-size: 14px; }
-.arb-btn--sm { height: 28px; padding: 0 10px; font-size: 13px; }
+.arb-btn--md {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+.arb-btn--sm {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 13px;
+}
 
 .arb-btn--primary {
   background: var(--accent);
   color: #fff;
 }
-.arb-btn--primary:hover:not(:disabled) { background: var(--accent-hover); }
-.arb-btn--primary:active:not(:disabled) { background: var(--accent-press); }
+.arb-btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.arb-btn--primary:active:not(:disabled) {
+  background: var(--accent-press);
+}
 
 .arb-btn--secondary {
   background: var(--bg-2);
   color: var(--fg-0);
   border-color: var(--border);
 }
-.arb-btn--secondary:hover:not(:disabled) { background: var(--bg-3); }
+.arb-btn--secondary:hover:not(:disabled) {
+  background: var(--bg-3);
+}
 
 .arb-btn--ghost {
   background: transparent;
   color: var(--fg-1);
 }
-.arb-btn--ghost:hover:not(:disabled) { background: var(--bg-2); }
+.arb-btn--ghost:hover:not(:disabled) {
+  background: var(--bg-2);
+}
 
 .arb-btn--danger {
   background: transparent;
   color: var(--danger);
   border-color: var(--border);
 }
-.arb-btn--danger:hover:not(:disabled) { background: var(--danger-soft); }
+.arb-btn--danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+}
 
 .arb-btn:focus-visible {
   outline: none;

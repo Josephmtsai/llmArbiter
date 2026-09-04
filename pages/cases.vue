@@ -46,15 +46,17 @@ const ACTION_SOFT_VAR: Record<PrimaryAction, string> = {
 }
 
 const groupedCases = computed(() =>
-  PRIMARY_ACTIONS
-    .map(action => ({ action, items: cases.value.filter(c => c.expected_action === action) }))
-    .filter(g => g.items.length > 0),
+  PRIMARY_ACTIONS.map((action) => ({
+    action,
+    items: cases.value.filter((c) => c.expected_action === action),
+  })).filter((g) => g.items.length > 0),
 )
 
-const summaryByAction = computed(() =>
-  Object.fromEntries(
-    PRIMARY_ACTIONS.map(a => [a, cases.value.filter(c => c.expected_action === a).length]),
-  ) as Record<PrimaryAction, number>,
+const summaryByAction = computed(
+  () =>
+    Object.fromEntries(
+      PRIMARY_ACTIONS.map((a) => [a, cases.value.filter((c) => c.expected_action === a).length]),
+    ) as Record<PrimaryAction, number>,
 )
 
 function toggleSnippet(id: number) {
@@ -105,7 +107,7 @@ async function createCase() {
 
 async function deleteCase(id: number) {
   await api.deleteCase(id).catch(() => null)
-  cases.value = cases.value.filter(c => c.id !== id)
+  cases.value = cases.value.filter((c) => c.id !== id)
 }
 
 onMounted(load)
@@ -181,14 +183,22 @@ onMounted(load)
         v-for="group in groupedCases"
         :key="group.action"
         class="arb-cases__group"
-        :style="{ '--group-color': ACTION_CSS_VAR[group.action], '--group-soft': ACTION_SOFT_VAR[group.action] }"
+        :style="{
+          '--group-color': ACTION_CSS_VAR[group.action],
+          '--group-soft': ACTION_SOFT_VAR[group.action],
+        }"
       >
         <!-- Group header -->
         <button class="arb-cases__group-header" @click="toggleGroup(group.action)">
           <span class="arb-cases__group-accent" />
           <UiActionBadge :action="group.action" size="sm" />
-          <span class="arb-cases__group-count">{{ group.items.length }} case{{ group.items.length !== 1 ? 's' : '' }}</span>
-          <span class="arb-cases__group-chevron" :class="{ 'arb-cases__group-chevron--open': !collapsedGroups.has(group.action) }">
+          <span class="arb-cases__group-count"
+            >{{ group.items.length }} case{{ group.items.length !== 1 ? 's' : '' }}</span
+          >
+          <span
+            class="arb-cases__group-chevron"
+            :class="{ 'arb-cases__group-chevron--open': !collapsedGroups.has(group.action) }"
+          >
             ›
           </span>
         </button>
@@ -207,10 +217,14 @@ onMounted(load)
                 >
                   {{ expandedSnippets.has(tc.id) ? 'hide log' : 'show log' }}
                 </button>
-                <button class="arb-cases__delete-btn" title="Delete" @click="deleteCase(tc.id)">✕</button>
+                <button class="arb-cases__delete-btn" title="Delete" @click="deleteCase(tc.id)">
+                  ✕
+                </button>
               </div>
             </div>
-            <pre v-if="expandedSnippets.has(tc.id)" class="arb-cases__snippet">{{ tc.log_snippet }}</pre>
+            <pre v-if="expandedSnippets.has(tc.id)" class="arb-cases__snippet">{{
+              tc.log_snippet
+            }}</pre>
           </div>
         </div>
       </div>
@@ -252,7 +266,10 @@ onMounted(load)
 }
 
 /* Misc states */
-.arb-cases__loading { padding: 40px; text-align: center; }
+.arb-cases__loading {
+  padding: 40px;
+  text-align: center;
+}
 .arb-cases__empty {
   padding: 40px;
   text-align: center;

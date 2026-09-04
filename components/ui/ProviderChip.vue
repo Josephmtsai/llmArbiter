@@ -3,9 +3,7 @@ defineProps<{ provider: string; model?: string }>()
 </script>
 
 <template>
-  <UiChip class="arb-provider-chip">
-    {{ provider }}{{ model ? ` · ${model}` : '' }}
-  </UiChip>
+  <UiChip class="arb-provider-chip"> {{ provider }}{{ model ? ` · ${model}` : '' }} </UiChip>
 </template>
 
 <style scoped>

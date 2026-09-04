@@ -27,7 +27,9 @@ onMounted(init)
   flex-direction: column;
   overflow: hidden;
 }
-.arb-shell__overlay { display: none; }
+.arb-shell__overlay {
+  display: none;
+}
 
 @media (max-width: 767px) {
   .arb-shell__overlay {

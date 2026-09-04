@@ -33,7 +33,9 @@ const pct = computed(() => Math.round(props.value * 100))
   background: var(--bg-2);
   overflow: hidden;
 }
-.arb-small-meter__fill { height: 100%; }
+.arb-small-meter__fill {
+  height: 100%;
+}
 .arb-small-meter__pct {
   font-family: var(--font-mono);
   font-size: 12px;

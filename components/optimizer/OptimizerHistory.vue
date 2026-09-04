@@ -10,7 +10,11 @@ import type {
   OptimizerRoundFailure,
   OptimizerRun,
 } from '~/types/api'
-import { bestOptimizerAccuracy, isOptimizerRunActive, optimizerRoundCount } from '~/utils/optimizerState'
+import {
+  bestOptimizerAccuracy,
+  isOptimizerRunActive,
+  optimizerRoundCount,
+} from '~/utils/optimizerState'
 
 const props = defineProps<{
   runs: OptimizerRun[]
@@ -124,11 +128,15 @@ const dateEndModel = computed<string | null>({
 })
 
 const uniqueOptimizerModels = computed(() =>
-  [...new Set(props.runs.map((r) => r.optimizer_model).filter((m): m is string => Boolean(m)))].sort(),
+  [
+    ...new Set(props.runs.map((r) => r.optimizer_model).filter((m): m is string => Boolean(m))),
+  ].sort(),
 )
 
 const uniqueEvaluatorModels = computed(() =>
-  [...new Set(props.runs.map((r) => r.evaluator_model).filter((m): m is string => Boolean(m)))].sort(),
+  [
+    ...new Set(props.runs.map((r) => r.evaluator_model).filter((m): m is string => Boolean(m))),
+  ].sort(),
 )
 
 const activeFilterCount = computed(() => {
@@ -144,14 +152,22 @@ const activeFilterCount = computed(() => {
 const filteredRuns = computed(() => {
   return props.runs.filter((run) => {
     if (filterStatuses.value.size > 0 && !filterStatuses.value.has(run.status)) return false
-    if (filterOptimizerModels.value.size > 0 && !filterOptimizerModels.value.has(run.optimizer_model ?? ''))
+    if (
+      filterOptimizerModels.value.size > 0 &&
+      !filterOptimizerModels.value.has(run.optimizer_model ?? '')
+    )
       return false
-    if (filterEvaluatorModels.value.size > 0 && !filterEvaluatorModels.value.has(run.evaluator_model ?? ''))
+    if (
+      filterEvaluatorModels.value.size > 0 &&
+      !filterEvaluatorModels.value.has(run.evaluator_model ?? '')
+    )
       return false
     if (filterAccuracyMin.value != null || filterAccuracyMax.value != null) {
       if (run.test_accuracy == null) return false
-      if (filterAccuracyMin.value != null && run.test_accuracy < filterAccuracyMin.value) return false
-      if (filterAccuracyMax.value != null && run.test_accuracy > filterAccuracyMax.value) return false
+      if (filterAccuracyMin.value != null && run.test_accuracy < filterAccuracyMin.value)
+        return false
+      if (filterAccuracyMax.value != null && run.test_accuracy > filterAccuracyMax.value)
+        return false
     }
     if (filterDateStart.value) {
       if (new Date(run.started_at) < new Date(filterDateStart.value)) return false
@@ -238,7 +254,9 @@ function formatCompareAccuracy(value: number | null | undefined): string {
   return `${(value * 100).toFixed(1)}%`
 }
 
-function compareMaxField(field: 'best_accuracy' | 'test_accuracy' | 'accuracy_gain'): number | null {
+function compareMaxField(
+  field: 'best_accuracy' | 'test_accuracy' | 'accuracy_gain',
+): number | null {
   const values = compareSelectedRuns.value.map((run) => {
     if (field === 'accuracy_gain') {
       const b = run.baseline_accuracy
@@ -251,7 +269,10 @@ function compareMaxField(field: 'best_accuracy' | 'test_accuracy' | 'accuracy_ga
   return nums.length > 0 ? Math.max(...nums) : null
 }
 
-function isCompareMax(run: OptimizerRun, field: 'best_accuracy' | 'test_accuracy' | 'accuracy_gain'): boolean {
+function isCompareMax(
+  run: OptimizerRun,
+  field: 'best_accuracy' | 'test_accuracy' | 'accuracy_gain',
+): boolean {
   const max = compareMaxField(field)
   if (max == null) return false
   let val: number | null
@@ -494,12 +515,23 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
         <!-- Filter Bar -->
         <div ref="filterBarRef" class="optimizer-history__filter-bar">
           <!-- Status filter -->
-          <details class="optimizer-history__filter-group" :open="activeFilterDimension === 'status'">
-            <summary class="optimizer-history__filter-summary" @click.prevent="toggleFilter('status')">
+          <details
+            class="optimizer-history__filter-group"
+            :open="activeFilterDimension === 'status'"
+          >
+            <summary
+              class="optimizer-history__filter-summary"
+              @click.prevent="toggleFilter('status')"
+            >
               Status
-              <span v-if="filterStatuses.size > 0" class="optimizer-history__filter-badge">{{ filterStatuses.size }}</span>
+              <span v-if="filterStatuses.size > 0" class="optimizer-history__filter-badge">{{
+                filterStatuses.size
+              }}</span>
             </summary>
-            <div v-show="activeFilterDimension === 'status'" class="optimizer-history__filter-options">
+            <div
+              v-show="activeFilterDimension === 'status'"
+              class="optimizer-history__filter-options"
+            >
               <label
                 v-for="status in ALL_STATUSES"
                 :key="status"
@@ -511,18 +543,32 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
                   @change="filterStatuses = toggleSetValue(filterStatuses, status)"
                 />
                 {{ status }}
-                <span class="optimizer-history__filter-count">{{ props.runs.filter((r) => r.status === status).length }}</span>
+                <span class="optimizer-history__filter-count">{{
+                  props.runs.filter((r) => r.status === status).length
+                }}</span>
               </label>
             </div>
           </details>
 
           <!-- Optimizer Model filter -->
-          <details v-if="uniqueOptimizerModels.length > 0" class="optimizer-history__filter-group" :open="activeFilterDimension === 'optimizerModel'">
-            <summary class="optimizer-history__filter-summary" @click.prevent="toggleFilter('optimizerModel')">
+          <details
+            v-if="uniqueOptimizerModels.length > 0"
+            class="optimizer-history__filter-group"
+            :open="activeFilterDimension === 'optimizerModel'"
+          >
+            <summary
+              class="optimizer-history__filter-summary"
+              @click.prevent="toggleFilter('optimizerModel')"
+            >
               Optimizer Model
-              <span v-if="filterOptimizerModels.size > 0" class="optimizer-history__filter-badge">{{ filterOptimizerModels.size }}</span>
+              <span v-if="filterOptimizerModels.size > 0" class="optimizer-history__filter-badge">{{
+                filterOptimizerModels.size
+              }}</span>
             </summary>
-            <div v-show="activeFilterDimension === 'optimizerModel'" class="optimizer-history__filter-options">
+            <div
+              v-show="activeFilterDimension === 'optimizerModel'"
+              class="optimizer-history__filter-options"
+            >
               <label
                 v-for="model in uniqueOptimizerModels"
                 :key="model"
@@ -534,18 +580,32 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
                   @change="filterOptimizerModels = toggleSetValue(filterOptimizerModels, model)"
                 />
                 {{ model.split('/').pop() }}
-                <span class="optimizer-history__filter-count">{{ props.runs.filter((r) => r.optimizer_model === model).length }}</span>
+                <span class="optimizer-history__filter-count">{{
+                  props.runs.filter((r) => r.optimizer_model === model).length
+                }}</span>
               </label>
             </div>
           </details>
 
           <!-- Evaluator Model filter -->
-          <details v-if="uniqueEvaluatorModels.length > 0" class="optimizer-history__filter-group" :open="activeFilterDimension === 'evaluatorModel'">
-            <summary class="optimizer-history__filter-summary" @click.prevent="toggleFilter('evaluatorModel')">
+          <details
+            v-if="uniqueEvaluatorModels.length > 0"
+            class="optimizer-history__filter-group"
+            :open="activeFilterDimension === 'evaluatorModel'"
+          >
+            <summary
+              class="optimizer-history__filter-summary"
+              @click.prevent="toggleFilter('evaluatorModel')"
+            >
               Evaluator Model
-              <span v-if="filterEvaluatorModels.size > 0" class="optimizer-history__filter-badge">{{ filterEvaluatorModels.size }}</span>
+              <span v-if="filterEvaluatorModels.size > 0" class="optimizer-history__filter-badge">{{
+                filterEvaluatorModels.size
+              }}</span>
             </summary>
-            <div v-show="activeFilterDimension === 'evaluatorModel'" class="optimizer-history__filter-options">
+            <div
+              v-show="activeFilterDimension === 'evaluatorModel'"
+              class="optimizer-history__filter-options"
+            >
               <label
                 v-for="model in uniqueEvaluatorModels"
                 :key="model"
@@ -557,16 +617,28 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
                   @change="filterEvaluatorModels = toggleSetValue(filterEvaluatorModels, model)"
                 />
                 {{ model.split('/').pop() }}
-                <span class="optimizer-history__filter-count">{{ props.runs.filter((r) => r.evaluator_model === model).length }}</span>
+                <span class="optimizer-history__filter-count">{{
+                  props.runs.filter((r) => r.evaluator_model === model).length
+                }}</span>
               </label>
             </div>
           </details>
 
           <!-- Test Accuracy range -->
-          <details class="optimizer-history__filter-group" :open="activeFilterDimension === 'accuracy'">
-            <summary class="optimizer-history__filter-summary" @click.prevent="toggleFilter('accuracy')">
+          <details
+            class="optimizer-history__filter-group"
+            :open="activeFilterDimension === 'accuracy'"
+          >
+            <summary
+              class="optimizer-history__filter-summary"
+              @click.prevent="toggleFilter('accuracy')"
+            >
               Test Accuracy
-              <span v-if="filterAccuracyMin != null || filterAccuracyMax != null" class="optimizer-history__filter-badge">1</span>
+              <span
+                v-if="filterAccuracyMin != null || filterAccuracyMax != null"
+                class="optimizer-history__filter-badge"
+                >1</span
+              >
             </summary>
             <div
               v-show="activeFilterDimension === 'accuracy'"
@@ -592,9 +664,14 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
 
           <!-- Date range -->
           <details class="optimizer-history__filter-group" :open="activeFilterDimension === 'date'">
-            <summary class="optimizer-history__filter-summary" @click.prevent="toggleFilter('date')">
+            <summary
+              class="optimizer-history__filter-summary"
+              @click.prevent="toggleFilter('date')"
+            >
               Started At
-              <span v-if="filterDateStart || filterDateEnd" class="optimizer-history__filter-badge">1</span>
+              <span v-if="filterDateStart || filterDateEnd" class="optimizer-history__filter-badge"
+                >1</span
+              >
             </summary>
             <div
               v-show="activeFilterDimension === 'date'"
@@ -639,24 +716,41 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
         </div>
 
         <!-- Active filter chips -->
-        <div class="optimizer-history__filter-chips" :class="{ 'optimizer-history__filter-chips--inactive': activeFilterCount === 0 }">
+        <div
+          class="optimizer-history__filter-chips"
+          :class="{ 'optimizer-history__filter-chips--inactive': activeFilterCount === 0 }"
+        >
           <template v-if="activeFilterCount > 0">
-            <span class="optimizer-history__filter-chip-label">{{ activeFilterCount }} filter{{ activeFilterCount > 1 ? 's' : '' }} active</span>
+            <span class="optimizer-history__filter-chip-label"
+              >{{ activeFilterCount }} filter{{ activeFilterCount > 1 ? 's' : '' }} active</span
+            >
             <span v-if="filterStatuses.size > 0" class="optimizer-history__chip">
               Status: {{ [...filterStatuses].join(', ') }}
-              <button class="optimizer-history__chip-close" @click="clearFilter('status')">×</button>
+              <button class="optimizer-history__chip-close" @click="clearFilter('status')">
+                ×
+              </button>
             </span>
             <span v-if="filterOptimizerModels.size > 0" class="optimizer-history__chip">
               Opt model: {{ [...filterOptimizerModels].map((m) => m.split('/').pop()).join(', ') }}
-              <button class="optimizer-history__chip-close" @click="clearFilter('optimizerModel')">×</button>
+              <button class="optimizer-history__chip-close" @click="clearFilter('optimizerModel')">
+                ×
+              </button>
             </span>
             <span v-if="filterEvaluatorModels.size > 0" class="optimizer-history__chip">
               Eval model: {{ [...filterEvaluatorModels].map((m) => m.split('/').pop()).join(', ') }}
-              <button class="optimizer-history__chip-close" @click="clearFilter('evaluatorModel')">×</button>
+              <button class="optimizer-history__chip-close" @click="clearFilter('evaluatorModel')">
+                ×
+              </button>
             </span>
-            <span v-if="filterAccuracyMin != null || filterAccuracyMax != null" class="optimizer-history__chip">
-              Accuracy: {{ filterAccuracyMin != null ? formatPercent(filterAccuracyMin) : '—' }} to {{ filterAccuracyMax != null ? formatPercent(filterAccuracyMax) : '—' }}
-              <button class="optimizer-history__chip-close" @click="clearFilter('accuracy')">×</button>
+            <span
+              v-if="filterAccuracyMin != null || filterAccuracyMax != null"
+              class="optimizer-history__chip"
+            >
+              Accuracy: {{ filterAccuracyMin != null ? formatPercent(filterAccuracyMin) : '—' }} to
+              {{ filterAccuracyMax != null ? formatPercent(filterAccuracyMax) : '—' }}
+              <button class="optimizer-history__chip-close" @click="clearFilter('accuracy')">
+                ×
+              </button>
             </span>
             <span v-if="filterDateStart || filterDateEnd" class="optimizer-history__chip">
               Date: {{ filterDateStart || '—' }} to {{ filterDateEnd || '—' }}
@@ -667,7 +761,9 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
             class="optimizer-history__clear-all"
             :disabled="activeFilterCount === 0"
             @click="clearAllFilters"
-          >Clear all filters</button>
+          >
+            Clear all filters
+          </button>
         </div>
 
         <!-- Run list -->
@@ -683,18 +779,27 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
             :key="run.optimizer_run_id"
             class="optimizer-history__run-item"
             :class="{
-              'optimizer-history__run-item--active': selectedRun?.optimizer_run_id === run.optimizer_run_id,
+              'optimizer-history__run-item--active':
+                selectedRun?.optimizer_run_id === run.optimizer_run_id,
               'optimizer-history__run-item--selected': compareSelectedIds.has(run.optimizer_run_id),
             }"
           >
             <label
               class="optimizer-history__run-checkbox-label"
-              :title="compareSelectedIds.size >= MAX_COMPARE && !compareSelectedIds.has(run.optimizer_run_id) ? '最多可比較 4 個 runs' : ''"
+              :title="
+                compareSelectedIds.size >= MAX_COMPARE &&
+                !compareSelectedIds.has(run.optimizer_run_id)
+                  ? '最多可比較 4 個 runs'
+                  : ''
+              "
             >
               <input
                 type="checkbox"
                 :checked="compareSelectedIds.has(run.optimizer_run_id)"
-                :disabled="compareSelectedIds.size >= MAX_COMPARE && !compareSelectedIds.has(run.optimizer_run_id)"
+                :disabled="
+                  compareSelectedIds.size >= MAX_COMPARE &&
+                  !compareSelectedIds.has(run.optimizer_run_id)
+                "
                 @change="toggleCompare(run.optimizer_run_id, $event)"
               />
             </label>
@@ -705,22 +810,36 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
             >
               <div class="optimizer-history__run-item-head">
                 <span class="num">#{{ run.optimizer_run_id }}</span>
-                <span class="optimizer-history__status-chip" :class="`optimizer-history__status-chip--${run.status}`">
+                <span
+                  class="optimizer-history__status-chip"
+                  :class="`optimizer-history__status-chip--${run.status}`"
+                >
                   {{ run.status }}
                 </span>
               </div>
-              <div v-if="run.optimizer_model || run.evaluator_model" class="optimizer-history__model-badges">
-                <span v-if="run.optimizer_model" class="optimizer-history__badge optimizer-history__badge--opt">
+              <div
+                v-if="run.optimizer_model || run.evaluator_model"
+                class="optimizer-history__model-badges"
+              >
+                <span
+                  v-if="run.optimizer_model"
+                  class="optimizer-history__badge optimizer-history__badge--opt"
+                >
                   opt: {{ run.optimizer_model.split('/').pop() }}
                 </span>
-                <span v-if="run.evaluator_model" class="optimizer-history__badge optimizer-history__badge--eval">
+                <span
+                  v-if="run.evaluator_model"
+                  class="optimizer-history__badge optimizer-history__badge--eval"
+                >
                   eval: {{ run.evaluator_model.split('/').pop() }}
                 </span>
               </div>
               <div class="optimizer-history__acc-flow">
                 <span class="num">{{ formatPercent(run.baseline_accuracy) }}</span>
                 <span class="optimizer-history__acc-arrow">to</span>
-                <span class="num optimizer-history__best-accuracy">{{ formatPercent(bestRoundAccuracy(run)) }}</span>
+                <span class="num optimizer-history__best-accuracy">{{
+                  formatPercent(bestRoundAccuracy(run))
+                }}</span>
                 <span class="optimizer-history__acc-arrow">to</span>
                 <span class="num">{{ formatPercent(run.test_accuracy) }}</span>
               </div>
@@ -729,503 +848,650 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
         </template>
       </UiCard>
 
-    <UiCard class="optimizer-history__detail">
-      <template v-if="selectedRun">
-        <div class="optimizer-history__panel-head">
-          <div>
-            <UiEyebrow>Run detail</UiEyebrow>
-            <h2 class="optimizer-history__title num">#{{ selectedRun.optimizer_run_id }}</h2>
+      <UiCard class="optimizer-history__detail">
+        <template v-if="selectedRun">
+          <div class="optimizer-history__panel-head">
+            <div>
+              <UiEyebrow>Run detail</UiEyebrow>
+              <h2 class="optimizer-history__title num">#{{ selectedRun.optimizer_run_id }}</h2>
+            </div>
+            <span class="optimizer-history__status-chip">{{ selectedRun.status }}</span>
           </div>
-          <span class="optimizer-history__status-chip">{{ selectedRun.status }}</span>
-        </div>
 
-        <div class="optimizer-history__model-badges optimizer-history__model-badges--large">
-          <span v-if="selectedRun.optimizer_model" class="optimizer-history__badge optimizer-history__badge--opt">
-            optimizer: {{ selectedRun.optimizer_model }}
-          </span>
-          <span
-            v-if="selectedRun.evaluator_provider || selectedRun.evaluator_model"
-            class="optimizer-history__badge optimizer-history__badge--eval"
-          >
-            eval: {{ [selectedRun.evaluator_provider, selectedRun.evaluator_model].filter(Boolean).join(' / ') }}
-          </span>
-        </div>
+          <div class="optimizer-history__model-badges optimizer-history__model-badges--large">
+            <span
+              v-if="selectedRun.optimizer_model"
+              class="optimizer-history__badge optimizer-history__badge--opt"
+            >
+              optimizer: {{ selectedRun.optimizer_model }}
+            </span>
+            <span
+              v-if="selectedRun.evaluator_provider || selectedRun.evaluator_model"
+              class="optimizer-history__badge optimizer-history__badge--eval"
+            >
+              eval:
+              {{
+                [selectedRun.evaluator_provider, selectedRun.evaluator_model]
+                  .filter(Boolean)
+                  .join(' / ')
+              }}
+            </span>
+          </div>
 
-        <div class="optimizer-history__run-meta">
-          <div>
-            <span>Started</span>
-            <strong class="num">{{ formatDate(selectedRun.started_at) }}</strong>
+          <div class="optimizer-history__run-meta">
+            <div>
+              <span>Started</span>
+              <strong class="num">{{ formatDate(selectedRun.started_at) }}</strong>
+            </div>
+            <div>
+              <span>Finished</span>
+              <strong class="num">{{ formatDate(selectedRun.finished_at) }}</strong>
+            </div>
+            <div>
+              <span>Duration</span>
+              <strong class="num">{{
+                durationLabel(selectedRun.started_at, selectedRun.finished_at)
+              }}</strong>
+            </div>
+            <div>
+              <span>Max rounds</span>
+              <strong class="num">{{ selectedRun.max_rounds }}</strong>
+            </div>
+            <div>
+              <span>Prompt version</span>
+              <strong class="num">{{ selectedRun.prompt_version_id ?? 'n/a' }}</strong>
+            </div>
+            <div>
+              <span>{{ currentEvalLabel(selectedRun) }}</span>
+              <NuxtLink
+                v-if="selectedRun.current_eval_run_id != null"
+                :to="`/evaluate/history/${selectedRun.current_eval_run_id}`"
+                class="optimizer-history__link"
+              >
+                #{{ selectedRun.current_eval_run_id }}
+              </NuxtLink>
+              <strong v-else class="num">n/a</strong>
+            </div>
           </div>
-          <div>
-            <span>Finished</span>
-            <strong class="num">{{ formatDate(selectedRun.finished_at) }}</strong>
-          </div>
-          <div>
-            <span>Duration</span>
-            <strong class="num">{{ durationLabel(selectedRun.started_at, selectedRun.finished_at) }}</strong>
-          </div>
-          <div>
-            <span>Max rounds</span>
-            <strong class="num">{{ selectedRun.max_rounds }}</strong>
-          </div>
-          <div>
-            <span>Prompt version</span>
-            <strong class="num">{{ selectedRun.prompt_version_id ?? 'n/a' }}</strong>
-          </div>
-          <div>
-            <span>{{ currentEvalLabel(selectedRun) }}</span>
+
+          <div class="optimizer-history__stats">
+            <span>Target {{ formatPercent(selectedRun.target_accuracy) }}</span>
+            <span>Baseline {{ formatPercent(selectedRun.baseline_accuracy) }}</span>
+            <span>Best {{ formatPercent(bestRoundAccuracy(selectedRun)) }}</span>
+            <span>Test {{ formatPercent(selectedRun.test_accuracy) }}</span>
+            <span>{{ optimizerRoundCount(selectedRun) }} rounds</span>
             <NuxtLink
-              v-if="selectedRun.current_eval_run_id != null"
+              v-if="selectedRun.baseline_eval_run_id != null"
+              :to="`/evaluate/history/${selectedRun.baseline_eval_run_id}`"
+              class="optimizer-history__stats-link"
+            >
+              Baseline eval
+            </NuxtLink>
+            <NuxtLink
+              v-if="selectedRun.test_eval_run_id != null"
+              :to="`/evaluate/history/${selectedRun.test_eval_run_id}`"
+              class="optimizer-history__stats-link"
+            >
+              Test eval
+            </NuxtLink>
+          </div>
+
+          <div
+            v-if="selectedRun.current_eval_run_id != null && isOptimizerRunActive(selectedRun)"
+            class="optimizer-history__evaluating"
+          >
+            <UiSpinner size="sm" />
+            <span>{{ currentEvalMessage(selectedRun) }}</span>
+            <NuxtLink
               :to="`/evaluate/history/${selectedRun.current_eval_run_id}`"
               class="optimizer-history__link"
             >
-              #{{ selectedRun.current_eval_run_id }}
+              View eval #{{ selectedRun.current_eval_run_id }}
             </NuxtLink>
-            <strong v-else class="num">n/a</strong>
           </div>
-        </div>
 
-        <div class="optimizer-history__stats">
-          <span>Target {{ formatPercent(selectedRun.target_accuracy) }}</span>
-          <span>Baseline {{ formatPercent(selectedRun.baseline_accuracy) }}</span>
-          <span>Best {{ formatPercent(bestRoundAccuracy(selectedRun)) }}</span>
-          <span>Test {{ formatPercent(selectedRun.test_accuracy) }}</span>
-          <span>{{ optimizerRoundCount(selectedRun) }} rounds</span>
-          <NuxtLink
-            v-if="selectedRun.baseline_eval_run_id != null"
-            :to="`/evaluate/history/${selectedRun.baseline_eval_run_id}`"
-            class="optimizer-history__stats-link"
-          >
-            Baseline eval
-          </NuxtLink>
-          <NuxtLink
-            v-if="selectedRun.test_eval_run_id != null"
-            :to="`/evaluate/history/${selectedRun.test_eval_run_id}`"
-            class="optimizer-history__stats-link"
-          >
-            Test eval
-          </NuxtLink>
-        </div>
-
-        <div
-          v-if="selectedRun.current_eval_run_id != null && isOptimizerRunActive(selectedRun)"
-          class="optimizer-history__evaluating"
-        >
-          <UiSpinner size="sm" />
-          <span>{{ currentEvalMessage(selectedRun) }}</span>
-          <NuxtLink :to="`/evaluate/history/${selectedRun.current_eval_run_id}`" class="optimizer-history__link">
-            View eval #{{ selectedRun.current_eval_run_id }}
-          </NuxtLink>
-        </div>
-
-        <div v-if="selectedRun.error_message" class="optimizer-history__error-msg">
-          {{ selectedRun.error_message }}
-        </div>
-
-        <div
-          v-if="selectedRun.model_comparisons && selectedRun.model_comparisons.length > 0"
-          class="optimizer-history__comparison"
-        >
-          <div class="optimizer-history__section-label">Model comparison</div>
-          <div class="optimizer-history__table-wrap">
-            <table class="optimizer-history__data-table">
-              <thead>
-                <tr>
-                  <th>Model</th>
-                  <th>Baseline</th>
-                  <th>Candidate</th>
-                  <th>Delta</th>
-                  <th>Failed</th>
-                  <th>Prompt</th>
-                  <th>Decision</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="comparison in selectedRun.model_comparisons" :key="modelComparisonName(comparison)">
-                  <td>{{ modelComparisonName(comparison) }}</td>
-                  <td class="num">{{ formatPercent(comparison.baseline_accuracy) }}</td>
-                  <td class="num">{{ formatPercent(comparison.candidate_accuracy) }}</td>
-                  <td class="num" :class="deltaToneClass(comparison.accuracy_delta)">
-                    {{ deltaLabel(comparison.accuracy_delta) }}
-                  </td>
-                  <td class="num">{{ comparison.failure_count ?? 'n/a' }}</td>
-                  <td class="num">{{ comparison.generated_prompt_version_id ?? 'n/a' }}</td>
-                  <td>
-                    <span
-                      class="optimizer-history__kept-badge"
-                      :class="modelComparisonDecisionClass(comparison)"
-                    >
-                      {{ modelComparisonDecisionLabel(comparison) }}
-                    </span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div v-if="selectedRun.error_message" class="optimizer-history__error-msg">
+            {{ selectedRun.error_message }}
           </div>
-        </div>
 
-        <div v-if="sortedRounds.length > 0" class="optimizer-history__rounds">
-          <div v-for="round in sortedRounds" :key="round.round_number" class="optimizer-history__round">
-            <button class="optimizer-history__round-head" type="button" @click="toggleRound(round.round_number)">
-              <span class="num">R{{ round.round_number }}</span>
-
-              <!-- Skipped round: LLM returned an invalid candidate -->
-              <template v-if="round.skip_reason">
-                <span class="optimizer-history__kept-badge optimizer-history__kept-badge--skipped">Skipped</span>
-                <span class="optimizer-history__skip-reason num">{{ round.skip_reason }}</span>
-              </template>
-
-              <!-- Normal round: evaluated and kept or rejected -->
-              <template v-else>
-                <span
-                  class="optimizer-history__kept-badge"
-                  :class="round.kept ? 'optimizer-history__kept-badge--kept' : 'optimizer-history__kept-badge--rejected'"
-                >
-                  {{ round.kept ? 'Kept' : round.reject_reason ? `Rejected: ${round.reject_reason}` : 'Rejected' }}
-                </span>
-                <span class="num" :class="deltaToneClass(round.accuracy_delta)">
-                  {{ deltaLabel(round.accuracy_delta) }}
-                </span>
-                <span class="num">{{ formatPercent(round.accuracy) }}</span>
-                <span class="optimizer-history__muted num">{{ round.failed_case_count }} failed</span>
-                <NuxtLink
-                  v-if="round.eval_run_id != null"
-                  :to="`/evaluate/history/${round.eval_run_id}`"
-                  class="optimizer-history__link"
-                  @click.stop
-                >
-                  eval #{{ round.eval_run_id }}
-                </NuxtLink>
-                <NuxtLink
-                  :to="`/settings?tab=prompts&prompt=${round.prompt_version_id}`"
-                  class="optimizer-history__link"
-                  @click.stop
-                >
-                  pv{{ round.prompt_version_id }}
-                </NuxtLink>
-                <span v-if="round.optimizer_model" class="optimizer-history__badge optimizer-history__badge--opt">
-                  {{ round.optimizer_model.split('/').pop() }}
-                </span>
-              </template>
-
-              <span class="optimizer-history__round-toggle">
-                {{ expandedRounds.has(round.round_number) ? 'Collapse' : 'Expand' }}
-              </span>
-            </button>
-
-            <div v-if="expandedRounds.has(round.round_number)" class="optimizer-history__round-detail">
-              <details v-if="roundAnalysis(round)" class="optimizer-history__analysis">
-                <summary class="optimizer-history__analysis-summary">Failure analysis</summary>
-                <p class="optimizer-history__analysis-body">{{ roundAnalysis(round) }}</p>
-              </details>
-
-              <div v-if="round.confusion_matrix && Object.keys(round.confusion_matrix).length > 0" class="optimizer-history__matrix">
-                <div class="optimizer-history__section-label">Confusion matrix</div>
-                <div class="optimizer-history__matrix-wrap">
-                  <table class="optimizer-history__matrix-table">
-                    <thead>
-                      <tr>
-                        <th class="optimizer-history__matrix-corner">expected / predicted</th>
-                        <th v-for="col in confusionPredictedActions(round.confusion_matrix)" :key="col">
-                          {{ shortAction(col) }}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="(predicted, expected) in round.confusion_matrix" :key="expected">
-                        <td class="optimizer-history__matrix-row-label">{{ shortAction(String(expected)) }}</td>
-                        <td
-                          v-for="col in confusionPredictedActions(round.confusion_matrix)"
-                          :key="col"
-                          class="num optimizer-history__matrix-cell"
-                          :class="{ 'optimizer-history__matrix-cell--nonzero': (predicted[col] ?? 0) > 0 }"
-                        >
-                          {{ predicted[col] ?? 0 }}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div v-if="round.per_action_deltas && Object.keys(round.per_action_deltas).length > 0" class="optimizer-history__per-action">
-                <div class="optimizer-history__section-label">Per-action deltas</div>
-                <div class="optimizer-history__matrix-wrap">
-                  <table class="optimizer-history__matrix-table">
-                    <thead>
-                      <tr>
-                        <th class="optimizer-history__matrix-corner">Action</th>
-                        <th class="num">Baseline</th>
-                        <th class="num">Candidate</th>
-                        <th class="num">Delta</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="(entry, action) in round.per_action_deltas" :key="action">
-                        <td class="optimizer-history__matrix-row-label">{{ shortAction(String(action)) }}</td>
-                        <td class="num">{{ formatPercent(entry.baseline_accuracy) }}</td>
-                        <td class="num">{{ formatPercent(entry.candidate_accuracy) }}</td>
-                        <td
-                          class="num optimizer-history__delta-cell"
-                          :class="[deltaToneClass(entry.delta), { 'optimizer-history__delta-cell--regression': entry.delta < 0 && Math.abs(entry.delta) > entry.tolerance }]"
-                        >
-                          {{ deltaLabel(entry.delta) }}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <!-- Error Intelligence -->
-              <div v-if="errorClusters(round).length > 0" class="optimizer-history__error-intel">
-                <div class="optimizer-history__section-label">Error Intelligence</div>
-                <p class="optimizer-history__error-intel-desc">
-                  These are grouped validation failures used to guide the next prompt candidate.
-                </p>
-                <div class="optimizer-history__cluster-list">
-                  <details
-                    v-for="(cluster, ci) in errorClusters(round)"
-                    :key="ci"
-                    class="optimizer-history__cluster"
+          <div
+            v-if="selectedRun.model_comparisons && selectedRun.model_comparisons.length > 0"
+            class="optimizer-history__comparison"
+          >
+            <div class="optimizer-history__section-label">Model comparison</div>
+            <div class="optimizer-history__table-wrap">
+              <table class="optimizer-history__data-table">
+                <thead>
+                  <tr>
+                    <th>Model</th>
+                    <th>Baseline</th>
+                    <th>Candidate</th>
+                    <th>Delta</th>
+                    <th>Failed</th>
+                    <th>Prompt</th>
+                    <th>Decision</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="comparison in selectedRun.model_comparisons"
+                    :key="modelComparisonName(comparison)"
                   >
-                    <summary class="optimizer-history__cluster-summary">
-                      <span class="optimizer-history__cluster-type">{{ errorTypeLabel(cluster.error_type) }}</span>
-                      <template v-if="cluster.expected_action && cluster.predicted_action">
-                        <span class="optimizer-history__acc-arrow">·</span>
-                        <span class="optimizer-history__cluster-action">{{ shortAction(cluster.expected_action) }}</span>
-                        <span class="optimizer-history__acc-arrow">→</span>
-                        <span class="optimizer-history__cluster-action">{{ shortAction(cluster.predicted_action) }}</span>
-                      </template>
-                      <span class="optimizer-history__cluster-count num">{{ cluster.count }}</span>
-                      <span v-if="cluster.accuracy_impact != null" class="optimizer-history__cluster-impact num">
-                        {{ formatImpact(cluster.accuracy_impact) }}
+                    <td>{{ modelComparisonName(comparison) }}</td>
+                    <td class="num">{{ formatPercent(comparison.baseline_accuracy) }}</td>
+                    <td class="num">{{ formatPercent(comparison.candidate_accuracy) }}</td>
+                    <td class="num" :class="deltaToneClass(comparison.accuracy_delta)">
+                      {{ deltaLabel(comparison.accuracy_delta) }}
+                    </td>
+                    <td class="num">{{ comparison.failure_count ?? 'n/a' }}</td>
+                    <td class="num">{{ comparison.generated_prompt_version_id ?? 'n/a' }}</td>
+                    <td>
+                      <span
+                        class="optimizer-history__kept-badge"
+                        :class="modelComparisonDecisionClass(comparison)"
+                      >
+                        {{ modelComparisonDecisionLabel(comparison) }}
                       </span>
-                    </summary>
-                    <div class="optimizer-history__cluster-detail">
-                      <p v-if="cluster.suggested_rule_focus" class="optimizer-history__cluster-focus">
-                        {{ cluster.suggested_rule_focus }}
-                      </p>
-                      <div v-if="cluster.representative_cases.length > 0" class="optimizer-history__rep-cases">
-                        <div class="optimizer-history__section-label optimizer-history__section-label--minor">
-                          Representative cases
-                        </div>
-                        <details
-                          v-for="(rc, ri) in cluster.representative_cases"
-                          :key="ri"
-                          class="optimizer-history__failure"
-                        >
-                          <summary class="optimizer-history__failure-summary">
-                            <span>{{ rc.expected_action ?? 'n/a' }}</span>
-                            <span class="optimizer-history__acc-arrow">→</span>
-                            <span>{{ rc.predicted_action ?? 'n/a' }}</span>
-                            <span class="num">{{ formatConfidence(rc.confidence) }}</span>
-                          </summary>
-                          <div class="optimizer-history__failure-detail">
-                            <span v-if="rc.source_case_id" class="optimizer-history__metadata-item">
-                              <strong>source_case_id</strong>: {{ rc.source_case_id }}
-                            </span>
-                            <div v-if="rc.log_snippet" class="optimizer-history__log-preview">{{ rc.log_snippet }}</div>
-                            <details v-if="rc.raw_output" class="optimizer-history__raw-output">
-                              <summary>Raw output</summary>
-                              <pre>{{ rc.raw_output }}</pre>
-                            </details>
-                          </div>
-                        </details>
-                      </div>
-                    </div>
-                  </details>
-                </div>
-              </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-              <div v-if="round.failures && round.failures.length > 0" class="optimizer-history__failures">
-                <div class="optimizer-history__section-label">Failure samples</div>
-                <div class="optimizer-history__failure-filters">
-                  <label>
-                    Expected
-                    <select
-                      :value="failureFilter(round.round_number).expected"
-                      @change="updateFailureFilter(round.round_number, 'expected', $event)"
-                    >
-                      <option value="">All</option>
-                      <option
-                        v-for="action in uniqueFailureActions(round.failures, 'expected_action')"
-                        :key="action"
-                        :value="action"
-                      >
-                        {{ shortAction(action) }}
-                      </option>
-                    </select>
-                  </label>
-                  <label>
-                    Predicted
-                    <select
-                      :value="failureFilter(round.round_number).predicted"
-                      @change="updateFailureFilter(round.round_number, 'predicted', $event)"
-                    >
-                      <option value="">All</option>
-                      <option
-                        v-for="action in uniqueFailureActions(round.failures, 'predicted_action')"
-                        :key="action"
-                        :value="action"
-                      >
-                        {{ shortAction(action) }}
-                      </option>
-                    </select>
-                  </label>
-                </div>
+          <div v-if="sortedRounds.length > 0" class="optimizer-history__rounds">
+            <div
+              v-for="round in sortedRounds"
+              :key="round.round_number"
+              class="optimizer-history__round"
+            >
+              <button
+                class="optimizer-history__round-head"
+                type="button"
+                @click="toggleRound(round.round_number)"
+              >
+                <span class="num">R{{ round.round_number }}</span>
 
-                <div class="optimizer-history__failure-list">
-                  <details
-                    v-for="(failure, index) in filteredFailures(round)"
-                    :key="`${failure.expected_action}-${failure.predicted_action}-${index}`"
-                    class="optimizer-history__failure"
+                <!-- Skipped round: LLM returned an invalid candidate -->
+                <template v-if="round.skip_reason">
+                  <span class="optimizer-history__kept-badge optimizer-history__kept-badge--skipped"
+                    >Skipped</span
                   >
-                    <summary class="optimizer-history__failure-summary">
-                      <span>{{ shortAction(String(failure.expected_action)) }}</span>
-                      <span class="optimizer-history__acc-arrow">to</span>
-                      <span>{{ shortAction(String(failure.predicted_action)) }}</span>
-                      <span class="num">{{ formatConfidence(failure.confidence) }}</span>
-                    </summary>
-                    <div class="optimizer-history__failure-detail">
-                      <span v-if="failure.source_case_id != null" class="optimizer-history__metadata-item">
-                        <strong>source_case_id</strong>: {{ failure.source_case_id }}
-                      </span>
-                      <div class="optimizer-history__log-preview">{{ failure.log_snippet }}</div>
-                      <div v-if="metadataEntries(failure.hardware_info).length > 0" class="optimizer-history__metadata">
+                  <span class="optimizer-history__skip-reason num">{{ round.skip_reason }}</span>
+                </template>
+
+                <!-- Normal round: evaluated and kept or rejected -->
+                <template v-else>
+                  <span
+                    class="optimizer-history__kept-badge"
+                    :class="
+                      round.kept
+                        ? 'optimizer-history__kept-badge--kept'
+                        : 'optimizer-history__kept-badge--rejected'
+                    "
+                  >
+                    {{
+                      round.kept
+                        ? 'Kept'
+                        : round.reject_reason
+                          ? `Rejected: ${round.reject_reason}`
+                          : 'Rejected'
+                    }}
+                  </span>
+                  <span class="num" :class="deltaToneClass(round.accuracy_delta)">
+                    {{ deltaLabel(round.accuracy_delta) }}
+                  </span>
+                  <span class="num">{{ formatPercent(round.accuracy) }}</span>
+                  <span class="optimizer-history__muted num"
+                    >{{ round.failed_case_count }} failed</span
+                  >
+                  <NuxtLink
+                    v-if="round.eval_run_id != null"
+                    :to="`/evaluate/history/${round.eval_run_id}`"
+                    class="optimizer-history__link"
+                    @click.stop
+                  >
+                    eval #{{ round.eval_run_id }}
+                  </NuxtLink>
+                  <NuxtLink
+                    :to="`/settings?tab=prompts&prompt=${round.prompt_version_id}`"
+                    class="optimizer-history__link"
+                    @click.stop
+                  >
+                    pv{{ round.prompt_version_id }}
+                  </NuxtLink>
+                  <span
+                    v-if="round.optimizer_model"
+                    class="optimizer-history__badge optimizer-history__badge--opt"
+                  >
+                    {{ round.optimizer_model.split('/').pop() }}
+                  </span>
+                </template>
+
+                <span class="optimizer-history__round-toggle">
+                  {{ expandedRounds.has(round.round_number) ? 'Collapse' : 'Expand' }}
+                </span>
+              </button>
+
+              <div
+                v-if="expandedRounds.has(round.round_number)"
+                class="optimizer-history__round-detail"
+              >
+                <details v-if="roundAnalysis(round)" class="optimizer-history__analysis">
+                  <summary class="optimizer-history__analysis-summary">Failure analysis</summary>
+                  <p class="optimizer-history__analysis-body">{{ roundAnalysis(round) }}</p>
+                </details>
+
+                <div
+                  v-if="round.confusion_matrix && Object.keys(round.confusion_matrix).length > 0"
+                  class="optimizer-history__matrix"
+                >
+                  <div class="optimizer-history__section-label">Confusion matrix</div>
+                  <div class="optimizer-history__matrix-wrap">
+                    <table class="optimizer-history__matrix-table">
+                      <thead>
+                        <tr>
+                          <th class="optimizer-history__matrix-corner">expected / predicted</th>
+                          <th
+                            v-for="col in confusionPredictedActions(round.confusion_matrix)"
+                            :key="col"
+                          >
+                            {{ shortAction(col) }}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(predicted, expected) in round.confusion_matrix" :key="expected">
+                          <td class="optimizer-history__matrix-row-label">
+                            {{ shortAction(String(expected)) }}
+                          </td>
+                          <td
+                            v-for="col in confusionPredictedActions(round.confusion_matrix)"
+                            :key="col"
+                            class="num optimizer-history__matrix-cell"
+                            :class="{
+                              'optimizer-history__matrix-cell--nonzero': (predicted[col] ?? 0) > 0,
+                            }"
+                          >
+                            {{ predicted[col] ?? 0 }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div
+                  v-if="round.per_action_deltas && Object.keys(round.per_action_deltas).length > 0"
+                  class="optimizer-history__per-action"
+                >
+                  <div class="optimizer-history__section-label">Per-action deltas</div>
+                  <div class="optimizer-history__matrix-wrap">
+                    <table class="optimizer-history__matrix-table">
+                      <thead>
+                        <tr>
+                          <th class="optimizer-history__matrix-corner">Action</th>
+                          <th class="num">Baseline</th>
+                          <th class="num">Candidate</th>
+                          <th class="num">Delta</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(entry, action) in round.per_action_deltas" :key="action">
+                          <td class="optimizer-history__matrix-row-label">
+                            {{ shortAction(String(action)) }}
+                          </td>
+                          <td class="num">{{ formatPercent(entry.baseline_accuracy) }}</td>
+                          <td class="num">{{ formatPercent(entry.candidate_accuracy) }}</td>
+                          <td
+                            class="num optimizer-history__delta-cell"
+                            :class="[
+                              deltaToneClass(entry.delta),
+                              {
+                                'optimizer-history__delta-cell--regression':
+                                  entry.delta < 0 && Math.abs(entry.delta) > entry.tolerance,
+                              },
+                            ]"
+                          >
+                            {{ deltaLabel(entry.delta) }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- Error Intelligence -->
+                <div v-if="errorClusters(round).length > 0" class="optimizer-history__error-intel">
+                  <div class="optimizer-history__section-label">Error Intelligence</div>
+                  <p class="optimizer-history__error-intel-desc">
+                    These are grouped validation failures used to guide the next prompt candidate.
+                  </p>
+                  <div class="optimizer-history__cluster-list">
+                    <details
+                      v-for="(cluster, ci) in errorClusters(round)"
+                      :key="ci"
+                      class="optimizer-history__cluster"
+                    >
+                      <summary class="optimizer-history__cluster-summary">
+                        <span class="optimizer-history__cluster-type">{{
+                          errorTypeLabel(cluster.error_type)
+                        }}</span>
+                        <template v-if="cluster.expected_action && cluster.predicted_action">
+                          <span class="optimizer-history__acc-arrow">·</span>
+                          <span class="optimizer-history__cluster-action">{{
+                            shortAction(cluster.expected_action)
+                          }}</span>
+                          <span class="optimizer-history__acc-arrow">→</span>
+                          <span class="optimizer-history__cluster-action">{{
+                            shortAction(cluster.predicted_action)
+                          }}</span>
+                        </template>
+                        <span class="optimizer-history__cluster-count num">{{
+                          cluster.count
+                        }}</span>
                         <span
-                          v-for="[key, value] in metadataEntries(failure.hardware_info)"
-                          :key="key"
+                          v-if="cluster.accuracy_impact != null"
+                          class="optimizer-history__cluster-impact num"
+                        >
+                          {{ formatImpact(cluster.accuracy_impact) }}
+                        </span>
+                      </summary>
+                      <div class="optimizer-history__cluster-detail">
+                        <p
+                          v-if="cluster.suggested_rule_focus"
+                          class="optimizer-history__cluster-focus"
+                        >
+                          {{ cluster.suggested_rule_focus }}
+                        </p>
+                        <div
+                          v-if="cluster.representative_cases.length > 0"
+                          class="optimizer-history__rep-cases"
+                        >
+                          <div
+                            class="optimizer-history__section-label optimizer-history__section-label--minor"
+                          >
+                            Representative cases
+                          </div>
+                          <details
+                            v-for="(rc, ri) in cluster.representative_cases"
+                            :key="ri"
+                            class="optimizer-history__failure"
+                          >
+                            <summary class="optimizer-history__failure-summary">
+                              <span>{{ rc.expected_action ?? 'n/a' }}</span>
+                              <span class="optimizer-history__acc-arrow">→</span>
+                              <span>{{ rc.predicted_action ?? 'n/a' }}</span>
+                              <span class="num">{{ formatConfidence(rc.confidence) }}</span>
+                            </summary>
+                            <div class="optimizer-history__failure-detail">
+                              <span
+                                v-if="rc.source_case_id"
+                                class="optimizer-history__metadata-item"
+                              >
+                                <strong>source_case_id</strong>: {{ rc.source_case_id }}
+                              </span>
+                              <div v-if="rc.log_snippet" class="optimizer-history__log-preview">
+                                {{ rc.log_snippet }}
+                              </div>
+                              <details v-if="rc.raw_output" class="optimizer-history__raw-output">
+                                <summary>Raw output</summary>
+                                <pre>{{ rc.raw_output }}</pre>
+                              </details>
+                            </div>
+                          </details>
+                        </div>
+                      </div>
+                    </details>
+                  </div>
+                </div>
+
+                <div
+                  v-if="round.failures && round.failures.length > 0"
+                  class="optimizer-history__failures"
+                >
+                  <div class="optimizer-history__section-label">Failure samples</div>
+                  <div class="optimizer-history__failure-filters">
+                    <label>
+                      Expected
+                      <select
+                        :value="failureFilter(round.round_number).expected"
+                        @change="updateFailureFilter(round.round_number, 'expected', $event)"
+                      >
+                        <option value="">All</option>
+                        <option
+                          v-for="action in uniqueFailureActions(round.failures, 'expected_action')"
+                          :key="action"
+                          :value="action"
+                        >
+                          {{ shortAction(action) }}
+                        </option>
+                      </select>
+                    </label>
+                    <label>
+                      Predicted
+                      <select
+                        :value="failureFilter(round.round_number).predicted"
+                        @change="updateFailureFilter(round.round_number, 'predicted', $event)"
+                      >
+                        <option value="">All</option>
+                        <option
+                          v-for="action in uniqueFailureActions(round.failures, 'predicted_action')"
+                          :key="action"
+                          :value="action"
+                        >
+                          {{ shortAction(action) }}
+                        </option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div class="optimizer-history__failure-list">
+                    <details
+                      v-for="(failure, index) in filteredFailures(round)"
+                      :key="`${failure.expected_action}-${failure.predicted_action}-${index}`"
+                      class="optimizer-history__failure"
+                    >
+                      <summary class="optimizer-history__failure-summary">
+                        <span>{{ shortAction(String(failure.expected_action)) }}</span>
+                        <span class="optimizer-history__acc-arrow">to</span>
+                        <span>{{ shortAction(String(failure.predicted_action)) }}</span>
+                        <span class="num">{{ formatConfidence(failure.confidence) }}</span>
+                      </summary>
+                      <div class="optimizer-history__failure-detail">
+                        <span
+                          v-if="failure.source_case_id != null"
                           class="optimizer-history__metadata-item"
                         >
-                          <strong>{{ key }}</strong>: {{ value }}
+                          <strong>source_case_id</strong>: {{ failure.source_case_id }}
                         </span>
+                        <div class="optimizer-history__log-preview">{{ failure.log_snippet }}</div>
+                        <div
+                          v-if="metadataEntries(failure.hardware_info).length > 0"
+                          class="optimizer-history__metadata"
+                        >
+                          <span
+                            v-for="[key, value] in metadataEntries(failure.hardware_info)"
+                            :key="key"
+                            class="optimizer-history__metadata-item"
+                          >
+                            <strong>{{ key }}</strong
+                            >: {{ value }}
+                          </span>
+                        </div>
+                        <pre
+                          v-if="failure.parsed_output != null"
+                          class="optimizer-history__structured-output"
+                          >{{ formatStructured(failure.parsed_output) }}</pre
+                        >
+                        <details v-if="failure.raw_output" class="optimizer-history__raw-output">
+                          <summary>Raw evaluator output</summary>
+                          <pre>{{ failure.raw_output }}</pre>
+                        </details>
                       </div>
-                      <pre v-if="failure.parsed_output != null" class="optimizer-history__structured-output">{{
-                        formatStructured(failure.parsed_output)
-                      }}</pre>
-                      <details v-if="failure.raw_output" class="optimizer-history__raw-output">
-                        <summary>Raw evaluator output</summary>
-                        <pre>{{ failure.raw_output }}</pre>
-                      </details>
+                    </details>
+                    <div
+                      v-if="filteredFailures(round).length === 0"
+                      class="optimizer-history__empty optimizer-history__empty--compact"
+                    >
+                      No failure samples match the selected filters.
                     </div>
-                  </details>
-                  <div v-if="filteredFailures(round).length === 0" class="optimizer-history__empty optimizer-history__empty--compact">
-                    No failure samples match the selected filters.
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <div v-else class="optimizer-history__empty optimizer-history__empty--compact">
-          No rounds yet.
+          <div v-else class="optimizer-history__empty optimizer-history__empty--compact">
+            No rounds yet.
+          </div>
+        </template>
+        <div v-else class="optimizer-history__empty">
+          Select an optimizer run to inspect round history.
         </div>
-      </template>
-      <div v-else class="optimizer-history__empty">
-        Select an optimizer run to inspect round history.
+      </UiCard>
+    </section>
+
+    <!-- Compare sub-tab view -->
+    <UiCard v-else class="optimizer-history__compare-view">
+      <div class="optimizer-history__panel-head">
+        <UiEyebrow>Run Comparison</UiEyebrow>
+        <span v-if="compareSelectedIds.size > 0" class="optimizer-history__muted">
+          已選取 {{ compareSelectedIds.size }} 個
+        </span>
+      </div>
+      <div v-if="compareSelectedRuns.length < 2" class="optimizer-history__empty">
+        請回到 Runs 選取至少 2 個 run 進行比較（最多 4 個）
+      </div>
+      <div v-else class="optimizer-history__compare-table-wrap">
+        <table class="optimizer-history__compare-table">
+          <thead>
+            <tr>
+              <th class="optimizer-history__compare-row-label">Field</th>
+              <th
+                v-for="run in compareSelectedRuns"
+                :key="run.optimizer_run_id"
+                class="optimizer-history__compare-col-head"
+              >
+                <span class="num">#{{ run.optimizer_run_id }}</span>
+                <button
+                  class="optimizer-history__compare-remove"
+                  @click="removeFromCompare(run.optimizer_run_id)"
+                >
+                  ×
+                </button>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="optimizer-history__compare-row-label">Status</td>
+              <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id">
+                <span
+                  class="optimizer-history__status-chip"
+                  :class="`optimizer-history__status-chip--${run.status}`"
+                  >{{ run.status }}</span
+                >
+              </td>
+            </tr>
+            <tr>
+              <td class="optimizer-history__compare-row-label">Started</td>
+              <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">
+                {{ formatDate(run.started_at) }}
+              </td>
+            </tr>
+            <tr>
+              <td class="optimizer-history__compare-row-label">Finished</td>
+              <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">
+                {{ formatDate(run.finished_at) }}
+              </td>
+            </tr>
+            <tr>
+              <td class="optimizer-history__compare-row-label">Duration</td>
+              <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">
+                {{ formatDuration(run.started_at, run.finished_at) }}
+              </td>
+            </tr>
+            <tr>
+              <td class="optimizer-history__compare-row-label">Max Rounds</td>
+              <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">
+                {{ run.max_rounds ?? '—' }}
+              </td>
+            </tr>
+            <tr>
+              <td class="optimizer-history__compare-row-label">Target Accuracy</td>
+              <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">
+                {{ formatPercent(run.target_accuracy) }}
+              </td>
+            </tr>
+            <tr>
+              <td class="optimizer-history__compare-row-label">Optimizer Model</td>
+              <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id">
+                {{ run.optimizer_model ?? '—' }}
+              </td>
+            </tr>
+            <tr>
+              <td class="optimizer-history__compare-row-label">Evaluator Model</td>
+              <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id">
+                {{ run.evaluator_model ?? '—' }}
+              </td>
+            </tr>
+            <tr>
+              <td class="optimizer-history__compare-row-label">Baseline Accuracy</td>
+              <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">
+                {{ formatCompareAccuracy(run.baseline_accuracy) }}
+              </td>
+            </tr>
+            <tr>
+              <td class="optimizer-history__compare-row-label">Best Accuracy</td>
+              <td
+                v-for="run in compareSelectedRuns"
+                :key="run.optimizer_run_id"
+                class="num"
+                :class="{
+                  'optimizer-history__compare-highlight': isCompareMax(run, 'best_accuracy'),
+                }"
+              >
+                {{ formatCompareAccuracy(bestRoundAccuracy(run)) }}
+              </td>
+            </tr>
+            <tr>
+              <td class="optimizer-history__compare-row-label">Test Accuracy</td>
+              <td
+                v-for="run in compareSelectedRuns"
+                :key="run.optimizer_run_id"
+                class="num"
+                :class="{
+                  'optimizer-history__compare-highlight': isCompareMax(run, 'test_accuracy'),
+                }"
+              >
+                {{ formatCompareAccuracy(run.test_accuracy) }}
+              </td>
+            </tr>
+            <tr>
+              <td class="optimizer-history__compare-row-label">Accuracy Gain</td>
+              <td
+                v-for="run in compareSelectedRuns"
+                :key="run.optimizer_run_id"
+                class="num"
+                :class="{
+                  'optimizer-history__compare-highlight': isCompareMax(run, 'accuracy_gain'),
+                }"
+              >
+                {{ formatGain(accuracyGain(run)) }}
+              </td>
+            </tr>
+            <tr>
+              <td class="optimizer-history__compare-row-label">Rounds</td>
+              <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">
+                {{ run.round_count ?? run.rounds?.length ?? '—' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </UiCard>
-  </section>
-
-  <!-- Compare sub-tab view -->
-  <UiCard v-else class="optimizer-history__compare-view">
-    <div class="optimizer-history__panel-head">
-      <UiEyebrow>Run Comparison</UiEyebrow>
-      <span v-if="compareSelectedIds.size > 0" class="optimizer-history__muted">
-        已選取 {{ compareSelectedIds.size }} 個
-      </span>
-    </div>
-    <div v-if="compareSelectedRuns.length < 2" class="optimizer-history__empty">
-      請回到 Runs 選取至少 2 個 run 進行比較（最多 4 個）
-    </div>
-    <div v-else class="optimizer-history__compare-table-wrap">
-      <table class="optimizer-history__compare-table">
-        <thead>
-          <tr>
-            <th class="optimizer-history__compare-row-label">Field</th>
-            <th v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="optimizer-history__compare-col-head">
-              <span class="num">#{{ run.optimizer_run_id }}</span>
-              <button class="optimizer-history__compare-remove" @click="removeFromCompare(run.optimizer_run_id)">×</button>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="optimizer-history__compare-row-label">Status</td>
-            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id">
-              <span class="optimizer-history__status-chip" :class="`optimizer-history__status-chip--${run.status}`">{{ run.status }}</span>
-            </td>
-          </tr>
-          <tr>
-            <td class="optimizer-history__compare-row-label">Started</td>
-            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">{{ formatDate(run.started_at) }}</td>
-          </tr>
-          <tr>
-            <td class="optimizer-history__compare-row-label">Finished</td>
-            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">{{ formatDate(run.finished_at) }}</td>
-          </tr>
-          <tr>
-            <td class="optimizer-history__compare-row-label">Duration</td>
-            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">{{ formatDuration(run.started_at, run.finished_at) }}</td>
-          </tr>
-          <tr>
-            <td class="optimizer-history__compare-row-label">Max Rounds</td>
-            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">{{ run.max_rounds ?? '—' }}</td>
-          </tr>
-          <tr>
-            <td class="optimizer-history__compare-row-label">Target Accuracy</td>
-            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">{{ formatPercent(run.target_accuracy) }}</td>
-          </tr>
-          <tr>
-            <td class="optimizer-history__compare-row-label">Optimizer Model</td>
-            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id">{{ run.optimizer_model ?? '—' }}</td>
-          </tr>
-          <tr>
-            <td class="optimizer-history__compare-row-label">Evaluator Model</td>
-            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id">{{ run.evaluator_model ?? '—' }}</td>
-          </tr>
-          <tr>
-            <td class="optimizer-history__compare-row-label">Baseline Accuracy</td>
-            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">{{ formatCompareAccuracy(run.baseline_accuracy) }}</td>
-          </tr>
-          <tr>
-            <td class="optimizer-history__compare-row-label">Best Accuracy</td>
-            <td
-              v-for="run in compareSelectedRuns"
-              :key="run.optimizer_run_id"
-              class="num"
-              :class="{ 'optimizer-history__compare-highlight': isCompareMax(run, 'best_accuracy') }"
-            >{{ formatCompareAccuracy(bestRoundAccuracy(run)) }}</td>
-          </tr>
-          <tr>
-            <td class="optimizer-history__compare-row-label">Test Accuracy</td>
-            <td
-              v-for="run in compareSelectedRuns"
-              :key="run.optimizer_run_id"
-              class="num"
-              :class="{ 'optimizer-history__compare-highlight': isCompareMax(run, 'test_accuracy') }"
-            >{{ formatCompareAccuracy(run.test_accuracy) }}</td>
-          </tr>
-          <tr>
-            <td class="optimizer-history__compare-row-label">Accuracy Gain</td>
-            <td
-              v-for="run in compareSelectedRuns"
-              :key="run.optimizer_run_id"
-              class="num"
-              :class="{ 'optimizer-history__compare-highlight': isCompareMax(run, 'accuracy_gain') }"
-            >{{ formatGain(accuracyGain(run)) }}</td>
-          </tr>
-          <tr>
-            <td class="optimizer-history__compare-row-label">Rounds</td>
-            <td v-for="run in compareSelectedRuns" :key="run.optimizer_run_id" class="num">{{ run.round_count ?? run.rounds?.length ?? '—' }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </UiCard>
-</div>
+  </div>
 </template>
 
 <style scoped>
@@ -1950,7 +2216,9 @@ function errorClusters(round: OptimizerRound): OptimizerErrorCluster[] {
   border-radius: var(--r-xs);
   background: var(--bg-2);
   cursor: pointer;
-  transition: background var(--dur-fast), border-color var(--dur-fast);
+  transition:
+    background var(--dur-fast),
+    border-color var(--dur-fast);
 }
 
 .optimizer-history__filter-option input[type='checkbox']:hover:not(:disabled),

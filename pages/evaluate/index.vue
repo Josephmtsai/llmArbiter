@@ -41,7 +41,7 @@ const effectiveModel = computed(() => customModel.value.trim() || selectedQuickM
 function pickQuickModel(val: string) {
   const isDeselect = selectedQuickModel.value === val
   selectedQuickModel.value = isDeselect ? null : val
-  if (!isDeselect) customModel.value = ''  // only clear on selection, not on deselect
+  if (!isDeselect) customModel.value = '' // only clear on selection, not on deselect
 }
 
 function onCustomModelInput() {
@@ -66,10 +66,12 @@ async function loadPrompts() {
     const res = await api.getPrompts()
     if (res.status === 'success') {
       prompts.value = res.data
-      const active = res.data.find(p => p.active)
+      const active = res.data.find((p) => p.active)
       if (active) selectedPromptId.value = active.id
     }
-  } catch { /* silent */ } finally {
+  } catch {
+    /* silent */
+  } finally {
     loadingPrompts.value = false
   }
 }
@@ -78,7 +80,9 @@ async function loadProvider() {
   try {
     const res = await api.getProviders()
     activeProvider.value = res.active_provider ?? null
-  } catch { /* silent */ }
+  } catch {
+    /* silent */
+  }
 }
 
 async function loadHistory() {
@@ -86,7 +90,9 @@ async function loadHistory() {
   try {
     const res = await api.getEvalHistory()
     if (res.status === 'success') history.value = res.data.runs
-  } catch { /* silent */ } finally {
+  } catch {
+    /* silent */
+  } finally {
     loadingHistory.value = false
   }
 }
@@ -151,13 +157,15 @@ function startPolling(runId: number) {
     try {
       const res = await api.getEvalJobs()
       if (res.status !== 'success') return
-      const job = res.data.jobs.find(j => j.run_id === runId)
+      const job = res.data.jobs.find((j) => j.run_id === runId)
       if (job) {
         activeJob.value = job
       } else {
         await finishJob(runId)
       }
-    } catch { /* silent — keep polling */ }
+    } catch {
+      /* silent — keep polling */
+    }
   }, 2500)
 }
 
@@ -186,8 +194,10 @@ async function runEval() {
       error.value = res.message
     }
   } catch (e: unknown) {
-    const status = e && typeof e === 'object' && 'status' in e ? (e as { status: number }).status : 0
-    if (status === 429) error.value = 'Max concurrent evaluations reached. Wait for a running job to finish.'
+    const status =
+      e && typeof e === 'object' && 'status' in e ? (e as { status: number }).status : 0
+    if (status === 429)
+      error.value = 'Max concurrent evaluations reached. Wait for a running job to finish.'
     else if (status === 404) error.value = 'Prompt not found. Please select a valid prompt version.'
     else error.value = e instanceof Error ? e.message : 'Failed to start evaluation'
   }
@@ -265,7 +275,9 @@ onMounted(async () => {
       activeJob.value = res.data.jobs[0]
       startPolling(res.data.jobs[0].run_id)
     }
-  } catch { /* silent */ }
+  } catch {
+    /* silent */
+  }
 })
 
 onUnmounted(() => {
@@ -324,7 +336,8 @@ onUnmounted(() => {
         </div>
 
         <p class="arb-eval__hint">
-          Runs all test cases through the selected prompt and scores pass/fail against expected actions.
+          Runs all test cases through the selected prompt and scores pass/fail against expected
+          actions.
         </p>
       </UiCard>
     </div>
@@ -336,16 +349,32 @@ onUnmounted(() => {
       <div class="arb-eval__progress-bar-wrap">
         <div
           class="arb-eval__progress-bar-fill"
-          :style="{ width: activeJob.total > 0 ? `${Math.round(activeJob.completed / activeJob.total * 100)}%` : '2%' }"
+          :style="{
+            width:
+              activeJob.total > 0
+                ? `${Math.round((activeJob.completed / activeJob.total) * 100)}%`
+                : '2%',
+          }"
         />
       </div>
       <div class="arb-eval__progress-meta">
-        <span class="num">{{ activeJob.completed }}&thinsp;/&thinsp;{{ activeJob.total || '…' }}</span>
-        <span v-if="activeJob.total > 0" class="num">{{ Math.round(activeJob.completed / activeJob.total * 100) }}%</span>
-        <span v-if="evalSourceLabel(activeJob)" class="arb-eval__source" :class="evalSourceClass(activeJob)">
+        <span class="num"
+          >{{ activeJob.completed }}&thinsp;/&thinsp;{{ activeJob.total || '…' }}</span
+        >
+        <span v-if="activeJob.total > 0" class="num"
+          >{{ Math.round((activeJob.completed / activeJob.total) * 100) }}%</span
+        >
+        <span
+          v-if="evalSourceLabel(activeJob)"
+          class="arb-eval__source"
+          :class="evalSourceClass(activeJob)"
+        >
           {{ evalSourceLabel(activeJob) }}
         </span>
-        <span>{{ activeJob.provider }}<template v-if="activeJob.model"> · {{ activeJob.model }}</template></span>
+        <span
+          >{{ activeJob.provider
+          }}<template v-if="activeJob.model"> · {{ activeJob.model }}</template></span
+        >
       </div>
       <div class="arb-eval__progress-actions">
         <UiButton
@@ -363,9 +392,7 @@ onUnmounted(() => {
     <div v-if="cancelMessage" class="arb-eval__cancel-msg">{{ cancelMessage }}</div>
 
     <!-- Discard warning -->
-    <div v-if="discardMessage" class="arb-eval__discard-warn">
-      ⚠ {{ discardMessage }}
-    </div>
+    <div v-if="discardMessage" class="arb-eval__discard-warn">⚠ {{ discardMessage }}</div>
 
     <!-- Summary -->
     <template v-if="result">
@@ -380,7 +407,8 @@ onUnmounted(() => {
               v-if="accuracyDelta !== null"
               class="arb-eval__delta-badge num"
               :style="{ color: deltaColor }"
-            >{{ deltaLabel }}</span>
+              >{{ deltaLabel }}</span
+            >
           </div>
         </UiCard>
         <UiCard class="arb-eval__summary-stat">
@@ -389,7 +417,9 @@ onUnmounted(() => {
         </UiCard>
         <UiCard class="arb-eval__summary-stat">
           <UiEyebrow>Timeouts</UiEyebrow>
-          <span class="arb-eval__score-val num">{{ (result.results ?? []).filter(r => r.predicted_action === 'timeout').length }}</span>
+          <span class="arb-eval__score-val num">{{
+            (result.results ?? []).filter((r) => r.predicted_action === 'timeout').length
+          }}</span>
         </UiCard>
       </div>
 
@@ -407,14 +437,16 @@ onUnmounted(() => {
           </thead>
           <tbody>
             <tr
-              v-for="r in (result.results ?? [])"
+              v-for="r in result.results ?? []"
               :key="r.test_case_id"
               :class="r.is_correct ? 'arb-eval__row--pass' : 'arb-eval__row--fail'"
             >
               <td class="num">#{{ r.test_case_id }}</td>
               <td><UiActionBadge :action="r.expected_action" size="sm" /></td>
               <td><UiActionBadge :action="r.predicted_action" size="sm" /></td>
-              <td class="num arb-eval__td-latency">{{ r.latency_ms != null ? `${r.latency_ms}ms` : '—' }}</td>
+              <td class="num arb-eval__td-latency">
+                {{ r.latency_ms != null ? `${r.latency_ms}ms` : '—' }}
+              </td>
               <td class="arb-eval__td-pass">
                 <span v-if="r.is_correct" class="arb-eval__pass-dot arb-eval__pass-dot--ok" />
                 <span v-else class="arb-eval__pass-dot arb-eval__pass-dot--fail" />
@@ -446,7 +478,10 @@ onUnmounted(() => {
         >
           <UiCard :clickable="true" class="arb-eval__history-item">
             <div class="arb-eval__history-row">
-              <span class="arb-eval__history-acc num" :style="{ color: historyAccuracyDisplay(h).color }">
+              <span
+                class="arb-eval__history-acc num"
+                :style="{ color: historyAccuracyDisplay(h).color }"
+              >
                 {{ historyAccuracyDisplay(h).label }}
               </span>
               <span class="arb-eval__history-ratio num">{{ h.correct }} / {{ h.total }}</span>
@@ -461,7 +496,9 @@ onUnmounted(() => {
             </div>
             <div class="arb-eval__history-meta">
               <span class="arb-eval__history-prompt num">prompt v{{ h.prompt_version_id }}</span>
-              <span class="arb-eval__history-date num">{{ new Date(h.started_at).toLocaleString() }}</span>
+              <span class="arb-eval__history-date num">{{
+                new Date(h.started_at).toLocaleString()
+              }}</span>
             </div>
           </UiCard>
         </NuxtLink>
@@ -478,10 +515,25 @@ onUnmounted(() => {
   gap: 20px;
   flex: 1;
 }
-.arb-eval__controls { display: flex; flex-direction: column; }
-.arb-eval__control-card { display: flex; flex-direction: column; gap: 12px; }
-.arb-eval__control-row { display: flex; align-items: flex-end; gap: 16px; }
-.arb-eval__hint { font-size: 12px; color: var(--fg-4); margin: 0; }
+.arb-eval__controls {
+  display: flex;
+  flex-direction: column;
+}
+.arb-eval__control-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.arb-eval__control-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
+.arb-eval__hint {
+  font-size: 12px;
+  color: var(--fg-4);
+  margin: 0;
+}
 
 .arb-eval__run-col {
   display: flex;
@@ -545,8 +597,12 @@ onUnmounted(() => {
   outline: none;
   transition: border-color var(--dur-fast);
 }
-.arb-eval__model-input:focus { border-color: var(--fg-3); }
-.arb-eval__model-input::placeholder { color: var(--fg-4); }
+.arb-eval__model-input:focus {
+  border-color: var(--fg-3);
+}
+.arb-eval__model-input::placeholder {
+  color: var(--fg-4);
+}
 
 .arb-eval__discard-warn {
   padding: 10px 14px;
@@ -622,7 +678,9 @@ onUnmounted(() => {
   display: flex;
   justify-content: flex-end;
 }
-.arb-eval__cancel-btn { color: var(--action-notify) !important; }
+.arb-eval__cancel-btn {
+  color: var(--action-notify) !important;
+}
 .arb-eval__cancel-msg {
   font-size: 12px;
   color: var(--fg-4);
@@ -691,20 +749,38 @@ onUnmounted(() => {
   color: var(--fg-2);
   border-bottom: 1px solid var(--border-subtle);
 }
-.arb-eval__table tr:last-child td { border-bottom: none; }
-.arb-eval__row--pass td { background: rgba(52, 211, 153, 0.03); }
-.arb-eval__row--fail td { background: rgba(248, 113, 113, 0.03); }
-.arb-eval__td-latency { font-size: 11px; color: var(--fg-4); }
-.arb-eval__td-pass { text-align: center; }
+.arb-eval__table tr:last-child td {
+  border-bottom: none;
+}
+.arb-eval__row--pass td {
+  background: rgba(52, 211, 153, 0.03);
+}
+.arb-eval__row--fail td {
+  background: rgba(248, 113, 113, 0.03);
+}
+.arb-eval__td-latency {
+  font-size: 11px;
+  color: var(--fg-4);
+}
+.arb-eval__td-pass {
+  text-align: center;
+}
 .arb-eval__pass-dot {
   display: inline-block;
   width: 8px;
   height: 8px;
   border-radius: 999px;
 }
-.arb-eval__pass-dot--ok { background: var(--conf-high); }
-.arb-eval__pass-dot--fail { background: var(--conf-low); }
-.arb-eval__history { display: flex; flex-direction: column; }
+.arb-eval__pass-dot--ok {
+  background: var(--conf-high);
+}
+.arb-eval__pass-dot--fail {
+  background: var(--conf-low);
+}
+.arb-eval__history {
+  display: flex;
+  flex-direction: column;
+}
 .arb-eval__history-header {
   display: flex;
   align-items: center;
@@ -717,8 +793,13 @@ onUnmounted(() => {
   text-decoration: none;
   transition: color var(--dur-fast);
 }
-.arb-eval__history-link:hover { color: var(--fg-1); }
-.arb-eval__history-link-card { text-decoration: none; display: block; }
+.arb-eval__history-link:hover {
+  color: var(--fg-1);
+}
+.arb-eval__history-link-card {
+  text-decoration: none;
+  display: block;
+}
 .arb-eval__history-model {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -741,9 +822,22 @@ onUnmounted(() => {
   font-size: 12px;
   color: var(--fg-4);
 }
-.arb-eval__history-list { display: flex; flex-direction: column; gap: 8px; }
-.arb-eval__history-item { display: flex; flex-direction: column; gap: 6px; cursor: pointer; }
-.arb-eval__history-row { display: flex; align-items: center; gap: 10px; }
+.arb-eval__history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.arb-eval__history-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+}
+.arb-eval__history-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .arb-eval__history-acc {
   font-family: var(--font-mono);
   font-size: 18px;
@@ -755,7 +849,11 @@ onUnmounted(() => {
   font-size: 12px;
   color: var(--fg-3);
 }
-.arb-eval__history-meta { display: flex; gap: 12px; align-items: center; }
+.arb-eval__history-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
 .arb-eval__history-prompt {
   font-family: var(--font-mono);
   font-size: 11px;

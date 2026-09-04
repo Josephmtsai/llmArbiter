@@ -69,12 +69,19 @@ export function useApi() {
       api<ArbiterResponse<DecisionStats>>('/decisions/stats', { query: params }),
 
     getRules: async () => {
-      const res = await api<ArbiterResponse<Record<string, {
-        rule_name: string
-        rule_value: { value: RuleValue }
-        description: string
-        updated_at: string
-      }>>>('/config/rules')
+      const res = await api<
+        ArbiterResponse<
+          Record<
+            string,
+            {
+              rule_name: string
+              rule_value: { value: RuleValue }
+              description: string
+              updated_at: string
+            }
+          >
+        >
+      >('/config/rules')
       const rules: Rule[] = Object.entries(res.data ?? {}).map(([name, entry]) => ({
         name,
         value: entry.rule_value.value,
@@ -89,8 +96,7 @@ export function useApi() {
         body: { value } satisfies RulePatchBody,
       }),
 
-    getProviders: () =>
-      api<ProviderResponse>('/config/provider'),
+    getProviders: () => api<ProviderResponse>('/config/provider'),
 
     setProvider: (provider: string) =>
       api<ProviderResponse>('/config/provider', {
@@ -107,24 +113,22 @@ export function useApi() {
       api<ArbiterResponse<PromptVersion>>('/config/prompts', {
         method: 'POST',
         body: { label, content } satisfies PromptCreateRequest,
-      }).then(res => ({ ...res, data: normalizePrompt(res.data) })),
+      }).then((res) => ({ ...res, data: normalizePrompt(res.data) })),
 
     activatePrompt: (id: number) =>
       api<ArbiterResponse<PromptVersion>>(`/config/prompts/${id}/activate`, {
         method: 'PATCH',
-      }).then(res => ({ ...res, data: normalizePrompt(res.data) })),
+      }).then((res) => ({ ...res, data: normalizePrompt(res.data) })),
 
     getCases: (params?: GetCasesParams) =>
       api<ArbiterResponse<PaginatedResponse<TestCase>>>('/cases', { query: params }),
 
-    getCase: (id: number) =>
-      api<ArbiterResponse<TestCase>>(`/cases/${id}`),
+    getCase: (id: number) => api<ArbiterResponse<TestCase>>(`/cases/${id}`),
 
     createCase: (body: TestCaseCreateRequest) =>
       api<ArbiterResponse<TestCase>>('/cases', { method: 'POST', body }),
 
-    deleteCase: (id: number) =>
-      api<void>(`/cases/${id}`, { method: 'DELETE' }),
+    deleteCase: (id: number) => api<void>(`/cases/${id}`, { method: 'DELETE' }),
 
     seedCases: () =>
       api<ArbiterResponse<Record<string, unknown>>>('/cases/seed', { method: 'POST' }),
@@ -138,15 +142,15 @@ export function useApi() {
         } satisfies EvaluateRequest,
       }),
 
-    getEvalJobs: () =>
-      api<ArbiterResponse<EvalJobsResponse>>('/evaluate/jobs'),
+    getEvalJobs: () => api<ArbiterResponse<EvalJobsResponse>>('/evaluate/jobs'),
 
     cancelEvalJob: async (runId: number): Promise<'cancelled' | 'already-ended' | 'timeout'> => {
       try {
         await api<void>(`/evaluate/jobs/${runId}`, { method: 'DELETE' })
         return 'cancelled'
       } catch (e: unknown) {
-        const status = e && typeof e === 'object' && 'status' in e ? (e as { status: number }).status : 0
+        const status =
+          e && typeof e === 'object' && 'status' in e ? (e as { status: number }).status : 0
         if (status === 409) return 'already-ended'
         if (status === 503) return 'timeout'
         throw e
@@ -154,7 +158,13 @@ export function useApi() {
     },
 
     getEvalResults: async (params?: GetEvalResultsParams) => {
-      const res = await api<ArbiterResponse<EvaluationSummary[] | { evaluations: EvaluationSummary[] } | { results: EvaluationSummary[] }>>('/evaluate/results', { query: params })
+      const res = await api<
+        ArbiterResponse<
+          | EvaluationSummary[]
+          | { evaluations: EvaluationSummary[] }
+          | { results: EvaluationSummary[] }
+        >
+      >('/evaluate/results', { query: params })
       let list: EvaluationSummary[]
       if (Array.isArray(res.data)) {
         list = res.data
@@ -168,8 +178,7 @@ export function useApi() {
       return { ...res, data: list }
     },
 
-    getEvalHistory: () =>
-      api<ArbiterResponse<{ runs: EvalRun[] }>>('/evaluate/history'),
+    getEvalHistory: () => api<ArbiterResponse<{ runs: EvalRun[] }>>('/evaluate/history'),
 
     getEvalRunDetail: (runId: number) =>
       api<ArbiterResponse<EvalRunDetail>>(`/evaluate/history/${runId}`),
@@ -177,17 +186,15 @@ export function useApi() {
     getEvalCompare: (by: 'provider' | 'prompt_version') =>
       api<ArbiterResponse<EvalCompareResponse>>('/evaluate/history/compare', { query: { by } }),
 
-    getEvalPoolStats: () =>
-      api<ArbiterResponse<EvalPoolStats>>('/eval-pool/stats'),
+    getEvalPoolStats: () => api<ArbiterResponse<EvalPoolStats>>('/eval-pool/stats'),
 
-    getReviewQueue: () =>
-      api<ArbiterResponse<ReviewQueueResponse>>('/review-queue'),
+    getReviewQueue: () => api<ArbiterResponse<ReviewQueueResponse>>('/review-queue'),
 
     updateReviewQueueEntry: (id: string, body: ReviewQueueMutationRequest) =>
-      api<ArbiterResponse<Record<string, never>>>(
-        `/review-queue/${encodeURIComponent(id)}`,
-        { method: 'PATCH', body },
-      ),
+      api<ArbiterResponse<Record<string, never>>>(`/review-queue/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body,
+      }),
 
     startPoolEvaluation: (promptId?: number, model?: string) =>
       api<ArbiterResponse<AsyncEvalStartResponse>>('/evaluate', {
@@ -199,8 +206,7 @@ export function useApi() {
         } satisfies EvaluateRequest,
       }),
 
-    getOptimizerHistory: () =>
-      api<ArbiterResponse<OptimizerHistoryResponse>>('/optimizer/history'),
+    getOptimizerHistory: () => api<ArbiterResponse<OptimizerHistoryResponse>>('/optimizer/history'),
 
     getOptimizerRunDetail: (runId: number) =>
       api<ArbiterResponse<OptimizerRun>>(`/optimizer/history/${runId}`),
@@ -220,14 +226,18 @@ export function useApi() {
       try {
         return await api<ArbiterResponse<null>>(`/evaluate/history/${runId}`, { method: 'DELETE' })
       } catch (e: unknown) {
-        if (e && typeof e === 'object' && 'status' in e && (e as { status: number }).status === 404) {
+        if (
+          e &&
+          typeof e === 'object' &&
+          'status' in e &&
+          (e as { status: number }).status === 404
+        ) {
           return { status: 'success', data: null, message: '' } as ArbiterResponse<null>
         }
         throw e
       }
     },
 
-    healthCheck: () =>
-      api<Record<string, unknown>>('/health'),
+    healthCheck: () => api<Record<string, unknown>>('/health'),
   }
 }

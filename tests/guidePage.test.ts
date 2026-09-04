@@ -44,7 +44,7 @@ describe('pages/guide.vue', () => {
     for (const id of ['data-splits', 'run-lifecycle', 'gates', 'runtime-flow']) {
       expect(wrapper.findAll(`#${id} figure`)).toHaveLength(1)
     }
-    const order = wrapper.findAll('figure [data-test]').map(el => el.attributes('data-test'))
+    const order = wrapper.findAll('figure [data-test]').map((el) => el.attributes('data-test'))
     expect(order).toEqual(['pool-sankey', 'run-flow', 'round-flow', 'run-seq'])
   })
 
@@ -52,14 +52,26 @@ describe('pages/guide.vue', () => {
     const wrapper = mountPage()
 
     const gates = wrapper.find('#gates')
-    const gateChildren = [...gates.element.children].map(el => el.className || el.tagName.toLowerCase())
-    expect(gateChildren.indexOf('figure')).toBeLessThan(gateChildren.indexOf('arb-guide__gate-grid'))
-    expect(gateChildren.indexOf('figure')).toBeGreaterThan(gateChildren.indexOf('arb-guide__section-head'))
+    const gateChildren = [...gates.element.children].map(
+      (el) => el.className || el.tagName.toLowerCase(),
+    )
+    expect(gateChildren.indexOf('figure')).toBeLessThan(
+      gateChildren.indexOf('arb-guide__gate-grid'),
+    )
+    expect(gateChildren.indexOf('figure')).toBeGreaterThan(
+      gateChildren.indexOf('arb-guide__section-head'),
+    )
 
     const runtime = wrapper.find('#runtime-flow')
-    const runtimeChildren = [...runtime.element.children].map(el => el.className || el.tagName.toLowerCase())
-    expect(runtimeChildren.indexOf('figure')).toBeLessThan(runtimeChildren.indexOf('arb-guide__timeline'))
-    expect(runtimeChildren.indexOf('figure')).toBeGreaterThan(runtimeChildren.indexOf('arb-guide__section-head'))
+    const runtimeChildren = [...runtime.element.children].map(
+      (el) => el.className || el.tagName.toLowerCase(),
+    )
+    expect(runtimeChildren.indexOf('figure')).toBeLessThan(
+      runtimeChildren.indexOf('arb-guide__timeline'),
+    )
+    expect(runtimeChildren.indexOf('figure')).toBeGreaterThan(
+      runtimeChildren.indexOf('arb-guide__section-head'),
+    )
   })
 
   it('no longer renders the retired split and loop diagrams', () => {
@@ -85,7 +97,9 @@ describe('pages/guide.vue', () => {
     const wrapper = mountPage()
 
     expect(wrapper.text()).toContain('The backbone of one optimizer run')
-    expect(wrapper.find('#run-lifecycle h2').text()).toBe('One run, start to finish: from snapshot to test accuracy')
+    expect(wrapper.find('#run-lifecycle h2').text()).toBe(
+      'One run, start to finish: from snapshot to test accuracy',
+    )
 
     const tabs = wrapper.findAll('.arb-guide__lang-tab')
     expect(tabs).toHaveLength(2)
@@ -99,8 +113,11 @@ describe('pages/guide.vue', () => {
     expect(text).toContain('一次 run 的訊息往返：誰負責分析、誰負責評分、誰負責留下紀錄')
     expect(wrapper.find('#run-lifecycle h2').text()).toBe('一次執行從頭到尾：從快照到測試準確率')
     expect(wrapper.find('#gates h2').text()).toBe('候選提示必須通過的兩道閘')
-    expect(wrapper.findAll('.fig-eyebrow').map(el => el.text())).toEqual([
-      '圖 1 · Sankey', '圖 2 · 流程圖 · Run 層級', '圖 3 · 流程圖 · Round 層級', '圖 4 · 循序圖',
+    expect(wrapper.findAll('.fig-eyebrow').map((el) => el.text())).toEqual([
+      '圖 1 · Sankey',
+      '圖 2 · 流程圖 · Run 層級',
+      '圖 3 · 流程圖 · Round 層級',
+      '圖 4 · 循序圖',
     ])
   })
 })

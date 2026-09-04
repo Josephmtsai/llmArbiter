@@ -23,7 +23,9 @@ async function submit() {
       </div>
 
       <div class="arb-login__body">
-        <p class="arb-login__desc">CI/CD intelligence dashboard. Enter your access password to continue.</p>
+        <p class="arb-login__desc">
+          CI/CD intelligence dashboard. Enter your access password to continue.
+        </p>
 
         <div v-if="authStore.error" class="arb-login__error">
           {{ authStore.error }}

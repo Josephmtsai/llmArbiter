@@ -85,11 +85,15 @@ describe('eval display helpers', () => {
   })
 
   it('uses backend eval run source before falling back to optimizer run IDs', () => {
-    expect(getEvalRunSource(makeEvalRun({ run_id: 25, source: 'db' }), new Set([24, 25]))).toBe('db')
-    expect(getEvalRunSource(makeEvalRun({ run_id: 26, source: 'pool' }), new Set([24, 25]))).toBe('pool')
-    expect(getEvalRunSource(makeEvalRun({ run_id: 27, source: 'optimizer' }), new Set([24, 25]))).toBe(
-      'optimizer',
+    expect(getEvalRunSource(makeEvalRun({ run_id: 25, source: 'db' }), new Set([24, 25]))).toBe(
+      'db',
     )
+    expect(getEvalRunSource(makeEvalRun({ run_id: 26, source: 'pool' }), new Set([24, 25]))).toBe(
+      'pool',
+    )
+    expect(
+      getEvalRunSource(makeEvalRun({ run_id: 27, source: 'optimizer' }), new Set([24, 25])),
+    ).toBe('optimizer')
     expect(getEvalRunSource(makeEvalRun({ run_id: 25 }), new Set([24, 25]))).toBe('optimizer')
     expect(getEvalRunSource(makeEvalRun({ run_id: 26 }), new Set([24, 25]))).toBeNull()
   })

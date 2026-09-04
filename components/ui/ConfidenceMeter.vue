@@ -6,9 +6,14 @@ const displayWidth = ref(props.animate ? 0 : props.value)
 watch(
   () => props.value,
   (v) => {
-    if (!props.animate) { displayWidth.value = v; return }
+    if (!props.animate) {
+      displayWidth.value = v
+      return
+    }
     displayWidth.value = 0
-    setTimeout(() => { displayWidth.value = v }, 30)
+    setTimeout(() => {
+      displayWidth.value = v
+    }, 30)
   },
   { immediate: true },
 )
@@ -54,7 +59,12 @@ const pct = computed(() => Math.round(props.value * 100))
 </template>
 
 <style scoped>
-.arb-conf { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.arb-conf {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
 .arb-conf__header {
   display: flex;
   justify-content: space-between;
@@ -72,8 +82,13 @@ const pct = computed(() => Math.round(props.value * 100))
   border: 1px solid var(--border);
   overflow: hidden;
 }
-.arb-conf__track--lg { height: 10px; }
-.arb-conf__fill { height: 100%; border-radius: 999px; }
+.arb-conf__track--lg {
+  height: 10px;
+}
+.arb-conf__fill {
+  height: 100%;
+  border-radius: 999px;
+}
 .arb-conf__footer {
   display: flex;
   justify-content: space-between;
@@ -84,5 +99,7 @@ const pct = computed(() => Math.round(props.value * 100))
   font-size: 11px;
   color: var(--fg-3);
 }
-.arb-conf__label { font-size: 11px; }
+.arb-conf__label {
+  font-size: 11px;
+}
 </style>
