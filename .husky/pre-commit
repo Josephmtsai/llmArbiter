@@ -1,2 +1,7 @@
+# Vitest 透過 tsconfig 的 extends 讀取 .nuxt/tsconfig.json；fresh clone 尚未產生時先補一次。
+if [ ! -f .nuxt/tsconfig.json ]; then
+  pnpm exec nuxt prepare
+fi
+
 pnpm exec lint-staged
 pnpm exec vitest run --changed --passWithNoTests
