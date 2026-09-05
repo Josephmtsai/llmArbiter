@@ -30,8 +30,9 @@ export function useTheme() {
   function apply(t: Theme) {
     theme.value = t
     if (import.meta.client) {
-      // No setAttribute here on purpose - app.vue binds data-theme through
-      // unhead, which would overwrite anything written directly to the DOM.
+      // Deliberately no direct DOM write here - app.vue binds data-theme
+      // through unhead, which would overwrite anything written straight to
+      // the element.
       persistTheme(t)
     }
   }

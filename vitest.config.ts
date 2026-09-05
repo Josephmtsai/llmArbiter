@@ -68,7 +68,7 @@ export default defineConfig({
       // "measured - 2". Thresholds only ever go up. Target is 80% (CLAUDE.md
       // §5). Ratcheted by `theme-persistence` on 2026-09-05 from the
       // tooling-baseline starting point of 41/41/51/78: measured
-      // lines 44.12 / statements 44.12 / functions 55.14 / branches 80.51.
+      // lines 44.22 / statements 44.22 / functions 55.14 / branches 80.51.
       // Branches stays at 78 - floor(80.51) - 2 is still 78.
       thresholds: {
         lines: 42,
