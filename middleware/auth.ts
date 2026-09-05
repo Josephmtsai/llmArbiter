@@ -6,6 +6,6 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   const ok = await authStore.check()
   if (!ok) {
-    return navigateTo('/login')
+    return navigateTo({ path: '/login', query: { redirect: to.fullPath } })
   }
 })
