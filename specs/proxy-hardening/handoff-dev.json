@@ -1,41 +1,126 @@
 {
   "from": "developer",
-  "to": "qa",
+  "to": "codex-reviewer",
   "feature": "proxy-hardening",
   "status": "ready",
-  "retry_count": 0,
+  "retry_count": 1,
   "max_retries": 2,
-  "summary": "以 $fetch.raw + sendStream 自建最小 proxy 取代 h3 proxyRequest：request header 只轉發 content-type/accept 加上 server 端的 X-API-Key，上游 Set-Cookie 一律不回寫（response 只轉發 content-type），method 白名單 GET/POST/PATCH/DELETE（其餘 405 附 Allow），path 第一段白名單九個 prefix（空字串/../// 皆 404 且不接觸上游），30s upstream timeout（504 upstream-timeout / 502 upstream-unreachable 並遮罩 API key），query 序列化跳過 null/undefined。所有判斷抽成純函式 server/utils/proxyPolicy.ts，覆蓋率 100%。",
+  "summary": "Review round 1 的 no-ship 修正。修掉 redirect 跟隨（改 redirect:'manual'，3xx 一律 502）、path 正規化（改用 parser identity：decodeURI(new URL(wildcard,base).pathname) 必須等於 '/'+wildcard）、streaming（sendStream 換成 pipeline，有 backpressure 且 client 斷線會取消上游）、request body 讀取失敗不再被吞掉（改回 400）、錯誤訊息只回固定 token（detail 只進 stderr）。route 拆成 functional core（server/utils/proxyHandler.ts，41 tests，四項指標皆 100%）+ h3 shell，shell 本身由新的 e2e 測試（跑起 build 出來的 server + mock upstream，走 raw socket）覆蓋並進 CI。另外撤回 review #3 的 Critical 嚴重性：實測 Nitro 會先 decodeURI 再交給 handler，%2e%2e 在原本的字面檢查就已經是 '..' 被擋下，該 bypass 只存在於純函式層而非 route；hardening 仍保留作為 defence in depth。",
   "changed_files": [
     "server/utils/proxyPolicy.ts",
+    "server/utils/proxyHandler.ts",
     "server/api/arbiter/[...].ts",
     "tests/proxyPolicy.test.ts",
+    "tests/proxyHandler.test.ts",
+    "tests/e2e/proxy.e2e.test.ts",
     "vitest.config.ts",
+    "vitest.e2e.config.ts",
+    "package.json",
+    ".github/workflows/ci.yml",
     "specs/proxy-hardening/spec.md",
-    "specs/proxy-hardening/tasks.md"
+    "specs/proxy-hardening/tasks.md",
+    "specs/proxy-hardening/review-codex-1.md"
   ],
   "ac_ref": "specs/proxy-hardening/tasks.md",
   "branch": "feat/proxy-hardening",
   "base": "7821674",
-  "commits": ["995d4a2"],
-  "verification": {
-    "lint_check": "pnpm lint:check — 0 errors, 10 warnings (all pre-existing vue/no-static-inline-styles, unchanged from base)",
-    "vue_tsc": "pnpm vue-tsc — clean, exit 0",
-    "test_coverage": "pnpm test:coverage — 11 files, 166 tests passed. Measured lines 44.66 / statements 44.66 / functions 58.21 / branches 82.25. server/utils/proxyPolicy.ts 100/100/100/100.",
-    "build": "pnpm build — complete, exit 0",
-    "coverage_ratchet": "functions 53 -> 56, branches 78 -> 80. lines/statements stay 42 (floor(44.66)-2 = 42).",
-    "runtime_ac": "AC-2.1 through AC-2.10 verified against a local mock upstream that records every request, using the production build and a real logged-in session cookie. 10/10 passed.",
-    "runtime_evidence": {
-      "AC-2.4_upstream_headers": "host, connection, accept, x-api-key, user-agent, accept-language, sec-fetch-mode, accept-encoding — no cookie, authorization or referer; user-agent is 'arbiter-proxy', not the probe's 'ACProbe/1.0'",
-      "AC-2.7": "504 with message 'upstream-timeout' after 30.0s",
-      "AC-2.8": "502 with message 'upstream-unreachable: fetch failed'; API key absent from the response body",
-      "allowlist_regression_probe": "all 26 endpoint paths reached from composables/useApi.ts pass the new path allowlist"
+  "commits": ["995d4a2", "674b9f7", "dfad3ce"],
+  "retry_history": [
+    {
+      "round": 1,
+      "reviewer": "codex-cli 0.153.3 (high reasoning)",
+      "report": "specs/proxy-hardening/review-codex-1.md",
+      "verdict": "no-ship",
+      "findings": [
+        {
+          "id": "codex-1",
+          "severity_reported": "Critical",
+          "severity_agreed": "Accepted boundary",
+          "what": "ignoreResponseError:true means upstream 4xx/5xx bodies are streamed to the browser verbatim, so an upstream that echoed the API key in an error payload would relay it.",
+          "resolution": "Accepted, not fixed. Requirement 5 governs this proxy's own error messages, not upstream payloads. Status/body pass-through is deliberate and the UI depends on it (422 detail bodies). The upstream is our own FastAPI service. Buffering every error response to inspect it would give up the streaming the design was chosen for. Documented in spec.md under 'Accepted boundary — upstream error response bodies', with the trigger to revisit (upstream becoming third-party)."
+        },
+        {
+          "id": "codex-2",
+          "severity_reported": "Major",
+          "severity_agreed": "Major",
+          "what": "Redirects were followed automatically; undici keeps custom headers cross-origin, so X-API-Key would reach an upstream-chosen origin.",
+          "resolution": "Fixed. redirect:'manual' on the upstream fetch; isRedirectStatus() turns any 3xx into 502. Not relayed either — relaying would let the upstream steer the browser. Covered by AC-4.7."
+        },
+        {
+          "id": "codex-3",
+          "severity_reported": "Major",
+          "severity_agreed": "Minor (defence in depth) — severity claim withdrawn",
+          "what": "validateProxyPath checked only literal '..', so percent-encoded dot segments were said to pass validation and then be canonicalised by the URL parser.",
+          "resolution": "Hardened, but the reachability claim is withdrawn after runtime measurement. Nitro/h3 hands the catch-all over already decoded with decodeURI semantics — instrumented against the built server, '/api/arbiter/health/%2e%2e/admin' arrives as routerParam 'health/../admin'. So %2e%2e hit the original literal check as '..' and was already rejected; the bypass existed in the pure function, not through the route. The hardening is kept because Nitro's decoding is not a documented contract and validateProxyPath is a pure function whose callers can change. It now rests on parser identity — decodeURI(new URL(wildcard, base).pathname) must equal '/' + wildcard, origin unchanged — which also catches single-dot segments the literal check never could. Both the original 'accepted residual' note and the first retraction (which called this Critical) are corrected in spec.md."
+        },
+        {
+          "id": "codex-4",
+          "severity_reported": "Major",
+          "severity_agreed": "Accepted boundary",
+          "what": "classifyUpstreamError only covers the window up to the upstream response headers; a body that stalls after a 200 is committed cannot become a 504.",
+          "resolution": "Accepted, with the failure mode improved. Buffering the whole body to keep the option of changing the status would give up streaming and cap response size by memory. What changed: sendStream would have ended the response cleanly, so a truncated body looked like a complete 200; pipeline destroys the response socket on a source error, so the client sees an aborted transfer that $fetch surfaces as a rejection. The 30s AbortSignal still covers the body. Documented in spec.md."
+        },
+        {
+          "id": "codex-5",
+          "severity_reported": "Major",
+          "severity_agreed": "Major",
+          "what": "h3 1.15's web-stream sendStream path neither honours res.write backpressure nor cancels the upstream stream on client disconnect.",
+          "resolution": "Fixed. The shell now uses pipeline(Readable.fromWeb(body), event.node.res), which propagates backpressure and destroys the source on disconnect. It also ends the response, setting writableEnded, which is what h3's event.handled getter reads."
+        },
+        {
+          "id": "codex-6",
+          "severity_reported": "Major",
+          "severity_agreed": "Major",
+          "what": "readRawBody was wrapped in .catch(() => undefined), so an aborted upload became a successful upstream write with an empty body.",
+          "resolution": "Fixed. A read failure returns 400 Invalid Request Body and the upstream is never called; the detail is logged. Covered by AC-4.5, including a non-Error rejection."
+        },
+        {
+          "id": "codex-7",
+          "severity_reported": "Major",
+          "severity_agreed": "Major",
+          "what": "The security-critical route was at 0% coverage on all four metrics; global thresholds passed because frontend coverage masked it. The 100% claim covered isolated helpers only.",
+          "resolution": "Fixed in two layers. (a) The route was split: all policy moved to server/utils/proxyHandler.ts as runProxy(request, deps) with injected getSessionUser / readBody / fetchUpstream / logError, covered by 41 tests at 100/100/100/100 — auth ordering, both gates, header wiring, body handling, redirect refusal, error classification, status sanitisation, and the real (non-injected) timeout-signal default. (b) The remaining h3 shell is covered by tests/e2e/proxy.e2e.test.ts, which spawns the built server plus a mock upstream and drives it over a raw node:http socket, asserting against what the upstream actually received. It runs in CI as its own step after pnpm build. The reviewer's own mutation scenario now fails: deleting the session gate breaks AC-4.1, and deleting the path guards from the built bundle fails 7 of the 8 AC-5.1 cases (verified, then restored)."
+        },
+        {
+          "id": "codex-8",
+          "severity_reported": "Minor",
+          "severity_agreed": "Major",
+          "what": "Non-timeout failures returned the raw cause message to the browser; redacting the API key does not stop disclosure of internal hostnames, IPs, ports or TLS details.",
+          "resolution": "Fixed, and treated as more than Minor since it is an information-disclosure boundary. classifyUpstreamError now returns { statusCode, message, detail }: message is a fixed token ('upstream-timeout' / 'upstream-unreachable') and is the only thing the browser sees; detail carries the redacted cause and goes to stderr only. The test that enshrined the old behaviour was rewritten."
+        },
+        {
+          "id": "codex-7b",
+          "severity_reported": "part of Major #7",
+          "severity_agreed": "Major",
+          "what": "The undefined-query test was synthetic: getQuery cannot produce undefined, and useApi.ts strips it before the request, so a route that forwarded 'action=' unchanged would still pass.",
+          "resolution": "Fixed by adding a real assertion at the route level: AC-5.4 drives GET /api/arbiter/decisions?limit=5 through the built server and asserts the mock upstream received exactly '/decisions?limit=5'. The pure-function test is kept as a unit-level contract for serializeQuery."
+        }
+      ]
     }
+  ],
+  "verification": {
+    "lint_check": "pnpm lint:check — 0 errors, 10 warnings (all pre-existing vue/no-static-inline-styles in pages/*.vue, unchanged from base)",
+    "vue_tsc": "pnpm vue-tsc — clean, exit 0",
+    "test_coverage": "pnpm test:coverage — 12 files, 256 tests passed. All files 45.36 lines / 83.15 branches / 59.33 functions / 45.36 statements. server/utils/proxyHandler.ts 100/100/100/100. server/utils/proxyPolicy.ts 98.33/97.18/100/98.33 (the two uncovered lines are the new URL catch, unreachable by construction, kept as a degrade-to-404 guard).",
+    "build": "pnpm build — complete, exit 0",
+    "test_e2e": "pnpm test:e2e — 1 file, 15 tests passed against the built server (.output/server/index.mjs) plus a mock upstream, over a raw node:http socket.",
+    "coverage_ratchet": "functions 56 -> 57. lines/statements stay 43 (floor(45.36)-2 = 43), branches stays 81 (floor(83.15)-2 = 81).",
+    "hooks": "The round-1 commit went through husky pre-commit (lint-staged + vitest run --changed). --no-verify was not used.",
+    "e2e_non_vacuous": "Mutation check: the traversal and not-normalized guards were deleted from the built bundle (.output/server/chunks/_/nitro.mjs) and 7 of the 8 AC-5.1 traversal cases failed. The bundle was restored from a backup and the suite re-run green."
+  },
+  "runtime_evidence": {
+    "nitro_decodes_the_wildcard": [
+      "request line /api/arbiter/health/%2e%2e/admin    -> routerParam \"health/../admin\"",
+      "request line /api/arbiter/config/rules/my%20rule -> routerParam \"config/rules/my rule\"",
+      "request line /api/arbiter/health/..%2fadmin      -> routerParam \"health/..%2Fadmin\"  (reserved %2f stays encoded)"
+    ],
+    "regression_caught_by_the_new_e2e_layer": "The first round-1 fix decoded a second time and refused raw spaces. GET /api/arbiter/config/rules/my%20rule returned 404 ('[proxy] path rejected (unsafe-char)') and never reached the upstream, while every unit test stayed green. It now returns 200 and the upstream receives /config/rules/my%20rule.",
+    "upstream_headers_observed": "user-agent: arbiter-proxy on every hit; cookie never forwarded; x-api-key present on every hit."
   },
   "open_ac": [
     {
       "id": "AC-2.11",
-      "reason": "Requires a manual smoke test of every page against the real backend. This worktree's .env holds only NUXT_SESSION_PASSWORD — no NUXT_API_KEY or NUXT_API_BASE_URL — and the backend answers 401 without a key, so it cannot be verified here. Substitute evidence: all 26 useApi.ts endpoint paths were probed through the rebuilt proxy and none is blocked by the new allowlist, so proxy routing is not a regression risk. Real backend behaviour is what remains unverified.",
+      "reason": "Still requires a manual smoke test of every page against the real backend. This worktree's .env holds only NUXT_SESSION_PASSWORD — no NUXT_API_KEY or NUXT_API_BASE_URL — so it cannot be verified here. Substitute evidence is unchanged: all 26 useApi.ts endpoint paths pass the allowlist, and the new e2e layer now also proves a correctly encoded path with a space reaches the upstream. What remains unverified is real backend behaviour, not proxy routing.",
       "owner": "qa"
     }
   ],
@@ -43,24 +128,32 @@
     {
       "id": "D1",
       "what": "The proxy sets an explicit outgoing User-Agent (PROXY_USER_AGENT = 'arbiter-proxy') rather than sending none.",
-      "why": "AC-2.4 asks for no user-agent upstream, but the fetch specification requires the header: when the caller sets none the runtime appends its own default. Runtime verification confirmed 'user-agent: node' reaching the mock. The browser's User-Agent was never leaked, but pinning a constant makes the value deliberate and testable instead of runtime-dependent. AC-2.4's security intent is fully met.",
-      "impact": "None on behaviour. The upstream sees a constant token."
+      "why": "AC-2.4 asks for no user-agent upstream, but the fetch specification requires the header: when the caller sets none the runtime appends its own default. Pinning a constant makes the value deliberate and testable instead of runtime-dependent. AC-2.4's security intent is fully met.",
+      "impact": "None on behaviour. Asserted end to end by AC-5.5."
     },
     {
       "id": "D2",
-      "what": "AC-2.3's traversal probe uses a raw node:http socket instead of fetch.",
-      "why": "undici's fetch resolves '..' in the URL before the request is sent, so a fetch-based probe never reaches the server with the literal path and produced a false 200 on the first run. The raw socket preserves the path, and the server correctly answers 404 without contacting the upstream.",
-      "impact": "Test methodology only; no production code implication."
+      "what": "Traversal probes use a raw node:http socket instead of fetch.",
+      "why": "undici's fetch resolves '..' before the request is sent, so a fetch-based probe never reaches the server with the literal path and produced a false 200 on the first run.",
+      "impact": "Test methodology only. Now permanent, in tests/e2e/proxy.e2e.test.ts rather than a throwaway script."
     },
     {
       "id": "D3",
-      "what": "validateProxyPath matches the literal '..' only, so a percent-encoded '%2e%2e' in a later segment is not rejected.",
-      "why": "This is the check the spec specifies. Not exploitable here: the upstream is an HTTP API rather than a file server, and the first-segment allowlist still applies.",
-      "impact": "Accepted residual, recorded in spec.md."
+      "what": "WITHDRAWN. The previous handoff recorded an accepted residual — that a percent-encoded '%2e%2e' in a later segment was not rejected, and that this was 'not exploitable'.",
+      "why": "The reasoning given for accepting it ('the first-segment allowlist still applies') was wrong on its own terms, which is what review #3 correctly identified. The residual is now closed by the parser-identity check. Note that reachability was also overstated in the other direction by the first retraction — see retry_history codex-3."
+    },
+    {
+      "id": "D4",
+      "what": "A new npm script (test:e2e), a second vitest config (vitest.e2e.config.ts) and a new CI step were added, which are outside the original spec's file list.",
+      "why": "Review #7 required the route to be covered by something repeatable that runs in CI. The e2e suite needs a build in .output/ and a node environment, so it cannot share the unit config without slowing every unit run and dragging measured coverage down with a file v8 cannot see into.",
+      "impact": "pnpm test and pnpm test:coverage are unchanged in scope and runtime. CI gains one step after Build."
     }
   ],
   "notes": [
-    "Nothing was pushed and nothing was merged to main, per instruction.",
+    "Nothing was pushed and nothing was merged, per instruction.",
+    "The throwaway runtime probe (probe-traversal.mjs) used during this round has been deleted; its cases live on in tests/e2e/proxy.e2e.test.ts.",
+    "vitest.config.ts on this branch ratchets thresholds to 43/43/57/81; feat/auth-hardening ratchets the same file to different numbers. Whichever merges second must take the maximum of each metric, not the incoming value.",
+    "process.stderr.write is still used for error detail because no logger utility exists yet; utils/logger.ts arrives with silent-failure-elimination and this call site should move to it then.",
     "A fresh `pnpm exec nuxt prepare` is required in a new worktree before vitest runs; tsconfig extends .nuxt/tsconfig.json."
   ]
 }
