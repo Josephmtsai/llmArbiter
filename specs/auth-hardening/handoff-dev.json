@@ -7,7 +7,7 @@
   "max_retries": 2,
   "branch": "feat/auth-hardening",
   "base": "7821674fecc59932acde8a87cebe382db119e092",
-  "commits": ["7e128f5", "7ab35f4", "f41403c", "05316cb", "107e0ef", "90097f1", "04f37ba"],
+  "commits": ["7e128f5", "7ab35f4", "f41403c", "05316cb", "107e0ef", "90097f1", "04f37ba", "3eb84b1"],
   "summary": "Retry #2：修掉 codex review 第二輪的 1 P0 / 3 P1 / 3 P2。P0 是 retry #1 自己引入的迴歸 —— resolveSafeRedirect 只在解析前檢查一次，正規化後會產出 protocol-relative 目標（/a/%2e%2e//evil.com 的 pathname 是 //evil.com），改為對正規化結果重跑同一組檢查，並讓 /login 比對不分大小寫。另外 check() 改回傳三態（網路錯誤與 5xx 不再等於已登出）、探測收斂與世代戳記移進 store（跨 useApi 實例只導頁一次、過期探測不覆蓋新 session）、rate limiter 容量路徑不再繞過節流做全表掃描、constantTime.ts 補上直接測試、AC-7.3 以純函式 shouldHandleUnauthorized 補齊驗證、placeholder 改為正規化後的片段比對。",
   "ac_ref": "specs/auth-hardening/tasks.md",
   "review_ref": "specs/auth-hardening/review-codex-2.md",
