@@ -150,7 +150,7 @@ describe('useAuthStore.check', () => {
     fetchMock.mockResolvedValue({ ok: true })
     const store = useAuthStore()
 
-    await expect(store.check()).resolves.toBe(true)
+    await expect(store.check()).resolves.toBe('authenticated')
     expect(store.authenticated).toBe(true)
     expect(fetchMock).toHaveBeenCalledWith('/api/auth/check', { headers: {} })
   })
@@ -160,16 +160,155 @@ describe('useAuthStore.check', () => {
     const store = useAuthStore()
     store.authenticated = true
 
-    await expect(store.check()).resolves.toBe(false)
+    await expect(store.check()).resolves.toBe('unauthenticated')
     expect(store.authenticated).toBe(false)
   })
 
-  it('treats a failed check as signed out', async () => {
+  it('reads a 401 as the server saying no (AC-6.9)', async () => {
     fetchMock.mockRejectedValue(httpError(401))
     const store = useAuthStore()
     store.authenticated = true
 
-    await expect(store.check()).resolves.toBe(false)
+    await expect(store.check()).resolves.toBe('unauthenticated')
     expect(store.authenticated).toBe(false)
+  })
+
+  it.each([
+    ['a network failure', new Error('network down')],
+    ['a 500', httpError(500)],
+    ['a 502 from a proxy', httpError(502)],
+    ['a gateway timeout', httpError(504)],
+    ['an error with no status at all', { message: 'aborted' }],
+  ])('reports %s as unknown and leaves the session alone (AC-6.10)', async (_label, failure) => {
+    // The bug this pins: collapsing every failure to "signed out" hands a
+    // momentary /api/auth/check outage the power to log out every user who
+    // holds a perfectly valid cookie.
+    fetchMock.mockRejectedValue(failure)
+    const store = useAuthStore()
+    store.authenticated = true
+
+    await expect(store.check()).resolves.toBe('unknown')
+    expect(store.authenticated).toBe(true)
+  })
+
+  it('does not invent a session when an unknown outcome finds none (AC-6.10)', async () => {
+    fetchMock.mockRejectedValue(httpError(503))
+    const store = useAuthStore()
+
+    await expect(store.check()).resolves.toBe('unknown')
+    expect(store.authenticated).toBe(false)
+  })
+
+  it('treats a malformed body as a negative answer', async () => {
+    // The server answered; it just did not say `ok: true`. That is the server
+    // declining, not the probe failing.
+    fetchMock.mockResolvedValue({})
+    const store = useAuthStore()
+    store.authenticated = true
+
+    await expect(store.check()).resolves.toBe('unauthenticated')
+    expect(store.authenticated).toBe(false)
+  })
+
+  it('coalesces concurrent probes into one request (AC-6.11)', async () => {
+    // Every useApi() instance builds its own interceptor, so one page firing
+    // several API calls turns a single expiry into a burst of 401s. Before the
+    // probe moved into the store each of those raised its own round trip.
+    let resolveProbe: (body: { ok: boolean }) => void = () => undefined
+    fetchMock.mockReturnValue(
+      new Promise<{ ok: boolean }>((resolve) => {
+        resolveProbe = resolve
+      }),
+    )
+    const store = useAuthStore()
+
+    const probes = [store.check(), store.check(), store.check()]
+    resolveProbe({ ok: false })
+
+    await expect(Promise.all(probes)).resolves.toEqual([
+      'unauthenticated',
+      'unauthenticated',
+      'unauthenticated',
+    ])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('starts a fresh probe once the previous one has settled (AC-6.11)', async () => {
+    fetchMock.mockResolvedValue({ ok: true })
+    const store = useAuthStore()
+
+    await store.check()
+    await store.check()
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('discards a probe that a login overtook (AC-6.12)', async () => {
+    // The probe asked about the session that existed when it was sent. By the
+    // time it answers the user has signed in again, so writing its result would
+    // undo a login that already succeeded.
+    let resolveProbe: (body: { ok: boolean }) => void = () => undefined
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/auth/check') {
+        return new Promise<{ ok: boolean }>((resolve) => {
+          resolveProbe = resolve
+        })
+      }
+      return Promise.resolve({ ok: true })
+    })
+    const store = useAuthStore()
+
+    const probe = store.check()
+    await expect(store.login('secret')).resolves.toBe(true)
+    expect(store.authenticated).toBe(true)
+
+    resolveProbe({ ok: false })
+
+    await expect(probe).resolves.toBe('unknown')
+    expect(store.authenticated).toBe(true)
+  })
+
+  it('discards a probe that a logout overtook (AC-6.12)', async () => {
+    let resolveProbe: (body: { ok: boolean }) => void = () => undefined
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/auth/check') {
+        return new Promise<{ ok: boolean }>((resolve) => {
+          resolveProbe = resolve
+        })
+      }
+      return Promise.resolve({ ok: true })
+    })
+    const store = useAuthStore()
+    store.authenticated = true
+
+    const probe = store.check()
+    await expect(store.logout()).resolves.toBe(true)
+    expect(store.authenticated).toBe(false)
+
+    resolveProbe({ ok: true })
+
+    await expect(probe).resolves.toBe('unknown')
+    expect(store.authenticated).toBe(false)
+  })
+})
+
+describe('useAuthStore.claimSignOut', () => {
+  it('grants the sign-out redirect to one caller (AC-6.13)', () => {
+    const store = useAuthStore()
+
+    expect(store.claimSignOut()).toBe(true)
+    expect(store.claimSignOut()).toBe(false)
+    expect(store.claimSignOut()).toBe(false)
+  })
+
+  it('is available again after the user signs back in (AC-6.13)', async () => {
+    fetchMock.mockResolvedValue({ ok: true })
+    const store = useAuthStore()
+    expect(store.claimSignOut()).toBe(true)
+    expect(store.claimSignOut()).toBe(false)
+
+    await store.login('secret')
+
+    expect(store.claimSignOut()).toBe(true)
   })
 })

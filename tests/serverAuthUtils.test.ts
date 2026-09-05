@@ -5,6 +5,7 @@ import {
   clientIpFromForwardedFor,
   createRateLimiter,
   isIpAddress,
+  isPlaceholderSecret,
   resetExpectedDigestCache,
   verifyLoginPassword,
 } from '../server/utils/auth'
@@ -62,7 +63,7 @@ describe('verifyLoginPassword', () => {
     expect(verifyLoginPassword('', '')).toBe(true)
   })
 
-  it('decides through the constant-time comparison, not === (AC-1.9)', () => {
+  it('decides through the constant-time comparison, not === (AC-1.14)', () => {
     // Lengths deliberately differ: a naive implementation would have to branch
     // on that, and `bufferEquals` throws outright on unequal buffers.
     expect(verifyLoginPassword('short', 'a-much-longer-expected-password')).toBe(false)
@@ -75,7 +76,7 @@ describe('verifyLoginPassword', () => {
     expect(Buffer.compare(left, right)).not.toBe(0)
   })
 
-  it('passes matching digests through for the correct password (AC-1.9)', () => {
+  it('passes matching digests through for the correct password (AC-1.14)', () => {
     expect(verifyLoginPassword('the-secret', 'the-secret')).toBe(true)
 
     const [left, right] = vi.mocked(bufferEquals).mock.calls[0]
@@ -133,6 +134,38 @@ describe('assertStrongSecret', () => {
       expect(() => assertStrongSecret('NUXT_AUTH_PASSWORD', value)).toThrow(/placeholder/)
     },
   )
+
+  it.each([
+    ['upper case', 'CHANGE-ME-AT-LEAST-32-CHARACTERS-LONG'],
+    ['mixed case', 'Change-Me-At-Least-32-Characters-Long'],
+    ['surrounding whitespace', '  change-me-at-least-32-characters-long\n'],
+    ['an appended suffix', 'change-me-at-least-32-characters-long-production'],
+    ['a prepended prefix', 'prod-replace-me-with-openssl-rand-hex-32-output'],
+    ['a shorter fragment padded out', `change-me-${'x'.repeat(30)}`],
+    ['a shorter fragment, upper case', `REPLACE-ME-${'x'.repeat(30)}`],
+  ])('rejects a placeholder with %s (AC-3.8)', (_label, value) => {
+    // Every realistic way an unedited example value reaches production: an
+    // editor changed the case, a copy kept the newline, or someone appended a
+    // word and called it edited.
+    expect(() => assertStrongSecret('NUXT_AUTH_PASSWORD', value)).toThrow(/placeholder/)
+  })
+
+  it.each([
+    ['an openssl hex secret', 'a3f9c1d7e2b48065931facd7e0b25148c6f3a97d0e415b82c7d6493a1f8025be'],
+    ['a long random passphrase', 'correct-horse-battery-staple-and-then-some-more-entropy'],
+  ])('accepts %s (AC-3.8)', (_label, value) => {
+    expect(() => assertStrongSecret('NUXT_AUTH_PASSWORD', value)).not.toThrow()
+  })
+
+  it('is a guard against copy-paste, not against a determined operator (AC-3.8)', () => {
+    // Stated as a test so the limit is on the record: substring matching stops
+    // an unedited example value, and nothing more. Anyone who wants a weak
+    // secret can pick one that is not on the list, and this will pass it.
+    expect(isPlaceholderSecret('hunter2-hunter2-hunter2-hunter2-hu')).toBe(false)
+    expect(() =>
+      assertStrongSecret('NUXT_AUTH_PASSWORD', 'hunter2-hunter2-hunter2-hunter2-hu'),
+    ).not.toThrow()
+  })
 
   it('names the offending variable in the message (AC-3.4)', () => {
     expect(() => assertStrongSecret('NUXT_SESSION_PASSWORD', 'short')).toThrow(
@@ -296,5 +329,30 @@ describe('createRateLimiter', () => {
     const limiter = newLimiter()
     for (let i = 0; i < 5; i += 1) expect(limiter.hit('9.9.9.9').allowed).toBe(true)
     expect(limiter.hit('9.9.9.9').allowed).toBe(false)
+  })
+
+  it('does not sweep off the capacity path, even with a stale bucket (AC-1.14)', () => {
+    // Sweeping here would be an O(maxKeys) scan that an attacker triggers on
+    // every request once the table is full -- precisely the cost the throttle
+    // exists to bound. The timeline below is the only shape where a bucket is
+    // stale while the throttle still has time to run: a bucket that survived
+    // one sweep can age out before the next one is due.
+    const limiter = createRateLimiter({ limit: 5, windowMs: WINDOW_MS, maxKeys: 3 })
+
+    limiter.hit('10.0.0.1', T0) // sweeps, lastSweep = T0
+    limiter.hit('10.0.0.2', T0 + 59_000) // throttled, no sweep
+    limiter.hit('10.0.0.3', T0 + 61_000) // sweeps: drops .1, keeps .2
+    limiter.hit('10.0.0.4', T0 + 62_000)
+    expect(limiter.size).toBe(3)
+
+    // .2 is now older than a window, but the last sweep was 59s ago, so the
+    // throttle still holds. The table is full, so the new key is refused.
+    const overflow = limiter.hit('10.0.0.99', T0 + 120_000)
+    expect(overflow).toEqual({ allowed: false, retryAfterSec: 60 })
+    expect(limiter.size).toBe(3)
+
+    // A second later the throttle elapses, the scheduled sweep reclaims, and
+    // the same key gets in. Fail-closed, and at most one window long.
+    expect(limiter.hit('10.0.0.99', T0 + 121_000).allowed).toBe(true)
   })
 })

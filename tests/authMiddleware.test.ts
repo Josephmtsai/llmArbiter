@@ -48,7 +48,7 @@ describe('middleware/auth', () => {
   })
 
   it('allows the request once a server check confirms the session', async () => {
-    check.mockResolvedValue(true)
+    check.mockResolvedValue('authenticated')
 
     await middleware({ path: '/decisions', fullPath: '/decisions' })
 
@@ -57,13 +57,28 @@ describe('middleware/auth', () => {
   })
 
   it('sends an unauthenticated visitor to /login carrying the original path (AC-5.1)', async () => {
-    check.mockResolvedValue(false)
+    check.mockResolvedValue('unauthenticated')
 
     await middleware({ path: '/decisions', fullPath: '/decisions?limit=10' })
 
     expect(navigateTo).toHaveBeenCalledWith({
       path: '/login',
       query: { redirect: '/decisions?limit=10' },
+    })
+  })
+
+  it('sends the visitor to /login when the probe could not complete (AC-5.5)', async () => {
+    // The guard decides whether to *admit*, so it fails closed: an `unknown`
+    // outcome is not permission to enter. The 401 interceptor makes the
+    // opposite call on the same value, because signing someone out on a failed
+    // probe is the destructive direction.
+    check.mockResolvedValue('unknown')
+
+    await middleware({ path: '/decisions', fullPath: '/decisions' })
+
+    expect(navigateTo).toHaveBeenCalledWith({
+      path: '/login',
+      query: { redirect: '/decisions' },
     })
   })
 })

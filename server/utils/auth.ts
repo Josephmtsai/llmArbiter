@@ -6,15 +6,30 @@ import { bufferEquals } from './constantTime'
 export const MIN_SECRET_LENGTH = 32
 
 /**
- * Values shipped in `.env.example`. They are public by definition, so a server
- * booted with one of them is effectively unauthenticated no matter how long the
- * string is. The superseded value is kept in the set so a deployment that
- * copied the older example is still caught.
+ * Fragments of the values shipped in `.env.example`, lower-cased. They are
+ * public by definition, so a server booted with one of them is effectively
+ * unauthenticated no matter how long the string is. The superseded example
+ * value is kept so a deployment that copied the older file is still caught.
+ *
+ * Matched as substrings against the trimmed, lower-cased secret, because the
+ * realistic failure is a copy-paste that picked up an editor's case change or a
+ * trailing newline, or that appended a suffix to the placeholder. That is the
+ * whole scope of this check: it catches an accident, and an operator who wants
+ * to run with a weak secret can trivially pick one that is not on this list.
  */
-export const PLACEHOLDER_SECRETS: ReadonlySet<string> = new Set([
+export const PLACEHOLDER_SECRET_FRAGMENTS: readonly string[] = [
   'replace-me-with-openssl-rand-hex-32-output',
   'change-me-at-least-32-characters-long',
-])
+  'change-me',
+  'replace-me',
+  'your-secret-here',
+]
+
+/** True when `value` looks like an unedited `.env.example` placeholder. */
+export function isPlaceholderSecret(value: string): boolean {
+  const normalized = value.trim().toLowerCase()
+  return PLACEHOLDER_SECRET_FRAGMENTS.some((fragment) => normalized.includes(fragment))
+}
 
 function sha256(value: string): Buffer {
   return createHash('sha256').update(value).digest()
@@ -61,7 +76,7 @@ export function assertStrongSecret(name: string, value: unknown): void {
       `${name} must be set and at least ${MIN_SECRET_LENGTH} characters long. See .env.example.`,
     )
   }
-  if (PLACEHOLDER_SECRETS.has(value)) {
+  if (isPlaceholderSecret(value)) {
     throw new Error(
       `${name} is still set to the .env.example placeholder. ` +
         'Generate a real secret with: openssl rand -hex 32',
@@ -168,13 +183,16 @@ export function createRateLimiter(opts: {
       }
 
       if (!bucket && buckets.size >= maxKeys) {
-        sweep(now)
-        if (buckets.size >= maxKeys) {
-          // Fail closed. A full table means this key cannot be counted, and a
-          // login endpoint that quietly stops rate limiting is worse than one
-          // that is briefly unavailable.
-          return denied(now, now)
-        }
+        // No second sweep here. The throttled one above is the only reclaim
+        // path, deliberately: sweeping on this branch is an O(maxKeys) scan
+        // that an attacker gets to trigger on every request once the table is
+        // full, which is the exact cost the throttle exists to bound.
+        //
+        // Fail closed. A full table means this key cannot be counted, and a
+        // login endpoint that quietly stops rate limiting is worse than one
+        // that is briefly unavailable. The table drains at the next sweep, so
+        // "briefly" is at most one window.
+        return denied(now, now)
       }
 
       buckets.set(key, { count: 1, windowStart: now })

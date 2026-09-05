@@ -63,6 +63,31 @@ describe('resolveSafeRedirect', () => {
   })
 
   it.each([
+    ['a traversal above the root', '/a/%2e%2e//evil.com'],
+    ['a traversal above the root, uppercase', '/a/%2E%2E//evil.com'],
+    ['a literal traversal above the root', '/a/..//evil.com'],
+    ['a traversal from the first segment', '/%2e%2e//evil.com'],
+    ['a traversal that lands on a host-looking path', '/settings/%2e%2e/%2e%2e//evil.com'],
+  ])('rejects %s, which normalises to protocol-relative (AC-4.7)', (_label, raw) => {
+    // The regression this guards: `new URL('/a/%2e%2e//evil.com', base).pathname`
+    // is `//evil.com`. The input passes every check on the raw string -- it is
+    // rooted, has no `//` prefix, no backslash, no control bytes -- so the only
+    // thing that catches it is re-running those checks on the parsed result.
+    // The origin check cannot: a path-relative input always resolves to the
+    // parse base, whatever the path normalises to.
+    expect(resolveSafeRedirect(raw)).toBe('/')
+  })
+
+  it.each(['/LOGIN', '/Login', '/lOgIn/', '/LOGIN?redirect=/x', '/settings/%2e%2e/LogIn'])(
+    'refuses to bounce back to %s regardless of case (AC-4.8)',
+    (raw) => {
+      // vue-router matches paths case-insensitively by default, so `/LOGIN`
+      // renders the login page just as `/login` does.
+      expect(resolveSafeRedirect(raw)).toBe('/')
+    },
+  )
+
+  it.each([
     ['a newline', `/${ctrl(0x0a)}/evil.com`],
     ['a carriage return', `/${ctrl(0x0d)}/evil.com`],
     ['a tab', `/${ctrl(0x09)}/evil.com`],

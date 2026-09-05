@@ -52,38 +52,39 @@ export function useApi() {
    * Signing the user out on the second is wrong, and the response alone cannot
    * tell them apart -- so ask the server before touching anything.
    *
-   * The same probe settles the race where a slow request's 401 arrives after
-   * the user has signed back in: the session is valid by then, so nothing is
-   * cleared.
+   * The probe is coalesced and generation-stamped inside the store, which is
+   * what settles the two races here: a burst of 401s across several `useApi()`
+   * instances shares one request, and a probe outstanding when the user signs
+   * back in reports `unknown` instead of clearing the new session.
+   *
+   * Only a confirmed `unauthenticated` signs the user out. `unknown` means the
+   * check itself failed to complete, which is not evidence of anything.
    */
   async function verifyAndSignOut(): Promise<void> {
-    if (await authStore.check()) return
+    const outcome = await authStore.check()
+    if (outcome !== 'unauthenticated') return
     // Re-read the route: the probe is a round trip, and the user may have
     // reached the login page while it was outstanding.
     if (route.path === '/login') return
+    if (!authStore.claimSignOut()) return
     authStore.reset()
     void navigateTo({ path: '/login', query: { redirect: route.fullPath } })
-  }
-
-  // Collapses a burst of simultaneous 401s into one probe and one redirect,
-  // rather than one of each per failed request.
-  let pendingSignOut: Promise<void> | null = null
-
-  function handleUnauthorized(): void {
-    pendingSignOut ??= verifyAndSignOut().finally(() => {
-      pendingSignOut = null
-    })
   }
 
   const api = $fetch.create({
     baseURL: '/api/arbiter',
     onResponseError({ response }) {
-      if (response.status !== 401) return
-      // SSR has its own gate in middleware/auth.ts; navigating mid-render
-      // would abort the very request the server is still answering.
-      if (!import.meta.client) return
-      if (route.path === '/login') return
-      handleUnauthorized()
+      if (
+        !shouldHandleUnauthorized({
+          status: response.status,
+          // Typed `boolean | undefined` by Nuxt; only `true` means client.
+          isClient: import.meta.client === true,
+          path: route.path,
+        })
+      ) {
+        return
+      }
+      void verifyAndSignOut()
     },
   })
 
