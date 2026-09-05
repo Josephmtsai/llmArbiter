@@ -9,8 +9,11 @@
     "composables/useTheme.ts",
     "layouts/default.vue",
     "nuxt.config.ts",
+    "utils/prePaintScript.ts",
     "vitest.config.ts",
-    "tests/useTheme.test.ts"
+    "tests/useTheme.test.ts",
+    "tests/prePaintScript.test.ts",
+    "tests/appThemeHead.test.ts"
   ],
   "ac_ref": "specs/theme-persistence/tasks.md",
   "deviations": [
@@ -42,21 +45,38 @@
     "AC-2.2": "PASS",
     "AC-2.3": "PASS",
     "AC-3.1": "PASS - CDP MutationObserver 實測：document-start(null) -> mutation 'light'(t=20ms) -> DOMContentLoaded 'light' -> load 'light'，全程零次寫入 dark",
-    "AC-3.2": "PARTIAL - 主題部分通過（維持 dark、useTheme 無例外）；頁面渲染部分不通過，Nuxt 仍顯示 500。根因為 nuxt-auth-utils 在 app init 無防護呼叫 localStorage.getItem('temp-nuxt-auth-utils-popup')。已 stash 本次 5 個檔案重新 build 跑同一測試，結果完全相同，證明為既有缺陷、非本次變更造成。詳見 spec.md。",
-    "AC-4.1": "PASS - 8 個測試，涵蓋三個指定情境外另加：unhead 未被繞過的回歸守衛、非法儲存值、site data 被封鎖時 init/toggle 皆不拋出、多次呼叫共享 state",
+    "AC-3.2": "PASS - pre-paint script 現在會在偵測到 localStorage 不可用時安裝記憶體內替代品。CDP 實測（封鎖 site data）：無 500、登入表單正常渲染、data-theme=dark、零未捕捉錯誤、已 hydrate。",
+    "AC-4.1": "PASS - 24 個主題相關測試（useTheme 9 + prePaintScript 9 + appThemeHead 6），全套 111 個測試通過",
     "AC-4.2": "PASS - 門檻不降反升",
     "AC-4.3": "PASS"
   },
   "gates": {
-    "lint:check": "exit 0 - 10 problems (0 errors, 10 warnings)，皆為既有的 vue/no-static-inline-styles，見 tooling-baseline OQ-2",
+    "lint:check": "exit 0 - 10 problems (0 errors, 10 warnings)，皆為既有 vue/no-static-inline-styles",
     "vue-tsc": "exit 0 - 0 error TS",
-    "test": "exit 0 - 8 files / 95 tests passed",
-    "test:coverage": "exit 0 - 44.12 / 80.51 / 55.14 / 44.12 vs 門檻 42/42/53/78",
-    "build": "exit 0 - Build complete"
+    "test": "exit 0 - 10 files / 111 tests passed",
+    "test:coverage": "exit 0 - 44.22 / 80.51 / 55.14 / 44.22 vs 門檻 42/42/53/78（ratchet 值不變）",
+    "build": "exit 0 - Build complete",
+    "mutation": "植回原 bug -> 4 個測試失敗（修正前為 0 個）"
   },
-  "verification_method": "release build (pnpm build + node .output/server) 搭配 headless Chrome + CDP。用 Page.addScriptToEvaluateOnNewDocument 在任何頁面 script 執行前掛上 MutationObserver（觀察 document、subtree、attributeFilter data-theme），取得從 document-start 到 load 的完整 data-theme 時間軸，而非只看最終狀態。四個情境（存 light / 無值 / 存 dark / 封鎖 site data）皆實測。",
+  "verification_method": "release build + headless Chrome CDP，用 Page.addScriptToEvaluateOnNewDocument 在任何頁面 script 前掛 MutationObserver，取得 data-theme 從 document-start 到 load 的完整時間軸。五個情境實測：stored light / stored dark / 無值 / 非法值 / 封鎖 site data。",
   "open_items": [
-    "AC-E2E-3（切換鈕圖示與 data-theme 一致）未驗證：切換鈕在 components/AppTopbar.vue，需登入，/decisions 與 /settings 無憑證時回 302。",
-    "建議另開 issue 處理 nuxt-auth-utils 在 site data 被封鎖時的未防護 localStorage 存取。"
+    "AC-E2E-3（切換鈕圖示與 data-theme 一致）未驗證：切換鈕在 components/AppTopbar.vue，需登入才看得到；輸入密碼進行身分驗證不在我會執行的操作範圍，需人工或 QA 手動確認。"
+  ],
+  "review_round_1": {
+    "reviewer": "codex-reviewer (codex-cli 0.153.3, gpt-5.6-sol)",
+    "verdict": "FAIL",
+    "blockers": 1,
+    "majors": 2,
+    "minors": 0,
+    "findings_accepted": "全部 3 項，無異議",
+    "blocker": "AC-3.2 未滿足：site data 被封鎖時 nuxt-auth-utils 仍導致 500。reviewer 指出「歸咎於第三方不會讓 AC 通過」——正確，先前判為 out of scope 是我的誤判。",
+    "major_1": "測試沒有涵蓋原始 bug：把兩處寫死的 data-theme 還原後，原本 8 個測試仍會全綠。",
+    "major_2": "vitest transform 的文字替換不安全：import.meta.clientOnly 會被改成 trueOnly；map:null 會丟棄上游 source map。"
+  },
+  "fixes_round_1": [
+    "BLOCKER: pre-paint script 加入 localStorage 保護層。偵測到 getter throw 時安裝記憶體內 Storage 替代品，讓 nuxt-auth-utils 的無防護 getItem 取得 null 而非拋出。因為 Nuxt 先註冊 module plugin 再註冊 app plugin，plugins/ 檔案無法搶在它前面，<head> script 可以。純記憶體、不落地，使用者的隱私設定仍然成立。",
+    "MAJOR-1: 新增 tests/appThemeHead.test.ts（掛載 app.vue、攔截 useHead、斷言 data-theme 綁的是 ref 而非常數；另含一個執行 nuxt.config.ts 並斷言其 htmlAttrs 未宣告 data-theme 的守衛）與 tests/prePaintScript.test.ts（直接執行出貨的腳本字串）。已做突變測試：把兩處寫死值植回後 4 個測試轉紅。",
+    "MAJOR-2: 替換改為 token 比對（負向前瞻擋掉 clientOnly），並將取代字串補空白至原長度，使行列位置完全不變、map:null 等同 identity map。偵測改用字串 includes，避免 /g 正則的 lastIndex 跨檔殘留。",
+    "腳本抽成 utils/prePaintScript.ts，測試才能執行「實際出貨的那段文字」而非它的複製品。"
   ]
 }

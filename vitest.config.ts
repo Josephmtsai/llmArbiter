@@ -6,14 +6,37 @@ import { defineConfig } from 'vitest/config'
 // without this every client-only branch reads as undefined and silently never
 // runs - tests would "pass" while covering nothing. jsdom is a browser
 // environment, so client:true / server:false is the honest mapping.
+//
+// Two deliberate constraints on the replacement:
+//
+// - The negative lookahead stops `import.meta.clientOnly` becoming `trueOnly`.
+//   Without it the match is a prefix match, not a token match.
+// - Each replacement is padded to the exact byte length of the text it replaces,
+//   so every following token keeps its original line AND column. That is what
+//   makes `map: null` honest here: positions are unchanged, so the identity
+//   mapping Vitest falls back to is correct and v8 coverage still points at the
+//   right source locations.
+//
+// Known limitation: this is textual, not syntax-aware, so the literal string
+// "import.meta.client" inside a string or template would also be replaced. No
+// source file contains one (only composables/useTheme.ts uses these flags at
+// all), and a syntax-aware pass is not worth the dependency for two call sites.
+const FLAG_SUBSTITUTIONS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/import\.meta\.client(?![\w$])/g, 'true'],
+  [/import\.meta\.server(?![\w$])/g, 'false'],
+]
+
 const nuxtImportMetaFlags = {
   name: 'nuxt-import-meta-flags',
   transform(code: string, id: string) {
-    if (id.includes('node_modules') || !/import\.meta\.(client|server)/.test(code)) return null
-    return {
-      code: code.replace(/import\.meta\.client/g, 'true').replace(/import\.meta\.server/g, 'false'),
-      map: null,
-    }
+    // Plain substring guard, not `regex.test()`: a /g regex carries lastIndex
+    // across calls, so testing it here would make later files miss matches.
+    if (id.includes('node_modules') || !code.includes('import.meta.')) return null
+    const transformed = FLAG_SUBSTITUTIONS.reduce(
+      (acc, [pattern, value]) => acc.replace(pattern, (match) => value.padEnd(match.length)),
+      code,
+    )
+    return { code: transformed, map: null }
   },
 }
 

@@ -1,3 +1,5 @@
+import { PRE_PAINT_SCRIPT } from './utils/prePaintScript'
+
 export default defineNuxtConfig({
   devtools: { enabled: true },
 
@@ -18,11 +20,8 @@ export default defineNuxtConfig({
         {
           // Runs before first paint so a restored 'light' theme never flashes
           // dark. Hardcoded constant, no user input - not an XSS surface
-          // (CLAUDE.md §3). localStorage access itself throws when the browser
-          // blocks site data, hence the try/catch.
-          innerHTML:
-            "try{var t=localStorage.getItem('arb-theme');" +
-            "if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}",
+          // (CLAUDE.md §3).
+          innerHTML: PRE_PAINT_SCRIPT,
         },
       ],
       link: [

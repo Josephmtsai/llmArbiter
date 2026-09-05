@@ -44,6 +44,19 @@ describe('useTheme', () => {
     expect(theme.value).toBe('light')
   })
 
+  it('restores a saved dark theme', () => {
+    // Not redundant with the default: this asserts the stored value is read and
+    // honoured. A broken init() that always returned 'dark' would pass the
+    // default test below but fail nothing else without this one.
+    localStorage.setItem(STORAGE_KEY, 'dark')
+
+    const { theme, init } = useTheme()
+    theme.value = 'light'
+    init()
+
+    expect(theme.value).toBe('dark')
+  })
+
   it('defaults to dark when nothing is stored', () => {
     const { theme, init } = useTheme()
     init()

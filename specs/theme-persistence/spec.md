@@ -70,3 +70,15 @@ SA 階段漏掉的兩處，實作時發現並一併處理：
 已用實驗證明其為既有缺陷，而非本次變更造成：把本 feature 的 5 個檔案 `git stash` 後重新 build 並跑同一個測試，結果**完全相同**（同樣的 `[nuxt] error caught during app initialization SecurityError: blocked`、同樣的 500 頁）。
 
 建議另開 issue 處理 `nuxt-auth-utils` 的封鎖情境，不在本 feature 範圍內修改第三方模組行為。
+
+### 更正：AC-3.2 已修復（review round 1 之後）
+
+上一節把 AC-3.2 的失敗歸為「既有缺陷、不在範圍內」。codex-reviewer 判定這是 BLOCKER，理由成立——歸咎於第三方不會讓驗收條件通過。
+
+修法：pre-paint script 追加一層保護。它位於 `<head>`，早於 Nuxt entry bundle 與所有 module plugin 執行；偵測到 `localStorage` getter 拋出時，就地安裝一個記憶體內的 Storage 替代品，`nuxt-auth-utils` 那段無防護的 `getItem` 因此取得 `null` 而非例外。
+
+之所以不能用 `plugins/` 解決：Nuxt 先註冊 module plugin、再註冊 app plugin，使用者的 plugin 排不到 `nuxt-auth-utils` 前面。`<head>` script 可以。
+
+替代品僅存在記憶體、不寫入任何持久化儲存，因此使用者「封鎖 site data」的隱私設定仍然被尊重——差別只在頁面會正常渲染而不是死掉。
+
+CDP 實測（封鎖 site data）：無 500、登入表單正常渲染、`data-theme=dark`、零未捕捉錯誤、已 hydrate。
