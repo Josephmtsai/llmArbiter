@@ -57,12 +57,12 @@ export function createRateLimiter(opts: { limit: number; windowMs: number }): Ra
 ```
 
 ### AC
-- [ ] AC-1.1: Given 相同字串，When 呼叫 `verifyPassword(a, a)`，Then 回傳 `true`。
-- [ ] AC-1.2: Given 不同字串（含長度不同、其中一方為空字串），When 呼叫 `verifyPassword`，Then 回傳 `false` 且不拋錯。
-- [ ] AC-1.3: Given `createRateLimiter({ limit: 5, windowMs: 60_000 })`，When 同一 key 在同一視窗內 `hit` 5 次，Then 每次 `allowed === true`。
-- [ ] AC-1.4: Given 同上，When 第 6 次 `hit`，Then `allowed === false` 且 `retryAfterSec` 介於 1 到 60。
-- [ ] AC-1.5: Given key 已被拒絕，When 傳入 `now` 超過 `windowStart + windowMs`，Then 重新 `allowed === true`。
-- [ ] AC-1.6: Given 兩個不同 key，When 其中一個超過 limit，Then 另一個不受影響。
+- [x] AC-1.1: Given 相同字串，When 呼叫 `verifyPassword(a, a)`，Then 回傳 `true`。
+- [x] AC-1.2: Given 不同字串（含長度不同、其中一方為空字串），When 呼叫 `verifyPassword`，Then 回傳 `false` 且不拋錯。
+- [x] AC-1.3: Given `createRateLimiter({ limit: 5, windowMs: 60_000 })`，When 同一 key 在同一視窗內 `hit` 5 次，Then 每次 `allowed === true`。
+- [x] AC-1.4: Given 同上，When 第 6 次 `hit`，Then `allowed === false` 且 `retryAfterSec` 介於 1 到 60。
+- [x] AC-1.5: Given key 已被拒絕，When 傳入 `now` 超過 `windowStart + windowMs`，Then 重新 `allowed === true`。
+- [x] AC-1.6: Given 兩個不同 key，When 其中一個超過 limit，Then 另一個不受影響。
 
 ---
 
@@ -103,12 +103,12 @@ export default defineEventHandler(async (event) => {
 備註：rate limit 檢查放在 body 驗證之前，讓格式錯誤的請求也計入次數。`limiter` 為 module-level singleton（Nitro 單一 instance）。
 
 ### AC
-- [ ] AC-2.1: Given body 為空、非 JSON、或缺少 `password`，When POST `/api/auth/login`，Then 回 400 而非 500。
-- [ ] AC-2.2: Given `password` 為空字串，When POST，Then 回 400（即使 `authPassword` 亦為空字串也不可登入）。
-- [ ] AC-2.3: Given 密碼錯誤，When POST，Then 回 401 且不建立 session。
-- [ ] AC-2.4: Given 密碼正確，When POST，Then 回 `{ ok: true }` 且後續 GET `/api/auth/check` 回 `{ ok: true }`。
-- [ ] AC-2.5: Given 同一 IP 於 60 秒內已 POST 5 次，When 第 6 次 POST（不論密碼對錯），Then 回 429 且帶 `Retry-After` header。
-- [ ] AC-2.6: Given 程式碼，When 檢視 login route，Then 不存在 `!==` / `===` 直接比對密碼，且 `useRuntimeConfig` 有傳入 `event`。
+- [x] AC-2.1: Given body 為空、非 JSON、或缺少 `password`，When POST `/api/auth/login`，Then 回 400 而非 500。
+- [x] AC-2.2: Given `password` 為空字串，When POST，Then 回 400（即使 `authPassword` 亦為空字串也不可登入）。
+- [x] AC-2.3: Given 密碼錯誤，When POST，Then 回 401 且不建立 session。
+- [x] AC-2.4: Given 密碼正確，When POST，Then 回 `{ ok: true }` 且後續 GET `/api/auth/check` 回 `{ ok: true }`。
+- [x] AC-2.5: Given 同一 IP 於 60 秒內已 POST 5 次，When 第 6 次 POST（不論密碼對錯），Then 回 429 且帶 `Retry-After` header。
+- [x] AC-2.6: Given 程式碼，When 檢視 login route，Then 不存在 `!==` / `===` 直接比對密碼，且 `useRuntimeConfig` 有傳入 `event`。
 
 ---
 
@@ -129,9 +129,9 @@ export default defineNitroPlugin(() => {
 ```
 
 ### AC
-- [ ] AC-3.1: Given `NUXT_AUTH_PASSWORD` 未設定或長度 < 32，When 執行 `node .output/server/index.mjs` 或 `pnpm dev`，Then 程序啟動失敗並輸出含 `NUXT_AUTH_PASSWORD` 的錯誤訊息。
-- [ ] AC-3.2: Given `NUXT_AUTH_PASSWORD` 長度 ≥ 32，When 啟動，Then 正常啟動。
-- [ ] AC-3.3: Given 環境完全沒有 `NUXT_AUTH_PASSWORD`，When 執行 `pnpm build`，Then build 成功（plugin 不在 build 期執行）。
+- [x] AC-3.1: Given `NUXT_AUTH_PASSWORD` 未設定或長度 < 32，When 執行 `node .output/server/index.mjs` 或 `pnpm dev`，Then 程序啟動失敗並輸出含 `NUXT_AUTH_PASSWORD` 的錯誤訊息。
+- [x] AC-3.2: Given `NUXT_AUTH_PASSWORD` 長度 ≥ 32，When 啟動，Then 正常啟動。
+- [x] AC-3.3: Given 環境完全沒有 `NUXT_AUTH_PASSWORD`，When 執行 `pnpm build`，Then build 成功（plugin 不在 build 期執行）。
 
 ---
 
@@ -151,9 +151,9 @@ export function resolveSafeRedirect(raw: unknown, fallback = '/'): string {
 ```
 
 ### AC
-- [ ] AC-4.1: Given `'/decisions?limit=10'`，When 呼叫，Then 原樣回傳。
-- [ ] AC-4.2: Given `'https://evil.com'`、`'//evil.com'`、含反斜線的路徑、`undefined`、陣列，When 呼叫，Then 回傳 `'/'`。
-- [ ] AC-4.3: Given `'/login'` 或 `'/login?redirect=/x'`，When 呼叫，Then 回傳 `'/'`（避免登入後又回到登入頁）。
+- [x] AC-4.1: Given `'/decisions?limit=10'`，When 呼叫，Then 原樣回傳。
+- [x] AC-4.2: Given `'https://evil.com'`、`'//evil.com'`、含反斜線的路徑、`undefined`、陣列，When 呼叫，Then 回傳 `'/'`。
+- [x] AC-4.3: Given `'/login'` 或 `'/login?redirect=/x'`，When 呼叫，Then 回傳 `'/'`（避免登入後又回到登入頁）。
 
 ---
 
@@ -187,10 +187,11 @@ async function submit() {
 ```
 
 ### AC
-- [ ] AC-5.1: Given 未登入，When 直接開啟 `/decisions?limit=10`，Then 導向 `/login?redirect=%2Fdecisions%3Flimit%3D10`。
-- [ ] AC-5.2: Given 在 `/login?redirect=/decisions` 登入成功，When 登入完成，Then 導向 `/decisions`。
-- [ ] AC-5.3: Given 在 `/login?redirect=https://evil.com` 登入成功，When 登入完成，Then 導向 `/`。
-- [ ] AC-5.4: Given 在 `/login`（無 redirect）登入成功，When 登入完成，Then 導向 `/`（維持現行行為）。
+- [x] AC-5.1: Given 未登入，When 直接開啟 `/decisions?limit=10`，Then 導向 `/login?redirect=%2Fdecisions%3Flimit%3D10`。
+  - 實測 `Location` 為 `/login?redirect=/decisions?limit=10`（Vue Router 不會對 query value 內的 `/` 與 `?` 做 percent-encode）。以 `URLSearchParams` 解析後得到 `/decisions?limit=10`，與 AC 期望的目標路徑相同，僅字面編碼不同。
+- [x] AC-5.2: Given 在 `/login?redirect=/decisions` 登入成功，When 登入完成，Then 導向 `/decisions`。
+- [x] AC-5.3: Given 在 `/login?redirect=https://evil.com` 登入成功，When 登入完成，Then 導向 `/`。
+- [x] AC-5.4: Given 在 `/login`（無 redirect）登入成功，When 登入完成，Then 導向 `/`（維持現行行為）。
 
 ---
 
@@ -261,13 +262,13 @@ async function handleLogout() {
 ```
 
 ### AC
-- [ ] AC-6.1: Given login API 回 401，When 呼叫 `login()`，Then 回傳 `false`、`error === 'Invalid password'`、`authenticated === false`。
-- [ ] AC-6.2: Given login API 回 429，When 呼叫 `login()`，Then `error === 'Too many attempts, try again later'`。
-- [ ] AC-6.3: Given login API 回 500 或網路錯誤，When 呼叫 `login()`，Then `error === 'Server error, please try again'`。
-- [ ] AC-6.4: Given `authenticated === true` 且 logout API 失敗，When 呼叫 `logout()`，Then 回傳 `false`、`authenticated` 仍為 `true`、`error` 非 null。
-- [ ] AC-6.5: Given logout API 成功，When 呼叫 `logout()`，Then 回傳 `true`、`authenticated === false`。
-- [ ] AC-6.6: Given `authenticated === true`，When 呼叫 `reset()`，Then `authenticated === false`、`error === null`，且**不**發出任何 HTTP 請求。
-- [ ] AC-6.7: Given TopBar logout 失敗，When 使用者按 Logout，Then 停留在原頁面且不導向 `/login`。
+- [x] AC-6.1: Given login API 回 401，When 呼叫 `login()`，Then 回傳 `false`、`error === 'Invalid password'`、`authenticated === false`。
+- [x] AC-6.2: Given login API 回 429，When 呼叫 `login()`，Then `error === 'Too many attempts, try again later'`。
+- [x] AC-6.3: Given login API 回 500 或網路錯誤，When 呼叫 `login()`，Then `error === 'Server error, please try again'`。
+- [x] AC-6.4: Given `authenticated === true` 且 logout API 失敗，When 呼叫 `logout()`，Then 回傳 `false`、`authenticated` 仍為 `true`、`error` 非 null。
+- [x] AC-6.5: Given logout API 成功，When 呼叫 `logout()`，Then 回傳 `true`、`authenticated === false`。
+- [x] AC-6.6: Given `authenticated === true`，When 呼叫 `reset()`，Then `authenticated === false`、`error === null`，且**不**發出任何 HTTP 請求。
+- [x] AC-6.7: Given TopBar logout 失敗，When 使用者按 Logout，Then 停留在原頁面且不導向 `/login`。
 
 ---
 
@@ -292,10 +293,11 @@ const api = $fetch.create({
 備註：`useRoute` / `useAuthStore` / `navigateTo` 均在 Nuxt app context 內可用；`useApi()` 本身只在 setup / composable 中被呼叫，interceptor 執行時 app context 仍存在。若 Developer 發現 interceptor 內取不到 context，改為在 `useApi()` 函式內先取 `route` 與 `authStore`，再於 `$fetch.create` 閉包中使用。
 
 ### AC
-- [ ] AC-7.1: Given 已登入且 session 於伺服器端失效，When 任一頁面透過 `useApi` 呼叫得到 401，Then 瀏覽器導向 `/login?redirect=<原 fullPath>` 且 `authStore.authenticated === false`。
-- [ ] AC-7.2: Given 目前在 `/login`，When 收到 401，Then 不觸發 navigateTo（避免迴圈）。
+- [x] AC-7.1: Given 已登入且 session 於伺服器端失效，When 任一頁面透過 `useApi` 呼叫得到 401，Then 瀏覽器導向 `/login?redirect=<原 fullPath>` 且 `authStore.authenticated === false`。
+- [x] AC-7.2: Given 目前在 `/login`，When 收到 401，Then 不觸發 navigateTo（避免迴圈）。
 - [ ] AC-7.3: Given SSR 期間的 `useApi` 呼叫收到 401，When 執行，Then 不呼叫 `navigateTo`、不修改 store（由 `middleware/auth.ts` 處理）。
-- [ ] AC-7.4: Given 非 401 的錯誤（404 / 500），When 收到，Then 行為與現況相同（錯誤照常 throw 給呼叫端）。
+  - **未勾選原因**：`vitest.config.ts` 的 `nuxt-import-meta-flags` plugin 會把 `import.meta.client` 文字替換為 `true`，因此 SSR 分支在 Vitest 下無法被執行到，本機無法以自動化測試驗證。已以程式碼檢視確認 `composables/useApi.ts` 內 `if (!import.meta.client) return` 位於 `authStore.reset()` 與 `navigateTo` 之前。
+- [x] AC-7.4: Given 非 401 的錯誤（404 / 500），When 收到，Then 行為與現況相同（錯誤照常 throw 給呼叫端）。
 
 ---
 
@@ -328,9 +330,9 @@ import { createPinia, setActivePinia } from 'pinia'
 ```
 
 ### AC
-- [ ] AC-8.1: Given 上述三個測試檔，When 執行 `pnpm test`，Then 全部通過。
-- [ ] AC-8.2: Given `pnpm test:coverage`，When 檢視 `server/utils/auth.ts`、`utils/auth.ts`、`stores/useAuthStore.ts`，Then 每檔 statements 覆蓋率 ≥ 80%。
-- [ ] AC-8.3: Given 完成後，When 執行 `pnpm lint` 與 `pnpm vue-tsc --noEmit`，Then 無錯誤、無 `any`、無 `console.log`。
+- [x] AC-8.1: Given 上述三個測試檔，When 執行 `pnpm test`，Then 全部通過。
+- [x] AC-8.2: Given `pnpm test:coverage`，When 檢視 `server/utils/auth.ts`、`utils/auth.ts`、`stores/useAuthStore.ts`，Then 每檔 statements 覆蓋率 ≥ 80%。
+- [x] AC-8.3: Given 完成後，When 執行 `pnpm lint` 與 `pnpm vue-tsc --noEmit`，Then 無錯誤、無 `any`、無 `console.log`。
 
 ---
 
@@ -340,3 +342,25 @@ import { createPinia, setActivePinia } from 'pinia'
 - `pnpm lint`、`pnpm vue-tsc --noEmit`、`pnpm test`、`pnpm build` 全部通過。
 - 手動驗證（本機 `pnpm dev`）：錯密碼 5 次後第 6 次顯示 rate-limit 訊息；登入後刪除 cookie 再操作任一頁面會回到 `/login?redirect=...`；登入後回到原頁。
 - `handoff-dev.json` 列出所有 `changed_files`。
+
+---
+
+## 驗證紀錄（Developer, 2026-09-05）
+
+| Gate | 指令 | 結果 |
+| --- | --- | --- |
+| Lint | `pnpm lint:check` | 0 errors / 10 warnings（皆為既有的 `vue/no-static-inline-styles`） |
+| Types | `pnpm vue-tsc` | 無錯誤 |
+| Tests | `pnpm test:coverage` | 18 files / 217 tests 全數通過，覆蓋率門檻通過 |
+| Build | `pnpm build` | 成功 |
+
+覆蓋率實測（All files）：statements 48.59 / branches 83.62 / functions 67.58 / lines 48.59。
+依 ratchet 規則已把 `vitest.config.ts` 門檻調升為 46 / 81 / 65 / 46。
+本功能新增檔案的單檔覆蓋率：`server/utils/auth.ts` 100%、`utils/auth.ts` 100%、
+`stores/useAuthStore.ts` statements 100% / branches 85.71%、`middleware/auth.ts` 100%、
+`composables/useApi.ts` statements 100%、`pages/login.vue` statements 97.36%。
+
+AC-2.x / AC-3.x / AC-5.1 以實際 build 產物驗證：啟動 `node .output/server/index.mjs`（受控環境變數、
+每個 rate-limit 相關階段各起一台乾淨 server，因為所有請求共用 127.0.0.1），共 14 項 runtime 檢查全部通過。
+DoD 的手動 `pnpm dev` 驗證改以此腳本等價完成：本 worktree 的 `.env` 沒有 `NUXT_AUTH_PASSWORD`，
+依交辦指示未修改 `.env`，改在 `.env.example` 註明最低 32 字元與啟動斷言。

@@ -69,12 +69,14 @@ export default defineConfig({
       // §5). Ratcheted by `theme-persistence` on 2026-09-05 from the
       // tooling-baseline starting point of 41/41/51/78: measured
       // lines 44.22 / statements 44.22 / functions 55.14 / branches 80.51.
-      // Branches stays at 78 - floor(80.51) - 2 is still 78.
+      // Branches stayed at 78 there - floor(80.51) - 2 is still 78.
+      // Ratcheted again by `auth-hardening` on 2026-09-05: measured
+      // lines 48.59 / statements 48.59 / functions 67.58 / branches 83.62.
       thresholds: {
-        lines: 42,
-        statements: 42,
-        functions: 53,
-        branches: 78,
+        lines: 46,
+        statements: 46,
+        functions: 65,
+        branches: 81,
       },
     },
   },

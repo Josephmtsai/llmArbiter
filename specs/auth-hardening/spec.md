@@ -77,14 +77,29 @@
 
 ## Architecture Decision
 
-- **純函式抽離**：`verifyPassword` / `createRateLimiter` 放 `server/utils/auth.ts`。Nitro 會 auto-import `server/utils/*`，同時 Vitest 可用相對路徑直接 import，不需 mock Nitro runtime。
+- **純函式抽離**：`verifyLoginPassword` / `createRateLimiter` 放 `server/utils/auth.ts`。Nitro 會 auto-import `server/utils/*`，同時 Vitest 可用相對路徑直接 import，不需 mock Nitro runtime。
 - **SHA-256 normalize 再 timingSafeEqual**：`timingSafeEqual` 要求等長 buffer；先對雙方做 `createHash('sha256')` 可讓長度固定為 32 bytes，避免以長度差異提前 return 洩漏資訊。
 - **Rate limit 設計**：fixed window（非 sliding）以維持 KISS；Map 於每次 `hit()` 時順手清除過期 entry，避免記憶體無限成長。限制常數 `limit=5`、`windowMs=60_000` 寫在 login route 建立 limiter 處，不放 runtimeConfig（YAGNI）。
 - **啟動斷言用 Nitro plugin 而非 nuxt.config hook**：plugin 只在 runtime 執行，不會讓 CI `pnpm build` 因缺 env 失敗；`.env.example` 已提供 ≥ 32 字元 placeholder。
 - **401 攔截放在 `useApi` 而非 route middleware**：session 過期多發生在頁面已載入後的 API 呼叫，route middleware 攔不到；`useApi` 是所有 `/api/arbiter/*` 呼叫的唯一入口。攔截時只 `reset()` 本地狀態，不呼叫 logout API（session 已無效，呼叫也會 401）。
 - **`reset()` 與 `logout()` 分離**：`logout()` 必須真的成功才清狀態；`reset()` 給「伺服器已判定未登入」的情境用。兩者語意不同，不合併。
+- **實作偏離（D1）**：函式名由 spec 的 `verifyPassword` 改為 `verifyLoginPassword`。`nuxt-auth-utils` 已 auto-import 一個語意不同的 `verifyPassword(hash, plain)`（scrypt 驗證），同名會在全域 auto-import 造成 `Duplicated imports` 警告與靜默覆蓋。
 - **Open-redirect 規則**：只接受 `startsWith('/') && !startsWith('//')` 且不含 `\`；不做白名單，因為 app 路由會持續增加。
 
 ## Acceptance Criteria
 
 See `tasks.md`.
+
+## Coverage 實測（Developer, 2026-09-05）
+
+`pnpm test:coverage`（18 test files / 217 tests 全數通過）All files：
+
+| Metric | 實測 | 調整後門檻 |
+| --- | --- | --- |
+| statements | 48.59 | 46 |
+| branches | 83.62 | 81 |
+| functions | 67.58 | 65 |
+| lines | 48.59 | 46 |
+
+依 tooling-baseline AD-6 的 ratchet 規則（實測向下取整減 2，只升不降），
+`vitest.config.ts` 門檻由 43 / 79 / 56 / 43 調升為上表數值。
