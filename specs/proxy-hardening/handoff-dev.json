@@ -3,9 +3,9 @@
   "to": "codex-reviewer",
   "feature": "proxy-hardening",
   "status": "ready",
-  "retry_count": 1,
+  "retry_count": 2,
   "max_retries": 2,
-  "summary": "Review round 1 的 no-ship 修正。修掉 redirect 跟隨（改 redirect:'manual'，3xx 一律 502）、path 正規化（改用 parser identity：decodeURI(new URL(wildcard,base).pathname) 必須等於 '/'+wildcard）、streaming（sendStream 換成 pipeline，有 backpressure 且 client 斷線會取消上游）、request body 讀取失敗不再被吞掉（改回 400）、錯誤訊息只回固定 token（detail 只進 stderr）。route 拆成 functional core（server/utils/proxyHandler.ts，41 tests，四項指標皆 100%）+ h3 shell，shell 本身由新的 e2e 測試（跑起 build 出來的 server + mock upstream，走 raw socket）覆蓋並進 CI。另外撤回 review #3 的 Critical 嚴重性：實測 Nitro 會先 decodeURI 再交給 handler，%2e%2e 在原本的字面檢查就已經是 '..' 被擋下，該 bypass 只存在於純函式層而非 route；hardening 仍保留作為 defence in depth。",
+  "summary": "Review round 2 的 no-ship 修正。最重要的是 finding 1：h3 在 routing 之前就用 ufo decodePath（decodeURIComponent 語意，只保護 %2F 與 %25）解過 path，所以 getRouterParam 拿到的已經不是 client 送的東西 —— 對 build 出來的 server 實測，/api/arbiter/config/rules/a%3Fb 會變成 routerParam 'config/rules/a' + query {b:''}，proxy 靜靜地對『另一個資源』回了 200；rate%25limit 與 a%23b 則是誤判 404。split 之後再怎麼驗都救不回已經遺失的 bytes，所以改成結構性修法：handler 改讀 event.node.req.originalUrl，自己在第一個 '?' 切開（validateProxyTarget），validateProxyPath 驗的是完全未解碼的原始 wildcard，query 逐 byte 原樣轉發，serializeQuery 整個刪掉。finding 2：被拒絕的 3xx 會留著 live body 佔住上游 socket，現在會先 cancel。另外自己補一個 report 沒提到的繞法：WHATWG parser 不會把 reserved %2F 當分隔符，health/%2F%2E%2E/admin 可以原封不動通過 identity 檢查，但 ASGI 上游解完會落在 /health/../admin —— 加上 %2E 一律拒絕的規則，並用測試證明 parser 真的不動那些輸入。finding 3/4 是測試本身的問題：e2e 對四個控制項完全無感（redirect 拒絕、auth gate、response body pipeline、request body 轉發），現在補齊並加上 scripts/proxy-mutation-check.mjs，逐一從 build 出來的 chunk 刪掉控制項並要求測試失敗，四個全部被殺；port 預約的 race 改成 EADDRINUSE 重試（PORT=0 沒用，Nitro 會當 falsy 然後綁 3000）。",
   "changed_files": [
     "server/utils/proxyPolicy.ts",
     "server/utils/proxyHandler.ts",
@@ -13,18 +13,24 @@
     "tests/proxyPolicy.test.ts",
     "tests/proxyHandler.test.ts",
     "tests/e2e/proxy.e2e.test.ts",
+    "scripts/proxy-mutation-check.mjs",
     "vitest.config.ts",
     "vitest.e2e.config.ts",
     "package.json",
     ".github/workflows/ci.yml",
     "specs/proxy-hardening/spec.md",
     "specs/proxy-hardening/tasks.md",
-    "specs/proxy-hardening/review-codex-1.md"
+    "specs/proxy-hardening/review-codex-1.md",
+    "specs/proxy-hardening/review-codex-2.md"
   ],
   "ac_ref": "specs/proxy-hardening/tasks.md",
   "branch": "feat/proxy-hardening",
   "base": "7821674",
-  "commits": ["995d4a2", "674b9f7", "dfad3ce"],
+  "commits": [
+    "995d4a2",
+    "674b9f7",
+    "dfad3ce"
+  ],
   "retry_history": [
     {
       "round": 1,
@@ -96,26 +102,82 @@
           "resolution": "Fixed by adding a real assertion at the route level: AC-5.4 drives GET /api/arbiter/decisions?limit=5 through the built server and asserts the mock upstream received exactly '/decisions?limit=5'. The pure-function test is kept as a unit-level contract for serializeQuery."
         }
       ]
+    },
+    {
+      "round": 2,
+      "reviewer": "codex-cli 0.153.3 (high reasoning)",
+      "report": "specs/proxy-hardening/review-codex-2.md",
+      "verdict": "no-ship",
+      "note": "The round-2 agent produced an empty output file and never wrote its report. The report was recovered verbatim from the codex rollout log (payload.last_agent_message) and committed as 52a67ac before any fix was attempted, so the findings below are the reviewer’s own words, not a reconstruction.",
+      "findings": [
+        {
+          "id": "codex-2-1",
+          "severity_reported": "Critical",
+          "severity_agreed": "Critical",
+          "what": "The handler validated h3’s decoded router parameter, not the request target. h3 runs ufo decodePath (decodeURIComponent semantics, only %2F and %25 protected) on the path half of the raw URL before the router splits it, so an encoded delimiter is gone by the time any check runs.",
+          "measured": "Against .output/: /api/arbiter/config/rules/a%3Fb -> routerParam \"config/rules/a\", query {b:\"\"} -> upstream GET /config/rules/a?b= with a 200. /api/arbiter/config/rules/rate%25limit -> \"config/rules/rate%limit\" -> 404. /api/arbiter/config/rules/a%23b -> \"config/rules/a\" -> 404.",
+          "resolution": "Fixed structurally. The shell reads event.node.req.originalUrl (assigned once by h3 before any layer runs, per createAppEventHandler) and validateProxyTarget splits at the first \"?\" itself. validateProxyPath now takes the raw, undecoded wildcard and only case-canonicalises escapes (%2f -> %2F). serializeQuery and QueryInput are deleted; the query is relayed byte for byte. Covered by AC-6.1 through AC-6.4."
+        },
+        {
+          "id": "codex-2-2",
+          "severity_reported": "Major",
+          "severity_agreed": "Major",
+          "what": "A refused upstream redirect returned 502 without cancelling the response body, so the upstream socket stayed occupied until GC or the 30s signal. A redirect loop could drain the connection pool while every request got a prompt 502.",
+          "resolution": "Fixed. await upstream.body?.cancel().catch(() => undefined) before returning. Three tests: cancel is called once and the stream is left unlocked, a rejecting cancel still yields 502, and a bodyless 3xx does not throw. AC-6.6."
+        },
+        {
+          "id": "codex-2-3",
+          "severity_reported": "Major",
+          "severity_agreed": "Major",
+          "what": "The e2e suite was vacuous for four shell controls: removing redirect:\"manual\", making getSessionUser always truthy, replacing the pipeline with res.end(), or making readBody return undefined all left the suite green. Every case was an authenticated GET against an upstream that never redirected and whose body nobody read.",
+          "resolution": "Fixed, and automated so it cannot regress. The mock upstream now serves a real cross-origin 302 (to a third server that records whether it was ever contacted) and a 512KB body; the suite adds an unauthenticated request, a PUT, a full-body comparison and POST/PATCH/DELETE body relay. scripts/proxy-mutation-check.mjs (pnpm test:e2e:mutation, a CI step after the e2e one) deletes each of the four controls from the built chunk in turn and requires the suite to fail. All four are killed. AC-6.7."
+        },
+        {
+          "id": "codex-2-4",
+          "severity_reported": "Minor",
+          "severity_agreed": "Minor",
+          "what": "reservePort closes its listener before spawning the application, so the port is unreserved for the whole of start-up.",
+          "resolution": "Fixed as a retry rather than a narrower window: a failed bind is retried on a fresh port up to 5 times, and any other start-up failure is reported with the captured server log. PORT=0 was measured and does not work — Nitro reads it as falsy and binds 3000. AC-6.8."
+        },
+        {
+          "id": "self-2-5",
+          "severity_reported": "not in the report — found while fixing #1",
+          "severity_agreed": "Major",
+          "what": "health/%2F%2E%2E/admin and health/%2F%2E%2E%2Fadmin survive the parser-identity check byte-for-byte, because the WHATWG parser does not treat a reserved %2F as a separator. An upstream that decodes the whole target lands on /health/../admin.",
+          "resolution": "Fixed by rejecting any %2E outright: a dot never needs encoding inside a path segment, so the escape only ever appears to smuggle a dot segment. Two tests assert the parser really does leave those inputs unchanged, so the rule is shown to be load-bearing rather than redundant with identity. AC-6.5."
+        }
+      ],
+      "behaviour_delta": {
+        "what": "Deleting serializeQuery removes a server-side normalisation of two query shapes that ufo withQuery handles differently: {since: null} serialises to a bare \"?since\", and {action: [\"a\", undefined, \"b\"]} to \"?action=a&action=undefined&action=b\" (both measured against the installed ufo).",
+        "why_accepted": "Neither reaches the proxy from this codebase: getDecisions filters v != null itself, the remaining callers pass typed optional params, and ofetch drops undefined values client-side. Re-introducing a server-side rewrite of the query is precisely what caused finding 1, so the verbatim relay stands. Recorded in tasks.md under Task 6 rather than dropped silently."
+      }
     }
   ],
   "verification": {
     "lint_check": "pnpm lint:check — 0 errors, 10 warnings (all pre-existing vue/no-static-inline-styles in pages/*.vue, unchanged from base)",
     "vue_tsc": "pnpm vue-tsc — clean, exit 0",
-    "test_coverage": "pnpm test:coverage — 12 files, 256 tests passed. All files 45.36 lines / 83.15 branches / 59.33 functions / 45.36 statements. server/utils/proxyHandler.ts 100/100/100/100. server/utils/proxyPolicy.ts 98.33/97.18/100/98.33 (the two uncovered lines are the new URL catch, unreachable by construction, kept as a degrade-to-404 guard).",
+    "test_coverage": "pnpm test:coverage — 12 files, 280 tests passed. All files 45.31 lines / 83.33 branches / 59.6 functions / 45.31 statements. server/utils/proxyHandler.ts 100/100/100/100. server/utils/proxyPolicy.ts 98.3/97.36/100/98.3 (uncovered: lines 159-160, the new URL catch, unreachable by construction and kept as a degrade-to-404 guard).",
     "build": "pnpm build — complete, exit 0",
-    "test_e2e": "pnpm test:e2e — 1 file, 15 tests passed against the built server (.output/server/index.mjs) plus a mock upstream, over a raw node:http socket.",
-    "coverage_ratchet": "functions 56 -> 57. lines/statements stay 43 (floor(45.36)-2 = 43), branches stays 81 (floor(83.15)-2 = 81).",
-    "hooks": "The round-1 commit went through husky pre-commit (lint-staged + vitest run --changed). --no-verify was not used.",
-    "e2e_non_vacuous": "Mutation check: the traversal and not-normalized guards were deleted from the built bundle (.output/server/chunks/_/nitro.mjs) and 7 of the 8 AC-5.1 traversal cases failed. The bundle was restored from a backup and the suite re-run green."
+    "test_e2e": "pnpm test:e2e — 1 file, 28 tests passed against the built server (.output/server/index.mjs) plus a mock upstream and a separate redirect-target server, over a raw node:http socket.",
+    "test_e2e_mutation": "pnpm test:e2e:mutation — M1 redirect:\"manual\", M2 the session gate, M3 the response-body pipeline and M4 the request-body reader are each deleted from the built shell chunk in turn; the e2e suite fails on all four. M5 (req.url for originalUrl) survives and is asserted to, with the h3 source reason recorded in the script.",
+    "coverage_ratchet": "No change this round. Measured 45.31/83.33/59.6 gives floor-2 of 43/81/57, which is what vitest.config.ts already holds.",
+    "hooks": "Both round-2 commits went through husky pre-commit (lint-staged + vitest run --changed). --no-verify was not used."
   },
   "runtime_evidence": {
-    "nitro_decodes_the_wildcard": [
-      "request line /api/arbiter/health/%2e%2e/admin    -> routerParam \"health/../admin\"",
-      "request line /api/arbiter/config/rules/my%20rule -> routerParam \"config/rules/my rule\"",
-      "request line /api/arbiter/health/..%2fadmin      -> routerParam \"health/..%2Fadmin\"  (reserved %2f stays encoded)"
+    "h3_decodes_the_path_before_routing": [
+      "h3 1.15.11 createAppEventHandler: originalUrl is assigned once, before any layer runs; _decodePath (ufo decodePath, decodeURIComponent-based with %2F and %25 protected) is applied to the path half of the raw URL; req.url is then reassigned per layer.",
+      "request line /api/arbiter/config/rules/a%3Fb        -> routerParam \"config/rules/a\", query {b:\"\"}  (200 against the WRONG resource)",
+      "request line /api/arbiter/config/rules/rate%25limit -> routerParam \"config/rules/rate%limit\"       (false 404)",
+      "request line /api/arbiter/config/rules/a%23b        -> routerParam \"config/rules/a\"                (false 404)",
+      "All three now return 200 with the upstream receiving the path byte-for-byte as sent."
     ],
-    "regression_caught_by_the_new_e2e_layer": "The first round-1 fix decoded a second time and refused raw spaces. GET /api/arbiter/config/rules/my%20rule returned 404 ('[proxy] path rejected (unsafe-char)') and never reached the upstream, while every unit test stayed green. It now returns 200 and the upstream receives /config/rules/my%20rule.",
-    "upstream_headers_observed": "user-agent: arbiter-proxy on every hit; cookie never forwarded; x-api-key present on every hit."
+    "why_originalUrl_and_not_req_url": "req.url happens to hold the same string today: h3 restores the raw URL whenever decoding changed it and the layer is mounted at \"/\", which is how Nitro mounts this router. That is measured, not relied on — the mutation check records it as an equivalent mutant (M5) rather than as covered behaviour. originalUrl is used because it is assigned once, before any layer runs, so it also survives a future nested mount.",
+    "parser_facts_the_rules_rest_on": [
+      "The WHATWG serializer upper-cases hex escapes (%3f -> %3F), so escapes are canonicalised before comparison rather than rejected for spelling.",
+      "%zz and a bare % pass through the parser unchanged, so identity cannot catch a malformed escape — hence the explicit BAD_ESCAPE rule.",
+      "A reserved %2F is not treated as a separator, so health/%2F%2E%2E/admin survives identity byte-for-byte — hence the explicit %2E rule."
+    ],
+    "upstream_headers_observed": "user-agent: arbiter-proxy on every hit; cookie never forwarded; x-api-key present on every hit; the redirect target server recorded zero requests."
   },
   "open_ac": [
     {
@@ -147,13 +209,21 @@
       "what": "A new npm script (test:e2e), a second vitest config (vitest.e2e.config.ts) and a new CI step were added, which are outside the original spec's file list.",
       "why": "Review #7 required the route to be covered by something repeatable that runs in CI. The e2e suite needs a build in .output/ and a node environment, so it cannot share the unit config without slowing every unit run and dragging measured coverage down with a file v8 cannot see into.",
       "impact": "pnpm test and pnpm test:coverage are unchanged in scope and runtime. CI gains one step after Build."
+    },
+    {
+      "id": "D5",
+      "what": "A second new npm script (test:e2e:mutation), a new scripts/ directory and a second CI step were added.",
+      "why": "Round-2 finding 3 was that a green e2e run proved nothing for four controls. A committed, runnable mutation check is the only form of that answer that survives the next change to the suite.",
+      "impact": "CI gains one step after the e2e one, roughly five e2e runs long (~10s total here). pnpm test and pnpm test:coverage are unchanged."
     }
   ],
   "notes": [
     "Nothing was pushed and nothing was merged, per instruction.",
-    "The throwaway runtime probe (probe-traversal.mjs) used during this round has been deleted; its cases live on in tests/e2e/proxy.e2e.test.ts.",
-    "vitest.config.ts on this branch ratchets thresholds to 43/43/57/81; feat/auth-hardening ratchets the same file to different numbers. Whichever merges second must take the maximum of each metric, not the incoming value.",
+    "retry_count is now 2 of max_retries 2. A further FAIL is escalated to the user rather than retried.",
+    "The round-2 review agent wrote no report file; it was recovered from the codex rollout log and committed as 52a67ac before any fix was attempted.",
+    "vitest.config.ts on this branch holds thresholds 43/43/57/81 (unchanged this round); feat/auth-hardening ratchets the same file to different numbers. Whichever merges second must take the maximum of each metric, not the incoming value.",
     "process.stderr.write is still used for error detail because no logger utility exists yet; utils/logger.ts arrives with silent-failure-elimination and this call site should move to it then.",
-    "A fresh `pnpm exec nuxt prepare` is required in a new worktree before vitest runs; tsconfig extends .nuxt/tsconfig.json."
+    "A fresh `pnpm exec nuxt prepare` is required in a new worktree before vitest runs; tsconfig extends .nuxt/tsconfig.json.",
+    "scripts/proxy-mutation-check.mjs edits .output/ in place and always restores it, including on an assertion failure. It needs a prior pnpm build."
   ]
 }

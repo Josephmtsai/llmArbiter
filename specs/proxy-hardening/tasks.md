@@ -79,8 +79,8 @@ export function classifyUpstreamError(error: unknown, secret: string): UpstreamF
 - [x] AC-1.2: Given wildcard `'decisions/stats'` When `validateProxyPath` is called Then `{ ok: true, path: '/decisions/stats' }`.
 - [x] AC-1.3: Given `'health'` Then ok; Given `'healthz'` Then `{ ok: false, reason: 'not-allowed' }`; Given `'admin/users'` Then `not-allowed`.
 - [x] AC-1.4: Given `'cases/../config'` Then `reason: 'traversal'`; Given `'cases//1'` Then `reason: 'double-slash'`; Given `''` Then `reason: 'empty'`.
-- [x] AC-1.5: Given `{ limit: 20, action: undefined, since: null }` When `serializeQuery` is called Then result is `'limit=20'` (no `action=` / `since=`).
-- [x] AC-1.6: Given `{ action: ['a', undefined, 'b'] }` Then `'action=a&action=b'`; Given `{}` Then `''`.
+- [~] AC-1.5: **Superseded in review round 2.** `serializeQuery` is deleted; the query is relayed byte for byte (see AC-6.4). Object-shaped query input no longer exists, so there is nothing to serialize. See the delta note under Task 6.
+- [~] AC-1.6: **Superseded in review round 2**, same reason as AC-1.5.
 - [x] AC-1.7: Given `{ cookie: 'nuxt-session=x', authorization: 'Bearer y', referer: 'https://z', 'user-agent': 'UA', 'content-type': 'application/json', accept: 'application/json', host: 'localhost' }` When `pickForwardHeaders` is called Then result equals exactly `{ 'content-type': 'application/json', accept: 'application/json' }`.
 - [x] AC-1.8: Given upstream `Headers` containing `set-cookie`, `content-type`, `content-length`, `x-powered-by` When `pickResponseHeaders` is called Then result equals exactly `{ 'content-type': <value> }`.
 - [x] AC-1.9: Given `new DOMException('x', 'TimeoutError')` (and an `Error` whose `cause` is that DOMException) When `classifyUpstreamError` is called Then `{ statusCode: 504, message: 'upstream-timeout' }`.
@@ -164,7 +164,7 @@ Notes for Developer:
 - [x] AC-2.6: Given the upstream mock responds `422` with a JSON body When the browser calls `POST /api/arbiter/analyze` Then the browser receives `422` and the same JSON body (status/body passthrough preserved).
 - [x] AC-2.7: Given the upstream mock sleeps longer than 30 s When the browser calls `GET /api/arbiter/health` Then the response is `504` with `message: 'upstream-timeout'` at ~30 s.
 - [x] AC-2.8: Given `NUXT_API_BASE_URL` points to a closed port When the browser calls `GET /api/arbiter/health` Then the response is `502`, its message starts with `upstream-unreachable:`, and the response body does not contain the value of `NUXT_API_KEY`.
-- [x] AC-2.9: Given the browser calls `GET /api/arbiter/decisions?limit=20&action=` via `useApi().getDecisions({ limit: 20, action: undefined })` When the upstream mock records the URL Then it is `/decisions?limit=20` (no `action=`).
+- [x] AC-2.9: Given the browser calls `GET /api/arbiter/decisions?limit=20&action=` via `useApi().getDecisions({ limit: 20, action: undefined })` When the upstream mock records the URL Then it is `/decisions?limit=20` (no `action=`). **Round 2 note:** still true, but no longer because the proxy strips it. The proxy now relays the query verbatim; the key never reaches it, because `getDecisions` filters `v != null` itself and ofetch/ufo `withQuery` drops `undefined` values client-side (measured). See the delta note under Task 6.
 - [x] AC-2.10: Given `POST /api/arbiter/cases` with a JSON body When forwarded Then the upstream receives the identical body and `content-type: application/json`.
 - [ ] AC-2.11 (NOT VERIFIED - see note below): All existing pages (`/analyze`, `/decisions`, `/settings`, `/cases`, `/evaluate`, optimizer history, sidebar health check) continue to work against the real backend — no regressions in manual smoke test.
 - [x] AC-2.12: `pnpm lint`, `pnpm vue-tsc --noEmit`, `pnpm test` all pass.
@@ -277,8 +277,9 @@ excluded from `pnpm test` / `pnpm test:coverage` and has its own config
       upstream records no request for any of them.
 - [x] AC-5.2: A `404` body contains neither `not-allowed` nor `traversal`.
 - [x] AC-5.3: `GET /api/arbiter/config/rules/my%20rule` returns `200` and the upstream receives
-      `/config/rules/my%20rule` — the encoded space is decoded by Nitro and re-encoded by the
-      proxy, not rejected.
+      `/config/rules/my%20rule`. **Amended in round 2:** the encoding is no longer decoded and
+      re-encoded — the raw bytes are carried straight through. Extended to `a%3Fb`,
+      `rate%25limit` and `a%23b`, each of which round 2 found broken (AC-6.1).
 - [x] AC-5.4: `GET /api/arbiter/health` reaches the upstream as `/health`;
       `GET /api/arbiter/decisions?limit=5` as `/decisions?limit=5`.
 - [x] AC-5.5: Every request the upstream received carries `x-api-key`, carries no `cookie`, and
@@ -287,3 +288,73 @@ excluded from `pnpm test` / `pnpm test:coverage` and has its own config
       (`.github/workflows/ci.yml`).
 - [x] AC-5.7: The suite is non-vacuous: with the traversal and `not-normalized` guards deleted
       from the built bundle, 7 of the 8 AC-5.1 cases fail. Re-verified green after restoring.
+      **Round 2 found this claim too narrow** — it covered the path guard only, and four other
+      controls were uncovered. Superseded by AC-6.7, which automates the check.
+
+---
+
+## Task 6 — Review round 2 corrections
+
+Round 2 rejected the round-1 implementation (`no-ship`) on four findings. Two were live defects
+in the proxy, two were gaps in what the tests could prove.
+
+**Finding 1 — the router parameter is not the request path.** h3 decodes the path half of the
+raw URL with ufo's `decodePath` (`decodeURIComponent` semantics, only `%2F` and `%25` protected)
+*before* the router splits it. Measured against `.output/`, three legitimate inputs broke:
+`config/rules/a%3Fb` proxied to `/config/rules/a` with a **200** — the wrong resource, silently —
+while `rate%25limit` and `a%23b` 404'd. No check placed after that split can recover the lost
+bytes, so the handler now reads `event.node.req.originalUrl` and does its own `?` split
+(`validateProxyTarget`). `validateProxyPath` validates the raw, undecoded wildcard.
+
+**Finding 2 — a refused redirect leaked its body.** A manual-redirect response still carries a
+live body, and the streaming path that would drain it never runs for a 3xx. The socket stayed
+occupied until GC or the 30 s signal, so a redirect loop could drain the connection pool while
+every request got a prompt 502. The body is now cancelled before returning.
+
+**Finding 3 — the e2e suite was vacuous for four controls.** See AC-6.7.
+
+**Finding 4 — the e2e port reservation raced.** See AC-6.8.
+
+**Additional, not from the report.** `health/%2F%2E%2E/admin` survives the parser-identity check
+byte-for-byte, because the WHATWG parser will not treat a reserved `%2F` as a separator — yet an
+upstream that decodes the whole target lands on `/health/../admin`. An explicit `%2E` rejection
+now covers it, with tests that assert the parser really does leave those inputs alone.
+
+**Behaviour delta to be aware of.** Dropping `serializeQuery` removes a server-side
+normalisation that was doing real work for two shapes ufo's `withQuery` handles differently:
+a `null` value becomes a bare key (`{since: null}` → `?since`) and an `undefined` *inside an
+array* becomes the literal string (`{action: ['a', undefined, 'b']}` → `?action=a&action=undefined&action=b`).
+Both were measured against the installed ufo. Neither reaches the proxy from this codebase
+today — `getDecisions` filters `v != null` itself, the remaining callers pass typed optional
+params, and ofetch drops `undefined` values client-side — and re-adding a server-side rewrite
+of the query is what caused finding 1, so the verbatim relay stands. Recorded here rather than
+silently dropped.
+
+### Acceptance Criteria
+
+- [x] AC-6.1: Written verbatim onto the wire, each of `config/rules/a%3Fb`,
+      `config/rules/rate%25limit`, `config/rules/a%23b`, `config/rules/my%20rule` and
+      `decisions?q=a%20b` returns `200` and reaches the upstream byte-for-byte unchanged.
+- [x] AC-6.2: `validateProxyTarget('/api/arbiter/config/rules/a%3Fb')` yields
+      `{ ok: true, path: '/config/rules/a%3Fb', query: '' }` — the encoded `?` stays in the path.
+      The split is on the **first** `?` only; later ones stay in the query.
+- [x] AC-6.3: A target not under `/api/arbiter/` is refused as `malformed` rather than guessed at.
+- [x] AC-6.4: A query is relayed byte for byte: `?tag=a%20b&tag=c&empty=&flag` arrives at the
+      upstream exactly as written.
+- [x] AC-6.5: `health/%2E%2E/admin`, `health/%2F%2E%2E%2Fadmin` and `health/%2F%2E%2E/admin` are
+      rejected as `traversal`, and the tests assert the URL parser leaves the last two intact —
+      so the rule is shown to be load-bearing rather than redundant.
+- [x] AC-6.6: A refused upstream 3xx cancels the response body (`body.locked === false`,
+      `cancel` called once), still returns `502` when `cancel` rejects, and does not throw when
+      the 3xx has no body.
+- [x] AC-6.7: `pnpm test:e2e:mutation` deletes each of `redirect: 'manual'`, the session gate,
+      the response-body pipeline and the request-body reader from the built shell chunk in turn,
+      and the e2e suite fails on every one. A fifth mutant (`req.url` for `originalUrl`) is
+      asserted to survive, with the h3 source reason recorded in the script. Runs in CI as a
+      step after the e2e one.
+- [x] AC-6.8: The e2e harness no longer assumes its reserved port is still free when the app
+      starts: a failed bind is retried on a fresh port up to 5 times, and any other start-up
+      failure is reported with the server log. (`PORT=0` is not usable — Nitro reads it as falsy
+      and binds 3000.)
+- [x] AC-6.9: `pnpm lint:check`, `pnpm vue-tsc`, `pnpm test:coverage`, `pnpm build`,
+      `pnpm test:e2e` and `pnpm test:e2e:mutation` all pass.

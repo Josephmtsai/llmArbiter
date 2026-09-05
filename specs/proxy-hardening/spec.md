@@ -15,10 +15,10 @@ SA system assessment (2026-09-04), roadmap item 2 / audit P0 #2 — "Proxy 轉�
 1. **Request header whitelist** — forward only `content-type` and `accept` to the upstream, plus the server-added `X-API-Key`. `cookie`, `authorization`, `referer`, `user-agent`, and everything else from the browser are **not** forwarded.
 2. **No `Set-Cookie` relay** — upstream `Set-Cookie` headers are never written to the browser response. Only `content-type` is relayed from the upstream response.
 3. **Method allowlist** — `GET`, `POST`, `PATCH`, `DELETE`. Anything else (`PUT`, `HEAD`, `OPTIONS`, …) → `405` with an `Allow` header.
-4. **Path allowlist** — first path segment must be one of `analyze`, `decisions`, `config`, `cases`, `evaluate`, `eval-pool`, `review-queue`, `optimizer`, `health` (every endpoint used in `composables/useApi.ts`). Non-listed → `404`. Paths containing `..` or `//` → `404` before allowlist lookup (Nitro decodes the wildcard before the handler, so the literal check sees the decoded form; encoded dot segments are caught by the parser-identity check below). Empty wildcard → `404`. The validated path must additionally survive the WHATWG URL parser unchanged (see "Implementation note — path traversal").
+4. **Path allowlist** — first path segment must be one of `analyze`, `decisions`, `config`, `cases`, `evaluate`, `eval-pool`, `review-queue`, `optimizer`, `health` (every endpoint used in `composables/useApi.ts`). Non-listed → `404`. **Revised in review round 2:** the path is taken from the **raw** request target (`event.node.req.originalUrl`) and validated undecoded — h3 percent-decodes before routing, so the router's own wildcard has already lost information (see "Implementation note — the raw request target"). Paths containing `..` or a `%2E` escape → `404` before allowlist lookup; a leading `/` or an internal `//` → `404`. Empty wildcard → `404`. The path must additionally survive the WHATWG URL parser byte-for-byte (see "Implementation note — path traversal").
 5. **Upstream timeout** — `AbortSignal.timeout(30_000)`. Timeout → `504` with message `upstream-timeout`. Other network failure → `502` with message `upstream-unreachable`. **Revised in review round 1:** both messages are now fixed tokens with no cause text. The cause is carried in a separate `detail` field that is written to stderr only — raw fetch causes name internal hostnames, IPs and ports (`connect ECONNREFUSED 10.0.7.12:8000`), which redacting the API key does not cover. The API key is still redacted from `detail` as a hard guarantee.
-6. **Query serialization** — keys whose value is `null`/`undefined` are skipped (not sent as `key=`). Array values are flattened to repeated keys; `null`/`undefined` array items are skipped.
-7. **Pure policy module** — `server/utils/proxyPolicy.ts` exports the allowlist checks, header filtering, query serialization, error classification and secret redaction as side-effect-free functions with Vitest coverage in `tests/proxyPolicy.test.ts`.
+6. **Query relay** — **Revised in review round 2:** the query is relayed byte for byte out of the raw request target. It is no longer parsed into an object and re-serialized, and `serializeQuery` is deleted: that round trip is exactly what lost and rewrote data. The only decision made here is where to split — the first `?` in the raw target — plus a refusal (`unsafe-char`) of a query carrying a raw control character, a raw space or a `#`.
+7. **Pure policy module** — `server/utils/proxyPolicy.ts` exports the allowlist checks, raw-target splitting, header filtering, error classification and secret redaction as side-effect-free functions with Vitest coverage in `tests/proxyPolicy.test.ts`.
 
 ### Out of Scope
 - Changing the session check (`getUserSession` 401 gate stays exactly as is — auth changes belong to `auth-hardening`).
@@ -51,8 +51,8 @@ fetchHeaders = mergeHeaders(getProxyRequestHeaders(event), opts.fetchOptions?.he
 
 1. `getUserSession` → `401` (unchanged).
 2. `isAllowedMethod(event.method)` → else `405` + `Allow: GET, POST, PATCH, DELETE`.
-3. `validateProxyPath(wildcard)` → else `404`. Rejects empty, `..`, `//`, or first segment not in `ALLOWED_PATH_PREFIXES`. Match is **segment-based** (`health` ok, `healthz` not).
-4. `serializeQuery(getQuery(event))` → query string with null/undefined skipped.
+3. `validateProxyTarget(event.node.req.originalUrl)` → else `404`. **Revised in review round 2.** It splits the raw request line at the first `?`, checks the path half is under `/api/arbiter/`, and hands the remainder to `validateProxyPath`, which rejects empty, `..`, `%2E`, a leading `/`, `//`, or a first segment not in `ALLOWED_PATH_PREFIXES`. Match is **segment-based** (`health` ok, `healthz` not).
+4. The query half is carried through verbatim — no parse, no re-serialize.
 5. `pickForwardHeaders(getRequestHeaders(event))` → `{ 'content-type'?, accept? }`, then add `X-API-Key`.
 6. Body: `readRawBody(event, false)` only for `POST | PATCH | DELETE` (the same payload-method set h3 uses today).
 7. `$fetch.raw(url, { method, headers, body, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS), responseType: 'stream', ignoreResponseError: true, retry: 0 })` inside `try/catch`.
@@ -119,33 +119,65 @@ same wrong premise. This is why Task 5 / AC-5.x now exists (see "Testing strateg
 covered end to end against a built server, so the shape of the input it really receives is
 asserted rather than assumed.
 
-**The hardening is kept, as defence in depth rather than as a fix for a live hole.** Nitro's
-decoding is not a documented contract, `validateProxyPath` is a pure function whose callers can
-change, and relying on undocumented upstream behaviour for a security boundary is the thing that
-produced this whole episode. Two independent invariants now hold in `validateProxyPath`, and it
-does **not** decode — a second decode is its own bypass class:
+*Round 2 — the premise was wrong again, and this time it was reachable.* Review round 2
+measured the built server once more. The decode is not `decodeURI` semantics but ufo's
+`decodePath` — `decodeURIComponent` with `%2F` and `%25` protected — applied to the path half of
+the raw URL **before** the router splits it. Three consequences, all confirmed against
+`.output/`:
+
+```
+/api/arbiter/config/rules/a%3Fb          routerParam "config/rules/a"          query {b:''}
+/api/arbiter/config/rules/rate%25limit   routerParam "config/rules/rate%limit"
+/api/arbiter/config/rules/a%23b          routerParam "config/rules/a"          (rest is a fragment)
+```
+
+The first is the serious one: an encoded `?` became a real query delimiter, so the proxy issued
+a **200 against a different resource** than the client asked for, silently. The other two were
+404s on legitimate input. No validation placed *after* that split can recover the lost bytes, so
+the fix is structural rather than another rule — the handler stops reading `getRouterParam` /
+`getQuery` altogether and validates the raw request target itself.
+
+**The hardening is kept and now operates on the raw bytes.** `validateProxyPath` receives the
+wildcard exactly as it appeared on the request line and does **not** decode — a decode is its
+own bypass class. Escapes are only case-canonicalised (`%2f` → `%2F`), since hex case does not
+change which path is named. Three independent invariants hold:
 
 1. **Literal form.** No `..`, no leading `/`, no `//`, and no character that would let the
-   parser split or rewrite the path: C0 controls, DEL, backslash, `?` and `#`. A space is
-   deliberately *not* refused, because that is what a correctly encoded `%20` decodes to.
-2. **Parser identity.** The wildcard is run through the same parser that builds the request URL
-   and its decoded round trip must come back unchanged:
-   `decodeURI(new URL(wildcard, 'https://proxy.invalid/').pathname) === '/' + wildcard`, with an
-   unchanged origin. Anything the parser would rewrite is rejected as `not-normalized`. This is
-   what catches what the literal check cannot: a single `.` segment (`health/.` is sent as
-   `/health/`), and any still-encoded dot segment should one ever reach the function undecoded.
-   Comparing the *decoded* round trip rather than the raw pathname is what admits a legitimate
-   space while still pinning the exact path the request is built from.
+   parser split or rewrite the path: anything outside printable ASCII (so C0 controls, DEL and
+   un-encoded non-ASCII bytes), plus backslash, `?` and `#`. A raw space is refused as well: it
+   cannot appear in a request line, so its presence means something decoded the path already.
+2. **No encoded dot segment.** A `.` never needs encoding inside a path segment, so `%2E` only
+   ever appears in order to slip a dot segment past invariant 1. The rule is load-bearing, not
+   redundant with invariant 3: the WHATWG parser does not treat a reserved `%2F` as a separator,
+   so `health/%2F%2E%2E/admin` survives identity byte-for-byte while an upstream that decodes
+   the whole target lands on `/health/../admin`.
+3. **Parser identity.** The canonicalised wildcard is run through the same parser that builds
+   the request URL and must come back byte-for-byte unchanged, origin included:
+   `new URL(canonical, 'https://proxy.invalid/').pathname === '/' + canonical`. Anything the
+   parser would rewrite is `not-normalized` — a single `.` segment, most obviously. The
+   comparison is against the raw pathname rather than a decoded round trip: nothing is decoded
+   anywhere now, so `%20` is simply carried through as `%20`.
 
 A malformed escape (`%zz`, a trailing `%`, a literal `%` a client failed to encode) is rejected
-as `malformed` rather than ignored. The returned path is the parser's own encoding, not the raw
-wildcard, so a decoded space goes out as `%20` — a raw space cannot appear in a request line.
-`cases/abc%2Fdef` survives byte-for-byte, since `decodeURI` leaves reserved `%2F` alone in both
-directions and it must not be mistaken for a separator.
+as `malformed` rather than ignored — the parser passes every one of those through untouched, so
+invariant 3 cannot see them. `config/rules/my%20rule`, `rate%25limit`, `a%3Fb`, `a%23b` and
+`cases/abc%2Fdef` all reach the upstream byte-for-byte as the client sent them.
 
 The rejection reason is logged but never returned: distinguishing `not-allowed` from
 `traversal` in a response hands a caller a map of the allowlist. Every path rejection is a
 bare `404`.
+
+### Implementation note — the raw request target (added in review round 2)
+The handler reads `event.node.req.originalUrl` — not `getRouterParam` / `getQuery`, and not
+`event.node.req.url`. From h3 1.15.11 `createAppEventHandler`: `originalUrl` is assigned once,
+before any layer runs, and no layer rewrites it; `req.url` is reassigned per layer, and the path
+is decoded (`_decodePath`) before the router matches. Taking the original target and doing the
+`?` split here makes the proxy's view of the request the client's own bytes, and drops the
+dependency on undocumented h3 behaviour that produced two wrong premises in a row.
+
+`event.node.req.url` happens to hold the same string today, because h3 restores the raw URL
+whenever decoding changed it and the layer is mounted at `/`. That is measured, not relied on:
+the mutation check records it as an equivalent mutant rather than as covered behaviour.
 
 ### Implementation note — upstream redirects (added in review round 1)
 `redirect: 'manual'` is now set on the upstream fetch and any 3xx is turned into a `502`
@@ -154,6 +186,11 @@ rather than followed or relayed. Verified against Node 22 / undici: undici strip
 so a followed redirect would have carried `X-API-Key` to whatever origin the upstream named.
 Relaying the 3xx instead would let the upstream steer the browser to an arbitrary origin, so
 the `location` header is dropped with the rest (only `content-type` is ever relayed).
+
+**Revised in review round 2:** the refused response's body is now cancelled before returning.
+A manual-redirect response still carries a live body, and the streaming path that would drain
+it never runs for a 3xx, so the upstream socket stayed occupied until GC or the 30s signal — a
+redirect loop could have drained the connection pool while every request got a prompt 502.
 
 ### Implementation note — unreadable request bodies (added in review round 1)
 `readRawBody` was previously wrapped in `.catch(() => undefined)`, so a client that aborted
@@ -236,14 +273,27 @@ Three layers, each covering what the one below cannot.
    to be written verbatim onto the wire to be tested at all. This layer exists because layers 1
    and 2 cannot see how Nitro parses and decodes the request line — the assumption that got that
    wrong survived a full green run of both (see "Implementation note — path traversal").
-   It asserts, against what the upstream actually received: no traversal shape reaches upstream,
-   rejection reasons do not leak, a correctly encoded path still works, and `X-API-Key` /
-   `User-Agent` / dropped `cookie` are as specified.
+   It asserts, against what the upstream actually received and what the browser actually got
+   back: no traversal shape reaches upstream, rejection reasons do not leak, every encoding a
+   correct client produces arrives byte-for-byte, an upstream redirect is refused without the
+   named origin ever being contacted, an unauthenticated request never reaches upstream, the
+   whole response body is relayed, request bodies survive on `POST`/`PATCH`/`DELETE`, and
+   `X-API-Key` / `User-Agent` / dropped `cookie` are as specified.
+
+4. **Mutation check.** *Added in review round 2.* A green layer-3 run shows the proxy works; it
+   does not show the suite would notice a control being deleted. Round 2 found four it would not
+   have noticed: the redirect refusal, the auth gate, the response-body pipeline and the
+   request-body relay were all invisible, because every case was an authenticated `GET` against
+   an upstream that never redirected and whose body nobody read.
+   `scripts/proxy-mutation-check.mjs` (`pnpm test:e2e:mutation`) deletes each control from the
+   built shell chunk in turn and requires the suite to fail. All four are killed. A fifth
+   mutant — reading `req.url` instead of `originalUrl` — is recorded as provably equivalent
+   under Nitro's root mounting, so the script asserts it *survives* rather than pretending
+   otherwise.
 
 Layer 3 needs `.output/`, so it is excluded from `pnpm test` / `pnpm test:coverage` and has its
 own config and script (`pnpm test:e2e`, `vitest.e2e.config.ts`). CI runs it as a step directly
-after `pnpm build`. Verified non-vacuous by mutation: deleting the traversal and
-`not-normalized` guards from the built bundle fails 7 of the 8 traversal cases.
+after `pnpm build`, and the mutation check as a step after that.
 
 Every AC that describes proxy behaviour is now automated. The one AC still unticked,
 AC-2.11, is a manual smoke test of every page against the *real* backend -- it is about backend
