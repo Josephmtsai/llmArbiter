@@ -1,5 +1,5 @@
 import vue from '@vitejs/plugin-vue'
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 // Nuxt substitutes import.meta.client / import.meta.server at build time.
 // Vitest does not, and its `define` option does not cover import.meta either, so
@@ -50,6 +50,10 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // The proxy end-to-end suite drives a built server in a separate process, so
+    // it needs `pnpm build` and reports no coverage. It has its own config and
+    // its own CI step: `pnpm test:e2e`.
+    exclude: [...configDefaults.exclude, 'tests/e2e/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
@@ -70,7 +74,10 @@ export default defineConfig({
       // tooling-baseline starting point of 41/41/51/78: measured
       // lines 44.22 / statements 44.22 / functions 55.14 / branches 80.51.
       // Branches stayed at 78 there - floor(80.51) - 2 is still 78.
-      // Ratcheted again by `auth-hardening` on 2026-09-05: measured
+      // Ratcheted by `proxy-hardening` on 2026-09-05 (review round 1, after the
+      // route was split into the testable `runProxy` core): measured lines 45.36 /
+      // statements 45.36 / functions 59.33 / branches 83.15.
+      // Ratcheted by `auth-hardening` on 2026-09-05: measured
       // lines 49.80 / statements 49.80 / functions 70.25 / branches 85.43,
       // after retry #1 added behavioural tests for the login route and the
       // startup assertion, both of which were at 0%.
@@ -78,11 +85,18 @@ export default defineConfig({
       // measured lines 50.18 / statements 50.18 / functions 71.00 /
       // branches 86.06, after adding the session-outcome, probe-coalescing,
       // constant-time and placeholder-matching tests.
+      // Merged on 2026-09-05: the two branches ratcheted this file
+      // independently, so each metric takes the higher of the two rather than
+      // the incoming value -- taking one side wholesale would silently
+      // un-ratchet the other. The merged suite (530 tests) then measured
+      // higher than either branch alone -- lines 51.02 / statements 51.02 /
+      // functions 73.02 / branches 87.48 -- so the ratchet is applied once
+      // more here rather than left at the per-branch maximum.
       thresholds: {
-        lines: 48,
-        statements: 48,
-        functions: 69,
-        branches: 84,
+        lines: 49,
+        statements: 49,
+        functions: 71,
+        branches: 85,
       },
     },
   },
