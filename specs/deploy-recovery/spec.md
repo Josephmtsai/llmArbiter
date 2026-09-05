@@ -152,7 +152,7 @@ SSR 下 `navigateTo` 對應一個 **302 redirect response**。Railway 的 health
 | **AD-7** | 檔名用 `.get.ts` 後綴 | Nitro 據此只註冊 GET。Railway healthcheck 送 GET；其他 method 回 405，減少端點的可用面。 |
 | **AD-8** | 回應體固定為 `{ status: 'ok' }`，**不含任何組態** | 見下方「不得洩漏」。 |
 | **AD-9** | `railway.toml` 的 `healthcheckPath` 改為 `/api/health` | |
-| **AD-10** | `healthcheckTimeout` 由 `30` 提高到 `100` | 見下方「timeout 是否足夠」。 |
+| **AD-10** | ~~`healthcheckTimeout` 由 `30` 提高到 `100`~~ **未採納（Human Gate 決議 2026-09-05）**：維持 `30`。 | 見下方「timeout 是否足夠」。 |
 
 #### 為什麼 `server/api/health.get.ts` 不受 `middleware/auth.ts` 影響（必須確認的前提）
 
@@ -205,6 +205,12 @@ Nitro 冷啟動通常 1–3 秒，30 秒在正常情況下綽綽有餘 —— **
 排程／網路抖動的餘裕。改動成本為零、風險為零。若 reviewer 認為超出本 feature 範圍，
 維持 30 也不影響任何 AC（AC-4.2 只要求該值明確、且 ≥ 30）。
 
+> **未採納（Human Gate 決議，2026-09-05）**：本節的「提高到 100」建議**不採納**。
+> `healthcheckTimeout` **維持 30**，`railway.toml` 該行不動。理由是 timeout 從來不是
+> 本次失敗的原因（日誌為 `Attempt #1 failed with HTTP 302`，是明確的失敗回應而非逾時），
+> 而 AC-4.2 只要求 ≥ 30，故維持 30 仍然通過。Task 4 的程式碼區塊中
+> `healthcheckTimeout = 100` 一行同樣不採納。
+
 ---
 
 ## Scope
@@ -220,7 +226,8 @@ Nitro 冷啟動通常 1–3 秒，30 秒在正常情況下綽綽有餘 —— **
    - placeholder 檢查、順序、行為完全不動。
 2. **Health 端點**（`server/api/health.get.ts`，新增）
    - GET `/api/health` → `200` + `{ status: 'ok' }`，無驗證、無組態。
-3. **`railway.toml`**：`healthcheckPath = "/api/health"`、`healthcheckTimeout = 100`。
+3. **`railway.toml`**：`healthcheckPath = "/api/health"`。
+   （`healthcheckTimeout` 維持 `30` —— AD-10 的提高建議未採納，見 Human Gate 決議。）
 4. **文件同步**：`.env.example`、`README.md`（下限說明、`.env.example` 區塊、
    Railway 章節、healthcheck 路徑）。
 5. **測試**：更新受影響的既有斷言、新增 health 端點測試、coverage ratchet。

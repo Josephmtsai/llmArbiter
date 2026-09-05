@@ -2,8 +2,22 @@ import { createHash } from 'node:crypto'
 
 import { bufferEquals } from './constantTime'
 
-/** Minimum length for `NUXT_AUTH_PASSWORD` and `NUXT_SESSION_PASSWORD`. */
+/**
+ * Minimum length for `NUXT_SESSION_PASSWORD`, and the default for any caller
+ * that does not say otherwise. 32 is not ours to lower: nuxt-auth-utils uses
+ * this value as the iron-webcrypto seal key and requires 32 characters itself.
+ */
 export const MIN_SECRET_LENGTH = 32
+
+/**
+ * Minimum length for `NUXT_AUTH_PASSWORD`. Deliberately lower than
+ * MIN_SECRET_LENGTH: this one is a human-typed login password, and the login
+ * endpoint is rate limited to 5 attempts per IP per minute
+ * (`server/api/auth/login.post.ts`), which is what makes 8 defensible here.
+ * That rate limiter is a load-bearing part of this number -- see spec
+ * `deploy-recovery`, AD-2 and R-1/R-3.
+ */
+export const MIN_AUTH_PASSWORD_LENGTH = 8
 
 /**
  * Fragments of the values shipped in `.env.example`, lower-cased. They are
@@ -68,12 +82,24 @@ export function verifyLoginPassword(input: string, expected: string): boolean {
 
 /**
  * Throws unless `value` is a usable secret. Shared by the startup assertion so
- * every secret is held to the same rule.
+ * every secret goes through the same two gates -- length, then placeholder.
+ *
+ * `minLength` defaults to the *stricter* floor on purpose: a future caller that
+ * forgets to pass one gets 32, not 8, so the failure direction is safe.
  */
-export function assertStrongSecret(name: string, value: unknown): void {
-  if (typeof value !== 'string' || value.length < MIN_SECRET_LENGTH) {
+export function assertStrongSecret(
+  name: string,
+  value: unknown,
+  minLength: number = MIN_SECRET_LENGTH,
+): void {
+  // Measured after trim. The raw length would wave through a secret that is
+  // mostly padding; at the old floor of 32 that took deliberate effort, at 8 it
+  // is one stray copy-paste away. Only the *measurement* is trimmed -- the
+  // stored value is left untouched, because trimming it would silently change
+  // what an existing deployment has to type (spec deploy-recovery, R-2).
+  if (typeof value !== 'string' || value.trim().length < minLength) {
     throw new Error(
-      `${name} must be set and at least ${MIN_SECRET_LENGTH} characters long. See .env.example.`,
+      `${name} must be set and at least ${minLength} characters long. See .env.example.`,
     )
   }
   if (isPlaceholderSecret(value)) {

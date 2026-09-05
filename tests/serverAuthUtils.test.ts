@@ -6,6 +6,8 @@ import {
   createRateLimiter,
   isIpAddress,
   isPlaceholderSecret,
+  MIN_AUTH_PASSWORD_LENGTH,
+  MIN_SECRET_LENGTH,
   resetExpectedDigestCache,
   verifyLoginPassword,
 } from '../server/utils/auth'
@@ -108,7 +110,19 @@ describe('verifyLoginPassword', () => {
   })
 })
 
-describe('assertStrongSecret', () => {
+describe('assertStrongSecret — the two floors are separate constants', () => {
+  it('exposes 8 for the auth password and 32 for everything else (AC-1.6)', () => {
+    expect(MIN_AUTH_PASSWORD_LENGTH).toBe(8)
+    expect(MIN_SECRET_LENGTH).toBe(32)
+    // Stated as an assertion so "let us just unify these" fails here first.
+    expect(MIN_AUTH_PASSWORD_LENGTH).toBeLessThan(MIN_SECRET_LENGTH)
+  })
+})
+
+// Split by *which floor is under test* rather than sharing one loosened regex.
+// A single `/at least \d+/` would pass whichever floor each secret happened to
+// get, which is exactly the regression AC-1.3 exists to catch.
+describe('assertStrongSecret — default floor (no minLength passed)', () => {
   it('accepts a 32+ character secret that is not a placeholder (AC-3.1)', () => {
     expect(() => assertStrongSecret('NUXT_AUTH_PASSWORD', 'x'.repeat(64))).not.toThrow()
   })
@@ -119,12 +133,129 @@ describe('assertStrongSecret', () => {
     ['a number', 12345],
     ['an empty string', ''],
     ['a 31 character string', 'a'.repeat(31)],
-  ])('rejects %s (AC-3.2)', (_label, value) => {
+  ])('rejects %s against the strict default (AC-1.5, AC-3.2)', (_label, value) => {
+    // The default must stay 32: a future caller that forgets to pass a floor
+    // has to inherit the strict one, not the lenient one.
     expect(() => assertStrongSecret('NUXT_AUTH_PASSWORD', value)).toThrow(
       /must be set and at least 32 characters long/,
     )
   })
 
+  it('accepts exactly 32 characters (AC-1.4)', () => {
+    expect(() => assertStrongSecret('NUXT_SESSION_PASSWORD', 'x'.repeat(32))).not.toThrow()
+  })
+})
+
+describe('assertStrongSecret — session floor, MIN_SECRET_LENGTH (32)', () => {
+  it('still rejects 31 characters (AC-1.3)', () => {
+    // The anti-regression assertion for this feature: lowering the session
+    // floor to the auth one has to break a test, not a production deploy.
+    expect(() =>
+      assertStrongSecret('NUXT_SESSION_PASSWORD', 'a'.repeat(31), MIN_SECRET_LENGTH),
+    ).toThrow(/NUXT_SESSION_PASSWORD must be set and at least 32 characters long/)
+  })
+
+  it.each([8, 9, 15, 31])('rejects %i characters (AC-1.3)', (length) => {
+    expect(() =>
+      assertStrongSecret('NUXT_SESSION_PASSWORD', 'a'.repeat(length), MIN_SECRET_LENGTH),
+    ).toThrow(/at least 32 characters long/)
+  })
+
+  it('accepts exactly 32 characters (AC-1.4)', () => {
+    expect(() =>
+      assertStrongSecret('NUXT_SESSION_PASSWORD', 'a'.repeat(32), MIN_SECRET_LENGTH),
+    ).not.toThrow()
+  })
+
+  it('rejects 32 spaces, which the untrimmed length used to wave through (AC-1.7)', () => {
+    expect(() =>
+      assertStrongSecret('NUXT_SESSION_PASSWORD', ' '.repeat(32), MIN_SECRET_LENGTH),
+    ).toThrow(/at least 32 characters long/)
+  })
+})
+
+describe('assertStrongSecret — auth floor, MIN_AUTH_PASSWORD_LENGTH (8)', () => {
+  it.each([8, 9, 15, 31])(
+    'accepts %i characters, which used to fail startup (AC-1.1)',
+    (length) => {
+      expect(() =>
+        assertStrongSecret('NUXT_AUTH_PASSWORD', 'a'.repeat(length), MIN_AUTH_PASSWORD_LENGTH),
+      ).not.toThrow()
+    },
+  )
+
+  it.each([
+    ['undefined', undefined],
+    ['null', null],
+    ['a number', 12345],
+    ['an object', { password: 'a'.repeat(32) }],
+    ['an empty string', ''],
+    ['a 1 character string', 'a'],
+    ['a 7 character string', 'a'.repeat(7)],
+  ])('rejects %s (AC-1.2)', (_label, value) => {
+    expect(() => assertStrongSecret('NUXT_AUTH_PASSWORD', value, MIN_AUTH_PASSWORD_LENGTH)).toThrow(
+      /^NUXT_AUTH_PASSWORD must be set and at least 8 characters long\./,
+    )
+  })
+
+  it('never quotes the old 32 in the auth message (AC-1.2, AC-3.4)', () => {
+    // An operator who pads an 8-character password out to 32 because the error
+    // told them to has fixed nothing. The message must name the real floor.
+    let message = ''
+    try {
+      assertStrongSecret('NUXT_AUTH_PASSWORD', 'short', MIN_AUTH_PASSWORD_LENGTH)
+    } catch (error) {
+      message = (error as Error).message
+    }
+    expect(message).toContain('NUXT_AUTH_PASSWORD')
+    expect(message).toContain('at least 8 characters long')
+    expect(message).not.toContain('32')
+  })
+
+  it('accepts exactly 8 and rejects exactly 7 (AC-1.4)', () => {
+    expect(() =>
+      assertStrongSecret('NUXT_AUTH_PASSWORD', 'a'.repeat(8), MIN_AUTH_PASSWORD_LENGTH),
+    ).not.toThrow()
+    expect(() =>
+      assertStrongSecret('NUXT_AUTH_PASSWORD', 'a'.repeat(7), MIN_AUTH_PASSWORD_LENGTH),
+    ).toThrow(/at least 8 characters long/)
+  })
+
+  it.each([
+    ['eight spaces', '        '],
+    ['mixed whitespace', '   \n\t   '],
+    ['padding around four real characters', '  abcd  '],
+  ])('rejects %s: length is measured after trim (AC-1.7)', (_label, value) => {
+    // At a floor of 32 this was theoretical -- nobody types 32 spaces by
+    // accident. At 8 it is one stray paste away.
+    expect(value.length).toBeGreaterThanOrEqual(8)
+    expect(() => assertStrongSecret('NUXT_AUTH_PASSWORD', value, MIN_AUTH_PASSWORD_LENGTH)).toThrow(
+      /at least 8 characters long/,
+    )
+  })
+
+  it('accepts padding around eight real characters (AC-1.7)', () => {
+    expect(() =>
+      assertStrongSecret('NUXT_AUTH_PASSWORD', '  abcdefgh  ', MIN_AUTH_PASSWORD_LENGTH),
+    ).not.toThrow()
+  })
+
+  it('throws the length error, not the placeholder one, when a value is both (AC-1.9)', () => {
+    // Gate order is unchanged: length first, placeholder second. Under the 8
+    // floor no value can be both -- the shortest fragment, `change-me`, is 9
+    // characters -- so the ordering is pinned at the 32 floor, where the same
+    // string is short *and* a placeholder.
+    expect(isPlaceholderSecret('change-me')).toBe(true)
+    expect(() =>
+      assertStrongSecret('NUXT_SESSION_PASSWORD', 'change-me', MIN_SECRET_LENGTH),
+    ).toThrow(/at least 32 characters long/)
+    expect(() =>
+      assertStrongSecret('NUXT_SESSION_PASSWORD', 'change-me', MIN_SECRET_LENGTH),
+    ).not.toThrow(/placeholder/)
+  })
+})
+
+describe('assertStrongSecret — placeholders survive the lower floor', () => {
   it.each(['replace-me-with-openssl-rand-hex-32-output', 'change-me-at-least-32-characters-long'])(
     'rejects the .env.example placeholder %s (AC-3.3)',
     (value) => {
@@ -135,6 +266,16 @@ describe('assertStrongSecret', () => {
     },
   )
 
+  it('rejects the 9-character `change-me` that the old 32 floor used to catch (AC-1.8)', () => {
+    // Under the old floor this never reached the placeholder gate -- 9 < 32
+    // stopped it. At 8 the second gate is the only thing left holding it.
+    expect('change-me'.length).toBe(9)
+    expect('change-me'.length).toBeGreaterThanOrEqual(MIN_AUTH_PASSWORD_LENGTH)
+    expect(() =>
+      assertStrongSecret('NUXT_AUTH_PASSWORD', 'change-me', MIN_AUTH_PASSWORD_LENGTH),
+    ).toThrow(/placeholder/)
+  })
+
   it.each([
     ['upper case', 'CHANGE-ME-AT-LEAST-32-CHARACTERS-LONG'],
     ['mixed case', 'Change-Me-At-Least-32-Characters-Long'],
@@ -143,11 +284,19 @@ describe('assertStrongSecret', () => {
     ['a prepended prefix', 'prod-replace-me-with-openssl-rand-hex-32-output'],
     ['a shorter fragment padded out', `change-me-${'x'.repeat(30)}`],
     ['a shorter fragment, upper case', `REPLACE-ME-${'x'.repeat(30)}`],
-  ])('rejects a placeholder with %s (AC-3.8)', (_label, value) => {
+    ['the short fragment upper-cased', 'CHANGE-ME'],
+    ['the short fragment with a newline', '\nchange-me\n'],
+    ['a short fragment with a suffix', 'change-me-2'],
+    ['a short fragment with a prefix', 'prod-replace-me'],
+    ['the your-secret-here fragment', 'your-secret-here'],
+  ])('rejects a placeholder with %s under the 8 floor too (AC-1.8, AC-3.8)', (_label, value) => {
     // Every realistic way an unedited example value reaches production: an
     // editor changed the case, a copy kept the newline, or someone appended a
-    // word and called it edited.
-    expect(() => assertStrongSecret('NUXT_AUTH_PASSWORD', value)).toThrow(/placeholder/)
+    // word and called it edited. Lowering the length gate must not open a lane
+    // past the second one.
+    expect(() => assertStrongSecret('NUXT_AUTH_PASSWORD', value, MIN_AUTH_PASSWORD_LENGTH)).toThrow(
+      /placeholder/,
+    )
   })
 
   it.each([

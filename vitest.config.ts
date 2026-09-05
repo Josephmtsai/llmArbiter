@@ -92,6 +92,12 @@ export default defineConfig({
       // higher than either branch alone -- lines 51.02 / statements 51.02 /
       // functions 73.02 / branches 87.48 -- so the ratchet is applied once
       // more here rather than left at the per-branch maximum.
+      // Measured by `deploy-recovery` on 2026-09-05 (584 tests): lines 51.08 /
+      // statements 51.08 / functions 73.02 / branches 87.50. floor(measured) - 2
+      // lands on 49 / 49 / 71 / 85 -- exactly the values already here, so the
+      // ratchet holds and nothing moves this round. Recorded rather than
+      // skipped: the new server/api/health.get.ts is inside the `server/**/*.ts`
+      // include and covers 100%, so it did not drag the totals down.
       thresholds: {
         lines: 49,
         statements: 49,

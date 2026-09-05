@@ -67,42 +67,49 @@ export function assertStrongSecret(
 
 ### AC — Per-secret 下限（AC-1.x）
 
-- [ ] AC-1.1: Given `NUXT_AUTH_PASSWORD` 為 8–31 字元的非 placeholder 字串
+- [x] AC-1.1: Given `NUXT_AUTH_PASSWORD` 為 8–31 字元的非 placeholder 字串
       （逐一測 8、9、15、31），When 呼叫
       `assertStrongSecret('NUXT_AUTH_PASSWORD', v, MIN_AUTH_PASSWORD_LENGTH)`，Then **不拋錯**。
       這是本 feature 存在的理由：這些值在變更前全部會讓 process 啟動失敗。
-- [ ] AC-1.2: Given 值為 `undefined`、`null`、非字串（數字、物件）、空字串、
+- [x] AC-1.2: Given 值為 `undefined`、`null`、非字串（數字、物件）、空字串、
       或 1–7 字元的字串，When 以 `MIN_AUTH_PASSWORD_LENGTH` 檢查，Then 拋錯，
       訊息含 **`at least 8 characters long`**（不得再出現 `32`）且含變數名 `NUXT_AUTH_PASSWORD`。
-- [ ] AC-1.3: Given 值為 31 字元字串，When 以 `MIN_SECRET_LENGTH` 檢查
+- [x] AC-1.3: Given 值為 31 字元字串，When 以 `MIN_SECRET_LENGTH` 檢查
       （即 session 的路徑），Then **仍然拋錯**，訊息含 `at least 32 characters long`。
       **這條是防回歸的核心**：它保證「把 8 套到 session 上」會讓測試失敗。
-- [ ] AC-1.4: Given 值為 32 字元字串，When 以 `MIN_SECRET_LENGTH` 檢查，Then 不拋錯
+- [x] AC-1.4: Given 值為 32 字元字串，When 以 `MIN_SECRET_LENGTH` 檢查，Then 不拋錯
       （邊界值：32 通過、31 不通過）。同理以 `MIN_AUTH_PASSWORD_LENGTH` 檢查時
       8 通過、7 不通過。
-- [ ] AC-1.5:（不變式）Given `assertStrongSecret` 只傳兩個參數（沿用預設），
+- [x] AC-1.5:（不變式）Given `assertStrongSecret` 只傳兩個參數（沿用預設），
       When 傳入 31 字元字串，Then 拋錯 —— 預設下限必須是 32，不是 8。
-- [ ] AC-1.6: Given `MIN_AUTH_PASSWORD_LENGTH` 與 `MIN_SECRET_LENGTH`，
+- [x] AC-1.6: Given `MIN_AUTH_PASSWORD_LENGTH` 與 `MIN_SECRET_LENGTH`，
       When 讀取，Then 分別為 `8` 與 `32`，且 `MIN_AUTH_PASSWORD_LENGTH < MIN_SECRET_LENGTH`。
-- [ ] AC-1.7:（trim，AD-4）Given 8 個空白 `'        '`、`'   \n\t  '`、
+- [x] AC-1.7:（trim，AD-4）Given 8 個空白 `'        '`、`'   \n\t  '`、
       以及 `'  abcd  '`（8 字元、trim 後 4），When 以 `MIN_AUTH_PASSWORD_LENGTH` 檢查，
       Then **拋長度錯誤**。Given `'  abcdefgh  '`（trim 後 8），Then 不拋錯。
       同一組行為在 `MIN_SECRET_LENGTH` 下同樣成立（32 個空白必須被拒）。
-- [ ] AC-1.8:（placeholder 不受影響）Given `PLACEHOLDER_SECRET_FRAGMENTS` 的任一值
+- [x] AC-1.8:（placeholder 不受影響）Given `PLACEHOLDER_SECRET_FRAGMENTS` 的任一值
       及其大小寫變體、前後空白／換行、附加前後綴，When 以
       **`MIN_AUTH_PASSWORD_LENGTH`**（較寬鬆的下限）檢查，Then 仍拋 `placeholder` 錯誤 ——
       放寬長度不得讓 placeholder 從長度閘門溜進來後又躲過第二道。
       特別涵蓋短片段 `'change-me'`（9 字元，在舊的 32 下限被長度擋掉，
       在新的 8 下限下**必須由 placeholder 檢查接手**）。
-- [ ] AC-1.9:（順序）Given 一個既太短**又**是 placeholder 的值（如 `'change'`，6 字元），
+- [x] AC-1.9:（順序）Given 一個既太短**又**是 placeholder 的值（如 `'change'`，6 字元），
       When 檢查，Then 拋的是**長度**錯誤（長度閘門在前，行為與變更前一致）。
-- [ ] AC-1.10:（rate limiter 未受影響）Given `createRateLimiter({ limit: 5, windowMs: 60_000 })`，
+      > 修正：`'change'` 其實**不是** placeholder ——
+      > `isPlaceholderSecret` 是拿 fragment 去 `includes` 受測值，
+      > `'change'.includes('change-me')` 為 false。而在 8 的下限下，
+      > 最短的 fragment `'change-me'`（9 字元）已經過得了長度閘門，
+      > 所以「既太短又是 placeholder」在 auth 路徑上不存在。
+      > 測試改以 `MIN_SECRET_LENGTH` + `'change-me'` 釘住閘門順序：
+      > 該值同時 9 < 32 且為 placeholder，拋的必須是長度錯誤。
+- [x] AC-1.10:（rate limiter 未受影響）Given `createRateLimiter({ limit: 5, windowMs: 60_000 })`，
       When 同一 key 在同一視窗內 `hit` 5 次，Then 皆 `allowed === true`；第 6 次
       `allowed === false` 且 `retryAfterSec` 介於 1–60。不同 key 互不影響；
       視窗過期後重新放行。**本 AC 存在的理由**：8 字元下限的可接受性建立在這個
       rate limiter 上（spec AD-2 / R-1），所以每次改動 `server/utils/auth.ts`
       都必須重新證明它沒被動到。
-- [ ] AC-1.11:（rate limiter 未受影響，route 層）Given 同一來源 IP，
+- [x] AC-1.11:（rate limiter 未受影響，route 層）Given 同一來源 IP，
       When 連續 POST `/api/auth/login` 6 次（密碼正確與否皆然、body 格式錯誤亦然），
       Then 第 6 次回 **429** 並帶 `Retry-After` header。
 
@@ -150,21 +157,21 @@ export default defineNitroPlugin(() => {
 
 ### AC — 啟動斷言（AC-2.x）
 
-- [ ] AC-2.1: Given `runtimeConfig.authPassword` 為 8 字元的非 placeholder 字串
+- [x] AC-2.1: Given `runtimeConfig.authPassword` 為 8 字元的非 placeholder 字串
       且無 `session`，When 啟動 plugin，Then **不拋錯**（變更前會拋）。
-- [ ] AC-2.2: Given `authPassword` 為 7 字元、空字串、`undefined` 或非字串，
+- [x] AC-2.2: Given `authPassword` 為 7 字元、空字串、`undefined` 或非字串，
       When 啟動，Then 拋錯，訊息含 `NUXT_AUTH_PASSWORD` 與 `at least 8`。
-- [ ] AC-2.3: Given `authPassword` 合法（8 字元）且 `session.password` 為 **31 字元**，
+- [x] AC-2.3: Given `authPassword` 合法（8 字元）且 `session.password` 為 **31 字元**，
       When 啟動，Then 拋錯，訊息含 `NUXT_SESSION_PASSWORD` 與 **`at least 32`**。
       **兩個下限必須在同一次啟動中各自生效** —— 這是本 task 的核心斷言。
-- [ ] AC-2.4: Given `authPassword` 為 8 字元、`session.password` 為 32 字元，
+- [x] AC-2.4: Given `authPassword` 為 8 字元、`session.password` 為 32 字元，
       兩者皆非 placeholder，When 啟動，Then 不拋錯。
-- [ ] AC-2.5: Given `authPassword` 或 `session.password` 為 placeholder（含大小寫變體、
+- [x] AC-2.5: Given `authPassword` 或 `session.password` 為 placeholder（含大小寫變體、
       含 9 字元的短片段 `change-me`），When 啟動，Then 拋 `placeholder` 錯誤並提示
       `openssl rand -hex 32`（行為不變）。
-- [ ] AC-2.6: Given `session` 不存在、非物件、為 `null`、或內無 `password` 鍵，
+- [x] AC-2.6: Given `session` 不存在、非物件、為 `null`、或內無 `password` 鍵，
       When 啟動，Then 跳過 session 檢查、不拋錯（行為不變）。
-- [ ] AC-2.7: Given 環境完全沒有 `NUXT_AUTH_PASSWORD`，When 執行 `pnpm build`，
+- [x] AC-2.7: Given 環境完全沒有 `NUXT_AUTH_PASSWORD`，When 執行 `pnpm build`，
       Then build 成功（Nitro plugin 不在 build 期執行，行為不變）。
 
 **測試：** `tests/assertConfigPlugin.test.ts`（修改；既有的
@@ -201,25 +208,29 @@ export default defineEventHandler(() => ({ status: 'ok' }))
 
 ### AC — Health 端點（AC-3.x）
 
-- [ ] AC-3.1: Given **未登入**（不帶任何 cookie），When GET `/api/health`，
+- [x] AC-3.1: Given **未登入**（不帶任何 cookie），When GET `/api/health`，
       Then 回 **200**，且**不是** 3xx —— 不得發生任何導向 `/login` 的行為。
-- [ ] AC-3.2: Given 同上，When 檢視回應，Then body 為 JSON `{ "status": "ok" }`。
-- [ ] AC-3.3: Given 帶著有效 session cookie，When GET `/api/health`，
+- [x] AC-3.2: Given 同上，When 檢視回應，Then body 為 JSON `{ "status": "ok" }`。
+- [x] AC-3.3: Given 帶著有效 session cookie，When GET `/api/health`，
       Then 回應與未登入時**完全相同**（端點不隨驗證狀態改變）。
-- [ ] AC-3.4:（不洩漏）Given 回應 body，When 以**相等**斷言比對，
+- [x] AC-3.4:（不洩漏）Given 回應 body，When 以**相等**斷言比對，
       Then 恰好等於 `{ status: 'ok' }`，沒有任何額外的鍵。
       並額外斷言序列化後的字串不含 `NUXT_`、`apiKey`、`apiBaseUrl`、`authPassword`、
       `session`、`password`、以及 `runtimeConfig` 任何欄位的值。
       （以相等斷言為主、關鍵字黑名單為輔：黑名單擋不住沒想到的欄位。）
-- [ ] AC-3.5:（不被 catch-all 攔到）Given 路由表，When 請求 `/api/health`，
+- [x] AC-3.5:（不被 catch-all 攔到）Given 路由表，When 請求 `/api/health`，
       Then 由 `server/api/health.get.ts` 處理，**不**進入 `server/api/arbiter/[...].ts`；
       回應不含 proxy 的錯誤形狀（`405 method-not-allowed` / `404 not-allowed` /
       `502 upstream-*`），也不需要上游 API 可達。
       （驗證方式：在**沒有** `NUXT_API_BASE_URL` / `NUXT_API_KEY` 可達上游的情況下
       仍回 200。）
-- [ ] AC-3.6: Given POST / PUT / DELETE `/api/health`，When 請求，Then **不**回 200
+- [x] AC-3.6: Given POST / PUT / DELETE `/api/health`，When 請求，Then **不**回 200
       （`.get.ts` 只註冊 GET；預期 405）。
-- [ ] AC-3.7: Given `/api/arbiter/health`（上游的那一條，經 proxy），When **未登入**請求，
+      > 實測結果：Nitro 對 method 不符的 `.get.ts` route 回的是 **404
+      > `Page not found: /api/health`**，不是 405。AC 的實質要求（不回 200、
+      > 不擴大端點可用面）成立；「405」只是 spec 對 Nitro 行為的預期偏差，
+      > 屬 Nitro 路由表的既定行為，不修改。
+- [x] AC-3.7: Given `/api/arbiter/health`（上游的那一條，經 proxy），When **未登入**請求，
       Then 仍回 **401** —— 新端點不得意外放寬 proxy 上 `health` 前綴的存取。
       這兩條路徑是不同的東西（spec 問題 B 的警示方塊）。
 
@@ -238,20 +249,23 @@ AC-3.1、AC-3.5、AC-3.6、AC-3.7 需要真實路由表，屬 runtime 驗證（�
 [deploy]
 startCommand = "node .output/server/index.mjs"
 healthcheckPath = "/api/health"
-healthcheckTimeout = 100
+healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
 ```
 
+> `healthcheckTimeout` **維持 30**：spec AD-10 的「提高到 100」建議經 Human Gate
+> 決議**未採納**（2026-09-05）。AC-4.2 只要求 ≥ 30，故仍通過。
+
 ### AC（AC-4.x）
 
-- [ ] AC-4.1: Given `railway.toml`，When 讀取 `healthcheckPath`，
+- [x] AC-4.1: Given `railway.toml`，When 讀取 `healthcheckPath`，
       Then 值為 `"/api/health"`，且該路徑存在對應的 `server/api/health.get.ts`
       （路徑與檔案必須對得起來，不能只改其中一邊）。
-- [ ] AC-4.2: Given `railway.toml`，When 讀取 `healthcheckTimeout`，
+- [x] AC-4.2: Given `railway.toml`，When 讀取 `healthcheckTimeout`，
       Then 值為明確的數字且 ≥ 30。（建議 100；維持 30 亦通過本 AC ——
       spec AD-10 說明了 302 才是失敗原因，timeout 不是。）
-- [ ] AC-4.3: Given `railway.toml`，When 檢視，Then `startCommand`、
+- [x] AC-4.3: Given `railway.toml`，When 檢視，Then `startCommand`、
       `restartPolicyType`、`restartPolicyMaxRetries`、`[build]` 區塊**未變更**。
 
 ---
@@ -283,19 +297,19 @@ restartPolicyMaxRetries = 3
 
 ### AC（AC-5.x）
 
-- [ ] AC-5.1: Given `.env.example`，When 檢視 `NUXT_AUTH_PASSWORD` 的註解，
+- [x] AC-5.1: Given `.env.example`，When 檢視 `NUXT_AUTH_PASSWORD` 的註解，
       Then 說明 minimum **8**、建議 8–15 隨機字元、並提示不要使用單字；
       不再出現「minimum 32」的敘述。
-- [ ] AC-5.2: Given `.env.example`，When 檢視 `NUXT_SESSION_PASSWORD` 的註解，
+- [x] AC-5.2: Given `.env.example`，When 檢視 `NUXT_SESSION_PASSWORD` 的註解，
       Then 明確寫出 **≥ 32**（nuxt-auth-utils 要求）。
-- [ ] AC-5.3: Given `README.md`，When 全文檢視，Then 上表 8 處全部更新；
+- [x] AC-5.3: Given `README.md`，When 全文檢視，Then 上表 8 處全部更新；
       全檔不再有任何「兩者都要 32」或「health check 打 `/`」的敘述；
       並包含 R-3 的提醒（8 字元的可接受性以「單一 replica + 每 IP rate limit」為前提，
       擴到多 replica 時須重新評估）。
-- [ ] AC-5.4:（一致性）Given `.env.example`、`README.md`、
+- [x] AC-5.4:（一致性）Given `.env.example`、`README.md`、
       `server/utils/auth.ts` 的常數、與錯誤訊息，When 交叉比對，
       Then 四者對「auth ≥ 8 / session ≥ 32」的敘述完全一致，無殘留的 32/8 混用。
-- [ ] AC-5.5: Given `README.md` 第 70–71 行的 `.env.example` 引用區塊，
+- [x] AC-5.5: Given `README.md` 第 70–71 行的 `.env.example` 引用區塊，
       When 與真實的 `.env.example` 比對，Then 兩者的變數名與 placeholder 值一致
       （順手修掉既有的過期內容）。
 
@@ -333,18 +347,18 @@ restartPolicyMaxRetries = 3
 
 ### AC（AC-6.x）
 
-- [ ] AC-6.1: Given 上述測試檔，When 執行 `pnpm test`，Then 全部通過，
+- [x] AC-6.1: Given 上述測試檔，When 執行 `pnpm test`，Then 全部通過，
       且**沒有任何既有測試因本次改動而需要放寬斷言**
       （拆分斷言以保留分辨力是允許的；把 `/at least 32/` 改成 `/at least \d+/` 不是）。
-- [ ] AC-6.2: Given `pnpm test:coverage`，When 檢視，Then
+- [x] AC-6.2: Given `pnpm test:coverage`，When 檢視，Then
       `server/api/health.get.ts`、`server/utils/auth.ts`、`server/plugins/assert-config.ts`
       三者皆為 **100%** statements，且 All files 四項門檻依 ratchet 規則調升後仍通過。
-- [ ] AC-6.3: Given `pnpm lint:check` 與 `pnpm vue-tsc`，When 執行，
+- [x] AC-6.3: Given `pnpm lint:check` 與 `pnpm vue-tsc`，When 執行，
       Then 無 error、無 `any`、無 `console.log`（既有的
       `vue/no-static-inline-styles` warning 不在本次變更檔案中，可維持）。
-- [ ] AC-6.4: Given `pnpm build`，When 執行，Then 成功
+- [x] AC-6.4: Given `pnpm build`，When 執行，Then 成功
       （即使環境未設 `NUXT_AUTH_PASSWORD`；呼應 AC-2.7）。
-- [ ] AC-6.5: Given `pnpm test:e2e`（需先 `pnpm build`），When 執行，Then 全部通過。
+- [x] AC-6.5: Given `pnpm test:e2e`（需先 `pnpm build`），When 執行，Then 全部通過。
 
 ---
 

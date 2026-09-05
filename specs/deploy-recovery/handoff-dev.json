@@ -1,0 +1,60 @@
+{
+  "from": "developer",
+  "to": "qa",
+  "feature": "deploy-recovery",
+  "status": "ready",
+  "summary": "修好 Railway 兩次部署失敗：(A) assertStrongSecret 加第三參數 minLength（預設維持 MIN_SECRET_LENGTH = 32），新增 MIN_AUTH_PASSWORD_LENGTH = 8，長度改以 value.trim().length 衡量但不 trim 被比對的值，錯誤訊息內插實際下限；assert-config.ts 兩個呼叫端都明確傳入下限。(B) 新增無驗證的 server/api/health.get.ts（固定回 { status: 'ok' }），railway.toml 的 healthcheckPath 改為 /api/health、healthcheckTimeout 依 Human Gate 決議維持 30。文件（.env.example / README.md）同步兩個分歧的下限並修掉兩處既有錯誤敘述。",
+  "changed_files": [
+    "server/utils/auth.ts",
+    "server/plugins/assert-config.ts",
+    "server/api/health.get.ts",
+    "railway.toml",
+    ".env.example",
+    "README.md",
+    "tests/serverAuthUtils.test.ts",
+    "tests/assertConfigPlugin.test.ts",
+    "tests/healthEndpoint.test.ts",
+    "vitest.config.ts",
+    "specs/deploy-recovery/spec.md",
+    "specs/deploy-recovery/tasks.md",
+    "specs/deploy-recovery/handoff-dev.json"
+  ],
+  "ac_ref": "specs/deploy-recovery/tasks.md",
+  "retry_count": 0,
+  "max_retries": 2,
+  "gate_results": {
+    "lint": "PASS — pnpm lint:check: 0 errors, 10 pre-existing vue/no-static-inline-styles warnings, none in files changed by this feature",
+    "vue-tsc": "PASS — pnpm vue-tsc (nuxt prepare && vue-tsc --noEmit): no diagnostics",
+    "test": "PASS — pnpm test:coverage: 24 files / 584 tests passed. All files 51.08 lines / 51.08 statements / 73.02 functions / 87.50 branches. server/api/health.get.ts, server/utils/auth.ts and server/plugins/assert-config.ts all 100% statements",
+    "build": "PASS — pnpm build: Nitro build complete, chunk routes/api/health.get.mjs emitted; build ran with no NUXT_AUTH_PASSWORD in the environment (AC-2.7 / AC-6.4)",
+    "e2e": "PASS — pnpm test:e2e: tests/e2e/proxy.e2e.test.ts 28/28 passed, unmodified"
+  },
+  "coverage_ratchet": {
+    "rule": "tooling-baseline AD-6: max(current, floor(measured) - 2), only ever up",
+    "measured": { "lines": 51.08, "statements": 51.08, "functions": 73.02, "branches": 87.5 },
+    "thresholds_after": { "lines": 49, "statements": 49, "functions": 71, "branches": 85 },
+    "note": "floor(measured) - 2 equals the current values on all four metrics, so nothing moved this round. Recorded in the vitest.config.ts comment block anyway."
+  },
+  "runtime_verification": [
+    "NUXT_AUTH_PASSWORD=8 chars + NUXT_SESSION_PASSWORD=32 chars -> server started (DoD 1)",
+    "NUXT_AUTH_PASSWORD=7 chars -> refused to boot: 'NUXT_AUTH_PASSWORD must be set and at least 8 characters long. See .env.example.' (DoD 2)",
+    "NUXT_SESSION_PASSWORD=31 chars -> refused to boot: 'NUXT_SESSION_PASSWORD must be set and at least 32 characters long. See .env.example.' (DoD 3)",
+    "GET /api/health, no cookie -> 200, body {\"status\":\"ok\"}, content-length 15 (DoD 4, AC-3.1/3.2)",
+    "GET /, no cookie -> 302, unchanged (DoD 5)",
+    "POST /api/health -> 404 'Page not found: /api/health', not 200 (DoD 6, AC-3.6 — see deviations)",
+    "GET /api/arbiter/health, no cookie -> 401, unchanged (DoD 7, AC-3.7)",
+    "6 consecutive POST /api/auth/login from one IP -> 401 x5 then 429 with 'Retry-After: 50' (DoD 8, AC-1.11)"
+  ],
+  "deviations": [
+    "AC-3.6 expected 405 for a non-GET on /api/health; Nitro actually answers 404 'Page not found: /api/health' for a method that matches no registered route. The AC's substance (not 200, no extra method surface) holds. Nitro routing behaviour, not changed. Noted inline in tasks.md.",
+    "AC-1.9's example value 'change' (6 chars) is not in fact a placeholder: isPlaceholderSecret does fragment.includes-into-value, and 'change'.includes('change-me') is false. Under the 8 floor no value can be both too short and a placeholder, since the shortest fragment 'change-me' is 9 chars. The gate ordering is therefore pinned at the 32 floor with 'change-me', which is genuinely both. Noted inline in tasks.md.",
+    "healthcheckTimeout stays 30 per the Human Gate decision; spec AD-10 and its 'raise to 100' section are marked 未採納, and the tasks.md Task 4 code block was corrected from 100 to 30 to match.",
+    "AC-1.7's mixed-whitespace example '   \\n\\t  ' is 7 characters, so it fails the 8 floor on raw length too and would not prove the trim. Used '   \\n\\t   ' (8 characters) instead so the case only fails after trimming.",
+    "README line 60 (NUXT_SESSION_PASSWORD 'min 32 chars for nuxt-auth-utils') was left as-is per the Task 5 table — it was already correct."
+  ],
+  "notes_for_qa": [
+    "Two floors are deliberately different and must stay that way: tests/serverAuthUtils.test.ts has separate describe blocks per floor, and the 31-character session case (AC-1.3) is the anti-regression pin. No existing assertion was loosened to /at least \\d+/.",
+    "tests/e2e/proxy.e2e.test.ts and tests/loginRoute.test.ts were not modified and both still pass.",
+    "Before deploying, confirm on Railway that NUXT_AUTH_PASSWORD (>= 8, random, not a dictionary word) and NUXT_SESSION_PASSWORD (>= 32) are both set and neither is an .env.example placeholder (spec R-6)."
+  ]
+}

@@ -56,7 +56,7 @@ pnpm test:coverage          # coverage report (target ≥ 80%)
 
 | Variable | Where | Description |
 |----------|-------|-------------|
-| `NUXT_AUTH_PASSWORD` | server-only | Password for the login page (min 32 chars for `nuxt-auth-utils`) |
+| `NUXT_AUTH_PASSWORD` | server-only | Password for the login page (min **8** chars — 8–15 random characters recommended) |
 | `NUXT_SESSION_PASSWORD` | server-only | Session encryption key (min 32 chars for `nuxt-auth-utils`) |
 | `NUXT_API_BASE_URL` | server-only | Backend base URL — never exposed to the browser |
 | `NUXT_API_KEY` | server-only | `X-API-Key` sent only from the Nuxt server proxy — never in the browser |
@@ -65,12 +65,21 @@ pnpm test:coverage          # coverage report (target ≥ 80%)
 > **Rule**: `runtimeConfig.public.*` is exposed to the browser. Never put secrets there.
 > Server-only secrets go under `runtimeConfig.*` (no `public` prefix).
 
+> **The two password floors are different, on purpose.** `NUXT_AUTH_PASSWORD` needs
+> **≥ 8** characters; `NUXT_SESSION_PASSWORD` needs **≥ 32**. The session password is
+> `nuxt-auth-utils`' encryption key (the iron-webcrypto seal key) and the module
+> requires 32 itself, so that one is not ours to lower. The login password is a
+> human-typed secret sitting behind a rate-limited endpoint (5 attempts per IP per
+> minute), and that rate limiter is what makes 8 acceptable — so pick 8–15 **random**
+> characters, never a dictionary word. The server asserts both at startup and refuses
+> to boot otherwise (`server/plugins/assert-config.ts`).
+
 `.env.example`:
 ```
-NUXT_AUTH_PASSWORD=change-me-at-least-32-characters-long
-NUXT_SESSION_PASSWORD=change-me-at-least-32-characters-long
+NUXT_AUTH_PASSWORD=replace-me-with-openssl-rand-hex-32-output
+NUXT_SESSION_PASSWORD=replace-me-with-openssl-rand-hex-32-output
 NUXT_API_BASE_URL=https://artbiter-production.up.railway.app
-NUXT_API_KEY=your-api-key-here
+NUXT_API_KEY=your_api_key_here
 PORT=8080
 ```
 
@@ -214,18 +223,34 @@ export default defineRsbuildConfig({
 3. **Environment variables** in Railway service settings:
 
    ```
-   NUXT_AUTH_PASSWORD=<strong-secret-min-32-chars>
+   NUXT_AUTH_PASSWORD=<random-secret-min-8-chars>
    NUXT_SESSION_PASSWORD=<strong-session-secret-min-32-chars>
    NUXT_API_BASE_URL=https://artbiter-production.up.railway.app
    NUXT_API_KEY=<your-api-key>
    PORT=8080
    ```
 
-   `NUXT_AUTH_PASSWORD` and `NUXT_SESSION_PASSWORD` must both be at least 32 characters.
+   The two floors differ: `NUXT_AUTH_PASSWORD` must be **at least 8** characters and
+   `NUXT_SESSION_PASSWORD` **at least 32**. The session password is `nuxt-auth-utils`'
+   encryption key, so 32 is a hard requirement of the module. The login password is
+   allowed to be shorter because the login endpoint is rate limited to 5 attempts per
+   IP per minute, which is the compensating control that makes 8 defensible — so it
+   must be **randomly generated**, not a dictionary word.
+
+   > That rate limiter is **per-IP and in-memory, scoped to a single instance**. If this
+   > service is ever scaled past one replica, each replica keeps its own counters and the
+   > effective attempt budget multiplies — re-evaluate the 8-character floor before doing
+   > so.
+
+   Before deploying, confirm in Railway service variables that both are set, that their
+   lengths clear 8 and 32 respectively, and that neither is still an `.env.example`
+   placeholder.
 
 4. **Generate domain** → Settings → Networking → Generate Domain.
 
-5. **Health check** path: `/` (Nuxt returns 200 on root).
+5. **Health check** path: `/api/health` (returns `200` with `{"status":"ok"}`, no auth
+   required). It must not be `/` — that route is behind `middleware/auth.ts` and answers
+   **302** to an unauthenticated request, which Railway counts as a failed healthcheck.
 
 ### GitHub Actions deploy
 
@@ -249,7 +274,7 @@ RAILWAY_SERVICE_ID=<Railway frontend service id>
 Keep application runtime variables in Railway service variables, not GitHub secrets:
 
 ```
-NUXT_AUTH_PASSWORD=<strong-secret-min-32-chars>
+NUXT_AUTH_PASSWORD=<random-secret-min-8-chars>
 NUXT_SESSION_PASSWORD=<strong-session-secret-min-32-chars>
 NUXT_API_BASE_URL=https://artbiter-production.up.railway.app
 NUXT_API_KEY=<your-api-key>
@@ -267,7 +292,7 @@ dockerfilePath = "Dockerfile"
 
 [deploy]
 startCommand = "node .output/server/index.mjs"
-healthcheckPath = "/"
+healthcheckPath = "/api/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
