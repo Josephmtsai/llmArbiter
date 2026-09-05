@@ -46,6 +46,35 @@ export function useApi() {
   const route = useRoute()
   const authStore = useAuthStore()
 
+  /**
+   * A 401 on `/api/arbiter/*` has two unrelated causes: our own session expired,
+   * or the upstream API rejected a request we were perfectly entitled to make.
+   * Signing the user out on the second is wrong, and the response alone cannot
+   * tell them apart -- so ask the server before touching anything.
+   *
+   * The same probe settles the race where a slow request's 401 arrives after
+   * the user has signed back in: the session is valid by then, so nothing is
+   * cleared.
+   */
+  async function verifyAndSignOut(): Promise<void> {
+    if (await authStore.check()) return
+    // Re-read the route: the probe is a round trip, and the user may have
+    // reached the login page while it was outstanding.
+    if (route.path === '/login') return
+    authStore.reset()
+    void navigateTo({ path: '/login', query: { redirect: route.fullPath } })
+  }
+
+  // Collapses a burst of simultaneous 401s into one probe and one redirect,
+  // rather than one of each per failed request.
+  let pendingSignOut: Promise<void> | null = null
+
+  function handleUnauthorized(): void {
+    pendingSignOut ??= verifyAndSignOut().finally(() => {
+      pendingSignOut = null
+    })
+  }
+
   const api = $fetch.create({
     baseURL: '/api/arbiter',
     onResponseError({ response }) {
@@ -54,8 +83,7 @@ export function useApi() {
       // would abort the very request the server is still answering.
       if (!import.meta.client) return
       if (route.path === '/login') return
-      authStore.reset()
-      void navigateTo({ path: '/login', query: { redirect: route.fullPath } })
+      handleUnauthorized()
     },
   })
 

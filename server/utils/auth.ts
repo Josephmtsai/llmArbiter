@@ -1,16 +1,110 @@
-import { createHash, timingSafeEqual } from 'node:crypto'
+import { createHash } from 'node:crypto'
+
+import { bufferEquals } from './constantTime'
+
+/** Minimum length for `NUXT_AUTH_PASSWORD` and `NUXT_SESSION_PASSWORD`. */
+export const MIN_SECRET_LENGTH = 32
+
+/**
+ * Values shipped in `.env.example`. They are public by definition, so a server
+ * booted with one of them is effectively unauthenticated no matter how long the
+ * string is. The superseded value is kept in the set so a deployment that
+ * copied the older example is still caught.
+ */
+export const PLACEHOLDER_SECRETS: ReadonlySet<string> = new Set([
+  'replace-me-with-openssl-rand-hex-32-output',
+  'change-me-at-least-32-characters-long',
+])
+
+function sha256(value: string): Buffer {
+  return createHash('sha256').update(value).digest()
+}
+
+/**
+ * One-entry memo for the configured password's digest. `expected` comes from
+ * runtimeConfig and is the same string on every request, so re-hashing it per
+ * login attempt is redundant work. This is a cost optimisation, not a security
+ * control -- the unmemoised version leaked nothing about the password content.
+ */
+let expectedMemo: { source: string; digest: Buffer } | null = null
+
+function expectedDigest(expected: string): Buffer {
+  if (expectedMemo === null || expectedMemo.source !== expected) {
+    expectedMemo = { source: expected, digest: sha256(expected) }
+  }
+  return expectedMemo.digest
+}
+
+/** Test seam: drops the memoised digest so each case starts clean. */
+export function resetExpectedDigestCache(): void {
+  expectedMemo = null
+}
 
 /**
  * Constant-time password comparison.
  *
- * `timingSafeEqual` throws when the two buffers differ in length, and returning
+ * `bufferEquals` throws when the two buffers differ in length, and returning
  * early on a length mismatch would itself leak the expected length. Hashing both
  * sides to a fixed 32-byte SHA-256 digest first removes that side channel.
  */
 export function verifyLoginPassword(input: string, expected: string): boolean {
-  const a = createHash('sha256').update(input).digest()
-  const b = createHash('sha256').update(expected).digest()
-  return timingSafeEqual(a, b)
+  return bufferEquals(sha256(input), expectedDigest(expected))
+}
+
+/**
+ * Throws unless `value` is a usable secret. Shared by the startup assertion so
+ * every secret is held to the same rule.
+ */
+export function assertStrongSecret(name: string, value: unknown): void {
+  if (typeof value !== 'string' || value.length < MIN_SECRET_LENGTH) {
+    throw new Error(
+      `${name} must be set and at least ${MIN_SECRET_LENGTH} characters long. See .env.example.`,
+    )
+  }
+  if (PLACEHOLDER_SECRETS.has(value)) {
+    throw new Error(
+      `${name} is still set to the .env.example placeholder. ` +
+        'Generate a real secret with: openssl rand -hex 32',
+    )
+  }
+}
+
+function isIpv4(value: string): boolean {
+  const parts = value.split('.')
+  if (parts.length !== 4) return false
+  return parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) <= 255)
+}
+
+function isIpv6(value: string): boolean {
+  // Deliberately loose: this only has to reject things that are not addresses
+  // at all, so that a forged header cannot smuggle an arbitrary bucket key.
+  if (!value.includes(':')) return false
+  if (!/^[0-9a-fA-F:.]+$/.test(value)) return false
+  const tail = value.slice(value.lastIndexOf(':') + 1)
+  return tail === '' || /^[0-9a-fA-F]{1,4}$/.test(tail) || isIpv4(tail)
+}
+
+export function isIpAddress(value: string): boolean {
+  return isIpv4(value) || isIpv6(value)
+}
+
+/**
+ * Extracts the client address from an `X-Forwarded-For` header value.
+ *
+ * Each proxy *appends* the address it received the request from, so the
+ * rightmost entry is the one written by the hop closest to us -- the only entry
+ * a client cannot forge. h3's `getRequestIP(event, { xForwardedFor: true })`
+ * takes the leftmost entry instead, which is entirely client-supplied: sending
+ * a fresh fake prefix per attempt would give every request its own bucket.
+ *
+ * Returns undefined when the header is absent or its last entry is not an
+ * address, so the caller falls back instead of keying a bucket on junk.
+ */
+export function clientIpFromForwardedFor(header: string | undefined | null): string | undefined {
+  if (typeof header !== 'string') return undefined
+  const last = header.split(',').pop()?.trim()
+  if (!last || !isIpAddress(last)) return undefined
+  return last
 }
 
 export interface RateLimitResult {
@@ -21,39 +115,77 @@ export interface RateLimitResult {
 export interface RateLimiter {
   hit(key: string, now?: number): RateLimitResult
   reset(): void
+  /** Live bucket count. Exposed so tests can observe eviction directly. */
+  readonly size: number
 }
+
+/**
+ * Upper bound on tracked keys. Far above the real client count for this app; it
+ * exists so a burst of distinct addresses cannot grow the Map without limit.
+ */
+export const DEFAULT_MAX_KEYS = 10_000
 
 /**
  * Fixed-window in-memory rate limiter.
  *
  * Sized for the single Nitro instance this app runs on (spec `auth-hardening`,
- * assumption 1). Expired buckets are dropped on every `hit`, so the Map cannot
- * grow without bound as client IPs churn.
+ * assumption 1).
  */
-export function createRateLimiter(opts: { limit: number; windowMs: number }): RateLimiter {
+export function createRateLimiter(opts: {
+  limit: number
+  windowMs: number
+  maxKeys?: number
+}): RateLimiter {
+  const maxKeys = opts.maxKeys ?? DEFAULT_MAX_KEYS
   const buckets = new Map<string, { count: number; windowStart: number }>()
+  let lastSweep = Number.NEGATIVE_INFINITY
+
+  function sweep(now: number): void {
+    for (const [key, bucket] of buckets) {
+      if (now - bucket.windowStart >= opts.windowMs) buckets.delete(key)
+    }
+    lastSweep = now
+  }
+
+  function denied(now: number, windowStart: number): RateLimitResult {
+    const retryAfterSec = Math.ceil((windowStart + opts.windowMs - now) / 1000)
+    return { allowed: false, retryAfterSec: Math.max(retryAfterSec, 1) }
+  }
 
   return {
     hit(key, now = Date.now()) {
-      for (const [k, b] of buckets) {
-        if (now - b.windowStart >= opts.windowMs) buckets.delete(k)
-      }
+      // Sweeping on every hit made each request O(bucket count), which is the
+      // wrong shape for the endpoint an attacker floods. Once per window bounds
+      // growth just as well; a bucket that survives until then is restarted by
+      // the staleness check below, so counts never carry across windows.
+      if (now - lastSweep >= opts.windowMs) sweep(now)
 
       const bucket = buckets.get(key)
-      if (!bucket) {
-        buckets.set(key, { count: 1, windowStart: now })
+      if (bucket && now - bucket.windowStart < opts.windowMs) {
+        bucket.count += 1
+        if (bucket.count > opts.limit) return denied(now, bucket.windowStart)
         return { allowed: true, retryAfterSec: 0 }
       }
 
-      bucket.count += 1
-      if (bucket.count > opts.limit) {
-        const retryAfterSec = Math.ceil((bucket.windowStart + opts.windowMs - now) / 1000)
-        return { allowed: false, retryAfterSec: Math.max(retryAfterSec, 1) }
+      if (!bucket && buckets.size >= maxKeys) {
+        sweep(now)
+        if (buckets.size >= maxKeys) {
+          // Fail closed. A full table means this key cannot be counted, and a
+          // login endpoint that quietly stops rate limiting is worse than one
+          // that is briefly unavailable.
+          return denied(now, now)
+        }
       }
+
+      buckets.set(key, { count: 1, windowStart: now })
       return { allowed: true, retryAfterSec: 0 }
     },
     reset() {
       buckets.clear()
+      lastSweep = Number.NEGATIVE_INFINITY
+    },
+    get size() {
+      return buckets.size
     },
   }
 }

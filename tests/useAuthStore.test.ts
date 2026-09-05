@@ -49,6 +49,23 @@ describe('useAuthStore.login', () => {
     expect(store.authenticated).toBe(false)
   })
 
+  it.each([401, 429, 500])(
+    'clears a previously authenticated session on %i (AC-6.8)',
+    async (status) => {
+      // Starting from `true` is the whole point: middleware/auth.ts returns
+      // early on `authenticated`, so a stale `true` left behind by a rejected
+      // login would walk the user into a guarded page with no server check.
+      fetchMock.mockResolvedValueOnce({ ok: true })
+      const store = useAuthStore()
+      await store.login('secret')
+      expect(store.authenticated).toBe(true)
+
+      fetchMock.mockRejectedValueOnce(httpError(status))
+      await expect(store.login('wrong')).resolves.toBe(false)
+      expect(store.authenticated).toBe(false)
+    },
+  )
+
   it('reports rate limiting on 429 (AC-6.2)', async () => {
     fetchMock.mockRejectedValue(httpError(429))
     const store = useAuthStore()

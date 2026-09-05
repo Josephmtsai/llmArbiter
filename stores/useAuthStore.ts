@@ -34,6 +34,10 @@ export const useAuthStore = defineStore('auth', () => {
       authenticated.value = true
       return true
     } catch (err: unknown) {
+      // A rejected attempt must not leave a stale `true` standing: middleware/
+      // auth.ts short-circuits on `authenticated` and would then skip the
+      // server check, turning a wrong password into a client-side pass.
+      authenticated.value = false
       const status = statusOf(err)
       if (status === 401) error.value = 'Invalid password'
       else if (status === 429) error.value = 'Too many attempts, try again later'

@@ -71,12 +71,14 @@ export default defineConfig({
       // lines 44.22 / statements 44.22 / functions 55.14 / branches 80.51.
       // Branches stayed at 78 there - floor(80.51) - 2 is still 78.
       // Ratcheted again by `auth-hardening` on 2026-09-05: measured
-      // lines 48.59 / statements 48.59 / functions 67.58 / branches 83.62.
+      // lines 49.80 / statements 49.80 / functions 70.25 / branches 85.43,
+      // after retry #1 added behavioural tests for the login route and the
+      // startup assertion, both of which were at 0%.
       thresholds: {
-        lines: 46,
-        statements: 46,
-        functions: 65,
-        branches: 81,
+        lines: 47,
+        statements: 47,
+        functions: 68,
+        branches: 83,
       },
     },
   },
