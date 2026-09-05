@@ -1,20 +1,16 @@
 {
   "from": "developer",
-  "to": "qa",
+  "to": "codex-reviewer",
   "feature": "auth-hardening",
   "status": "ready",
-  "retry_count": 0,
+  "retry_count": 1,
   "max_retries": 2,
   "branch": "feat/auth-hardening",
   "base": "7821674fecc59932acde8a87cebe382db119e092",
-  "commits": [
-    "05316cb",
-    "f41403c",
-    "7ab35f4",
-    "7e128f5"
-  ],
-  "summary": "登入路由加上固定視窗 rate limit 與 timing-safe 密碼比對、啟動時斷言 NUXT_AUTH_PASSWORD、登入後導回原路徑並擋 open redirect、useAuthStore 誠實回報成敗、useApi 全域攔截 401。",
+  "commits": ["7e128f5", "7ab35f4", "f41403c", "05316cb", "107e0ef", "90097f1"],
+  "summary": "Retry #1：修掉 codex adversarial review 的 8 Major / 3 Minor。XFF 改取最右側條目、placeholder secret 明確拒絕、rate limiter 加上 maxKeys 與 fail-closed 並停止每次全表掃描、登入失敗清除 authenticated、401 攔截先探測 session 再登出、補上 login route 與 assert-config 的行為覆蓋（0% → 100%）、把 timingSafeEqual 抽到可 mock 的 seam、resolveSafeRedirect 改為先 normalise 再判斷並擋控制字元。",
   "ac_ref": "specs/auth-hardening/tasks.md",
+  "review_ref": "specs/auth-hardening/review-codex-1.md",
   "changed_files": [
     ".env.example",
     "components/AppTopBar.vue",
@@ -24,13 +20,18 @@
     "server/api/auth/login.post.ts",
     "server/plugins/assert-config.ts",
     "server/utils/auth.ts",
+    "server/utils/constantTime.ts",
+    "specs/auth-hardening/handoff-dev.json",
+    "specs/auth-hardening/review-codex-1.md",
     "specs/auth-hardening/spec.md",
     "specs/auth-hardening/tasks.md",
     "stores/useAuthStore.ts",
     "tests/appTopBarLogout.test.ts",
+    "tests/assertConfigPlugin.test.ts",
     "tests/authMiddleware.test.ts",
     "tests/authRedirect.test.ts",
     "tests/loginRedirect.test.ts",
+    "tests/loginRoute.test.ts",
     "tests/serverAuthUtils.test.ts",
     "tests/useApiAuthInterceptor.test.ts",
     "tests/useApiEndpoints.test.ts",
@@ -38,58 +39,168 @@
     "utils/auth.ts",
     "vitest.config.ts"
   ],
+  "changed_files_retry_1": [
+    ".env.example",
+    "composables/useApi.ts",
+    "server/api/auth/login.post.ts",
+    "server/plugins/assert-config.ts",
+    "server/utils/auth.ts",
+    "server/utils/constantTime.ts",
+    "specs/auth-hardening/handoff-dev.json",
+    "specs/auth-hardening/review-codex-1.md",
+    "specs/auth-hardening/spec.md",
+    "specs/auth-hardening/tasks.md",
+    "stores/useAuthStore.ts",
+    "tests/assertConfigPlugin.test.ts",
+    "tests/authRedirect.test.ts",
+    "tests/loginRoute.test.ts",
+    "tests/serverAuthUtils.test.ts",
+    "tests/useApiAuthInterceptor.test.ts",
+    "tests/useAuthStore.test.ts",
+    "utils/auth.ts",
+    "vitest.config.ts"
+  ],
+  "retry_history": [
+    {
+      "retry": 1,
+      "date": "2026-09-05",
+      "trigger": "codex adversarial review verdict no-ship (8 Major / 3 Minor)",
+      "review_artifact": "specs/auth-hardening/review-codex-1.md",
+      "commit": "90097f1",
+      "fixes": [
+        {
+          "severity": "major",
+          "finding": "Rate limiter 以 h3 的 getRequestIP(event, { xForwardedFor: true }) 取 IP，那是最左側、client 自填的條目；輪換假前綴即可每次取得新 bucket。",
+          "fix": "新增 clientIpFromForwardedFor()，取最右側條目並驗證為 IPv4/IPv6；三段 fallback：XFF 最右側 → getRequestIP(event) → 共用 'unknown'（Human Gate 核可）。",
+          "files": ["server/utils/auth.ts", "server/api/auth/login.post.ts"],
+          "ac": ["AC-2.1", "AC-2.2", "AC-2.3", "AC-2.4", "AC-2.5"],
+          "test": "tests/loginRoute.test.ts『is not evaded by rotating a forged X-Forwarded-For prefix』：6 次請求各帶不同偽造前綴、相同真實尾端，第 6 次仍回 429。"
+        },
+        {
+          "severity": "major",
+          "finding": ".env.example 的 placeholder 長度 43 字元，通過長度斷言；以它部署等同公開已知密碼。",
+          "fix": "新增 PLACEHOLDER_SECRETS 黑名單（含已淘汰的舊 placeholder），assertStrongSecret 明確拒絕並提示 openssl rand -hex 32；.env.example 改為一眼看得出不能用的值並註明啟動會斷言。",
+          "files": ["server/utils/auth.ts", ".env.example"],
+          "ac": ["AC-3.3"],
+          "test": "tests/serverAuthUtils.test.ts + tests/assertConfigPlugin.test.ts 各自涵蓋兩個 placeholder。"
+        },
+        {
+          "severity": "major",
+          "finding": "bucket Map 無筆數上限，且每次 hit() 都全表掃描（O(n)）—— 正好在被灌爆的端點上。",
+          "fix": "清掃改為每個 window 最多一次（跨 window 正確性改由 staleness 檢查保證）；新增 maxKeys（預設 10,000），表滿時強制清掃一次，仍滿則 fail closed。",
+          "files": ["server/utils/auth.ts"],
+          "ac": ["AC-1.5", "AC-1.7", "AC-1.8"],
+          "test": "tests/serverAuthUtils.test.ts『refuses new keys once the table is full rather than growing』與『restarts a stale bucket even when no sweep has run』。"
+        },
+        {
+          "severity": "major",
+          "finding": "login() 失敗未清 authenticated；middleware/auth.ts:5 見到殘留的 true 會跳過伺服器檢查，等於把錯密碼變成 client 端通行證。",
+          "fix": "catch 區塊開頭先 authenticated.value = false。",
+          "files": ["stores/useAuthStore.ts"],
+          "ac": ["AC-6.8"],
+          "test": "tests/useAuthStore.test.ts『clears a previously authenticated session on %i』（401 / 429 / 500，且先成功登入過一次）。"
+        },
+        {
+          "severity": "major",
+          "finding": "401 攔截把上游 API 的 401 誤判為自己的 session 過期，造成假登出；慢請求的 401 也會踢掉剛重新登入的 session。",
+          "fix": "收到 401 先呼叫 authStore.check() 向伺服器確認，確定沒登入才 reset + 導頁；探測回來後重讀 route，避免使用者已自行到 /login 時又導一次；同時間的多個 401 收斂成一次探測、一次 reset、一次導頁。修正完全留在 composables/useApi.ts，未動 proxy route（交辦指示要求）。",
+          "files": ["composables/useApi.ts"],
+          "ac": ["AC-7.2", "AC-7.5", "AC-7.6", "AC-7.7"],
+          "test": "tests/useApiAuthInterceptor.test.ts 4 個新案例。"
+        },
+        {
+          "severity": "major",
+          "finding": "server/api/auth/login.post.ts（0/24 行）與 server/plugins/assert-config.ts（0/8 行）完全沒有行為覆蓋。",
+          "fix": "新增 tests/loginRoute.test.ts（19 cases）與 tests/assertConfigPlugin.test.ts（12 cases），以 vi.stubGlobal 補齊 h3/Nitro auto-import、vi.resetModules() 取得乾淨的 module-level limiter。",
+          "files": ["tests/loginRoute.test.ts", "tests/assertConfigPlugin.test.ts"],
+          "ac": ["AC-1.11", "AC-1.12", "AC-3.5", "AC-3.6", "AC-8.2"],
+          "test": "兩檔覆蓋率皆 100%。"
+        },
+        {
+          "severity": "major",
+          "finding": "密碼測試無法證明用了 timing-safe 原語 —— 把主體換成 return input === expected 仍全數通過。",
+          "fix": "抽出 server/utils/constantTime.ts（單行 bufferEquals wrapper）作為可 mock 的 seam，測試 spy 該函式並斷言兩側皆為 32 bytes 的 digest。",
+          "files": ["server/utils/constantTime.ts", "server/utils/auth.ts", "tests/serverAuthUtils.test.ts"],
+          "ac": ["AC-1.9"],
+          "test": "tests/serverAuthUtils.test.ts『decides through the constant-time comparison, not ===』。已實測：把 verifyLoginPassword 換成 === 會讓此案例失敗。"
+        },
+        {
+          "severity": "minor",
+          "finding": "Map 清理測試從未觀察到清理發生。",
+          "fix": "RateLimiter 增加 size getter。",
+          "files": ["server/utils/auth.ts", "tests/serverAuthUtils.test.ts"],
+          "ac": ["AC-1.7"],
+          "test": "斷言 50 個過期 bucket 在下一次 hit 後降為 1。"
+        },
+        {
+          "severity": "minor",
+          "finding": "resolveSafeRedirect 以字面前綴判斷，/settings/%2e%2e/login 與 /login/ 均放行；控制字元未擋。",
+          "fix": "先擋絕對 URL / // / 反斜線 / C0+DEL 控制字元，再以 WHATWG URL 對相對 base 解析並重新確認 origin，最後才比對 pathname 是否為 /login 或 /login/。",
+          "files": ["utils/auth.ts", "tests/authRedirect.test.ts"],
+          "ac": ["AC-4.3", "AC-4.4", "AC-4.5", "AC-4.6"],
+          "test": "tests/authRedirect.test.ts 擴為 40 cases；utils/auth.ts 覆蓋率 100%。"
+        },
+        {
+          "severity": "minor-downgraded",
+          "finding": "每次登入都重新雜湊 expected（review 原本以洩漏風險提出，交辦時降級為單純的重複工）。",
+          "fix": "加一格 memo，註解明確寫出理由是省去重複工、不是防洩漏；提供 resetExpectedDigestCache() 測試 seam。",
+          "files": ["server/utils/auth.ts"],
+          "ac": ["AC-1.10"],
+          "test": "以 Buffer 實例同一性斷言只雜湊一次，expected 改變時重新雜湊。"
+        }
+      ]
+    }
+  ],
   "verification": {
     "lint": {
       "command": "pnpm lint:check",
       "result": "pass",
-      "detail": "0 errors, 10 warnings（皆為既有的 vue/no-static-inline-styles，非本次改動）"
+      "detail": "exit 0；0 errors / 10 warnings（皆為既有的 vue/no-static-inline-styles，不在本次變更檔案中）"
     },
     "types": {
       "command": "pnpm vue-tsc",
       "result": "pass",
-      "detail": "無錯誤"
+      "detail": "exit 0（nuxt prepare && vue-tsc --noEmit）"
     },
     "tests": {
       "command": "pnpm test:coverage",
       "result": "pass",
-      "detail": "18 test files / 217 tests 全數通過"
+      "detail": "exit 0；20 test files / 311 tests 全數通過"
     },
     "build": {
       "command": "pnpm build",
       "result": "pass",
-      "detail": "Nitro build 成功"
+      "detail": "exit 0，Build complete!，4.84 MB（1.07 MB gzip）"
     },
     "runtime": {
-      "command": "node .output/server/index.mjs（受控 env 的驗證腳本）",
+      "command": "node .output/server/index.mjs（受控 env 的驗證腳本，retry 前執行）",
       "result": "pass",
-      "detail": "14/14 runtime 檢查通過，涵蓋 AC-2.1~2.5、AC-3.1~3.2、AC-5.1 與 logout 清除 session"
+      "detail": "14/14 runtime 檢查通過，涵蓋 AC-5.1、AC-3.7 與 logout 清除 session。retry #1 未改動 middleware/auth.ts 與 pages/login.vue，該批驗證仍成立；login route 的行為改由 tests/loginRoute.test.ts 覆蓋。"
     },
     "coverage": {
-      "statements": 48.59,
-      "branches": 83.62,
-      "functions": 67.58,
-      "lines": 48.59,
-      "thresholds_before": {
-        "statements": 43,
-        "branches": 79,
-        "functions": 56,
-        "lines": 43
-      },
-      "thresholds_after": {
-        "statements": 46,
-        "branches": 81,
-        "functions": 65,
-        "lines": 46
+      "statements": 49.8,
+      "branches": 85.43,
+      "functions": 70.25,
+      "lines": 49.8,
+      "thresholds_before": { "statements": 46, "branches": 81, "functions": 65, "lines": 46 },
+      "thresholds_after": { "statements": 47, "branches": 83, "functions": 68, "lines": 47 },
+      "per_file": {
+        "server/utils/auth.ts": "100 / 100 / 100 / 100",
+        "server/utils/constantTime.ts": "100 / 100 / 100 / 100",
+        "server/api/auth/login.post.ts": "100 / 100 / 100 / 100（retry 前 0/24 行）",
+        "server/plugins/assert-config.ts": "100 / 100 / 100 / 100（retry 前 0/8 行）",
+        "utils/auth.ts": "100 / 100 / 100 / 100",
+        "middleware/auth.ts": "100 / 100 / 100 / 100",
+        "stores/useAuthStore.ts": "statements 100 / branches 85.71",
+        "composables/useApi.ts": "statements 100"
       }
     }
   },
   "ac_summary": {
-    "total": 36,
-    "passed": 35,
+    "total": 53,
+    "passed": 52,
     "unverified": 1,
-    "unverified_ids": [
-      "AC-7.3"
-    ]
+    "unverified_ids": ["AC-7.3"]
   },
   "deviations": [
     {
@@ -105,17 +216,25 @@
     {
       "id": "D3",
       "item": "AC-7.3 無法本機自動化驗證",
-      "detail": "vitest.config.ts 的 nuxt-import-meta-flags plugin 會把 import.meta.client 文字替換為 true，SSR 分支在 Vitest 下不可能被執行。tasks.md 保留未勾，僅以程式碼檢視確認 guard 位於 reset() 與 navigateTo 之前。建議 QA 在真實 SSR 環境（pnpm build 後 node .output/server/index.mjs，帶失效 cookie 直接請求頁面）覆核。"
+      "detail": "vitest.config.ts 的 nuxt-import-meta-flags plugin 會把 import.meta.client 文字替換為 true，SSR 分支在 Vitest 下不可能被執行。tasks.md 保留未勾，僅以程式碼檢視確認 guard 位於任何狀態變更之前。建議 QA 在真實 SSR 環境（pnpm build 後 node .output/server/index.mjs，帶失效 cookie 直接請求頁面）覆核。"
     },
     {
       "id": "D4",
       "item": "本 worktree 的 .env 缺少 NUXT_AUTH_PASSWORD",
-      "detail": "依交辦指示未修改 .env。因此本 worktree 直接跑 pnpm dev 會被啟動斷言擋下（這正是 AC-3.1 的預期行為）。已在 .env.example 註明最低 32 字元與啟動斷言。部署環境（Railway）需確保此環境變數已設定且長度 >= 32。"
+      "detail": "依交辦指示未修改 .env。因此本 worktree 直接跑 pnpm dev 會被啟動斷言擋下（這正是 AC-3.2 的預期行為）。部署環境（Railway）需確保此環境變數已設定、長度 >= 32 且不是 placeholder。"
+    },
+    {
+      "id": "D5",
+      "item": "retry #1 新增檔案 server/utils/constantTime.ts（偏離「只改既有檔案」的預設）",
+      "detail": "交辦指示要求證明密碼比對走的是 timing-safe 原語，未指定作法。實測兩條路都不可行：(a) vi.mock('node:crypto', ...) 只替換測試檔自己的 binding，來源模組拿到的仍是真貨，spy 呼叫數為 0；(b) vi.spyOn(nodeCrypto, 'timingSafeEqual') 直接拋 TypeError: Cannot redefine property。因此把 timingSafeEqual 包成單行第一方模組作為 mock seam。代價是多一個檔案；未被自動化驗證的部分縮小到那一行 wrapper。"
     }
   ],
-  "notes_for_qa": [
-    "rate limit 為 module-level in-memory Map，重啟 server 即重置；同一台機器上所有測試共用 127.0.0.1，連續測試請每個階段重啟 server 或等待 60 秒視窗。",
+  "notes_for_reviewer": [
+    "AC 編號在 retry #1 重新依行為分組：AC-1.x 密碼驗證與 rate limit、AC-2.x client 位址解析、AC-3.x secret 設定、AC-4.x safe redirect、AC-5.x middleware/login 頁、AC-6.x store、AC-7.x useApi 攔截、AC-8.x 測試與 gate。對照表見 tasks.md 文末〈Retry #1 修正對照〉。",
+    "tasks.md 的 Task 程式碼片段先前是 SA 草稿，已同步更新為實作後的實際樣貌（原本寫的 verifyPassword、getRequestIP xForwardedFor、每次 hit 全表掃描都已過時）。",
+    "rate limit 為 module-level in-memory Map，重啟 server 即重置；同一台機器上所有 runtime 測試共用 127.0.0.1。",
     "未觸碰 server/api/arbiter/[...].ts 與 server/utils/proxyPolicy.ts（proxy-hardening 的範圍）。",
+    "vitest.config.ts 門檻已升為 47/83/68/47；與 proxy-hardening 分支合併時請取兩者較高值。",
     "未 push、未 merge 到 main。"
   ]
 }
