@@ -1,0 +1,121 @@
+{
+  "from": "developer",
+  "to": "qa",
+  "feature": "auth-hardening",
+  "status": "ready",
+  "retry_count": 0,
+  "max_retries": 2,
+  "branch": "feat/auth-hardening",
+  "base": "7821674fecc59932acde8a87cebe382db119e092",
+  "commits": [
+    "05316cb",
+    "f41403c",
+    "7ab35f4",
+    "7e128f5"
+  ],
+  "summary": "登入路由加上固定視窗 rate limit 與 timing-safe 密碼比對、啟動時斷言 NUXT_AUTH_PASSWORD、登入後導回原路徑並擋 open redirect、useAuthStore 誠實回報成敗、useApi 全域攔截 401。",
+  "ac_ref": "specs/auth-hardening/tasks.md",
+  "changed_files": [
+    ".env.example",
+    "components/AppTopBar.vue",
+    "composables/useApi.ts",
+    "middleware/auth.ts",
+    "pages/login.vue",
+    "server/api/auth/login.post.ts",
+    "server/plugins/assert-config.ts",
+    "server/utils/auth.ts",
+    "specs/auth-hardening/spec.md",
+    "specs/auth-hardening/tasks.md",
+    "stores/useAuthStore.ts",
+    "tests/appTopBarLogout.test.ts",
+    "tests/authMiddleware.test.ts",
+    "tests/authRedirect.test.ts",
+    "tests/loginRedirect.test.ts",
+    "tests/serverAuthUtils.test.ts",
+    "tests/useApiAuthInterceptor.test.ts",
+    "tests/useApiEndpoints.test.ts",
+    "tests/useAuthStore.test.ts",
+    "utils/auth.ts",
+    "vitest.config.ts"
+  ],
+  "verification": {
+    "lint": {
+      "command": "pnpm lint:check",
+      "result": "pass",
+      "detail": "0 errors, 10 warnings（皆為既有的 vue/no-static-inline-styles，非本次改動）"
+    },
+    "types": {
+      "command": "pnpm vue-tsc",
+      "result": "pass",
+      "detail": "無錯誤"
+    },
+    "tests": {
+      "command": "pnpm test:coverage",
+      "result": "pass",
+      "detail": "18 test files / 217 tests 全數通過"
+    },
+    "build": {
+      "command": "pnpm build",
+      "result": "pass",
+      "detail": "Nitro build 成功"
+    },
+    "runtime": {
+      "command": "node .output/server/index.mjs（受控 env 的驗證腳本）",
+      "result": "pass",
+      "detail": "14/14 runtime 檢查通過，涵蓋 AC-2.1~2.5、AC-3.1~3.2、AC-5.1 與 logout 清除 session"
+    },
+    "coverage": {
+      "statements": 48.59,
+      "branches": 83.62,
+      "functions": 67.58,
+      "lines": 48.59,
+      "thresholds_before": {
+        "statements": 43,
+        "branches": 79,
+        "functions": 56,
+        "lines": 43
+      },
+      "thresholds_after": {
+        "statements": 46,
+        "branches": 81,
+        "functions": 65,
+        "lines": 46
+      }
+    }
+  },
+  "ac_summary": {
+    "total": 36,
+    "passed": 35,
+    "unverified": 1,
+    "unverified_ids": [
+      "AC-7.3"
+    ]
+  },
+  "deviations": [
+    {
+      "id": "D1",
+      "item": "server/utils/auth.ts 函式命名",
+      "detail": "spec 寫 verifyPassword，實作改名為 verifyLoginPassword。nuxt-auth-utils 已 auto-import 語意不同的 verifyPassword(hash, plain)，同名會造成 nuxt prepare 的 Duplicated imports 警告與全域靜默覆蓋。已同步更新 spec.md。"
+    },
+    {
+      "id": "D2",
+      "item": "AC-5.1 的 redirect 字面編碼",
+      "detail": "實測 Location 為 /login?redirect=/decisions?limit=10，而非 AC 文字寫的 percent-encoded 形式。Vue Router 不會對 query value 內的 / 與 ? 做編碼；以 URLSearchParams 解析後得到 /decisions?limit=10，導向目標與 AC 期望一致，僅字面不同。"
+    },
+    {
+      "id": "D3",
+      "item": "AC-7.3 無法本機自動化驗證",
+      "detail": "vitest.config.ts 的 nuxt-import-meta-flags plugin 會把 import.meta.client 文字替換為 true，SSR 分支在 Vitest 下不可能被執行。tasks.md 保留未勾，僅以程式碼檢視確認 guard 位於 reset() 與 navigateTo 之前。建議 QA 在真實 SSR 環境（pnpm build 後 node .output/server/index.mjs，帶失效 cookie 直接請求頁面）覆核。"
+    },
+    {
+      "id": "D4",
+      "item": "本 worktree 的 .env 缺少 NUXT_AUTH_PASSWORD",
+      "detail": "依交辦指示未修改 .env。因此本 worktree 直接跑 pnpm dev 會被啟動斷言擋下（這正是 AC-3.1 的預期行為）。已在 .env.example 註明最低 32 字元與啟動斷言。部署環境（Railway）需確保此環境變數已設定且長度 >= 32。"
+    }
+  ],
+  "notes_for_qa": [
+    "rate limit 為 module-level in-memory Map，重啟 server 即重置；同一台機器上所有測試共用 127.0.0.1，連續測試請每個階段重啟 server 或等待 60 秒視窗。",
+    "未觸碰 server/api/arbiter/[...].ts 與 server/utils/proxyPolicy.ts（proxy-hardening 的範圍）。",
+    "未 push、未 merge 到 main。"
+  ]
+}
