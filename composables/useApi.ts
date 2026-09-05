@@ -40,8 +40,23 @@ interface GetCasesParams {
 }
 
 export function useApi() {
+  // Captured here in setup context rather than inside the interceptor: the
+  // interceptor can fire after the call stack has left the Nuxt app context.
+  // `route` stays reactive, so fullPath is still current when a 401 arrives.
+  const route = useRoute()
+  const authStore = useAuthStore()
+
   const api = $fetch.create({
     baseURL: '/api/arbiter',
+    onResponseError({ response }) {
+      if (response.status !== 401) return
+      // SSR has its own gate in middleware/auth.ts; navigating mid-render
+      // would abort the very request the server is still answering.
+      if (!import.meta.client) return
+      if (route.path === '/login') return
+      authStore.reset()
+      void navigateTo({ path: '/login', query: { redirect: route.fullPath } })
+    },
   })
 
   function normalizePrompt(prompt: PromptVersion): PromptVersion {

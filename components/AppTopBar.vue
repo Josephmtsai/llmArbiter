@@ -8,8 +8,9 @@ const authStore = useAuthStore()
 const sidebarOpen = useState('mobile:sidebarOpen', () => false)
 
 async function handleLogout() {
-  await authStore.logout()
-  await navigateTo('/login')
+  // Only leave the page once the server has actually dropped the session.
+  const ok = await authStore.logout()
+  if (ok) await navigateTo('/login')
 }
 </script>
 
