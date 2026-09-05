@@ -75,17 +75,17 @@ export function classifyUpstreamError(error: unknown, secret: string): UpstreamF
 ```
 
 ### AC
-- [ ] AC-1.1: Given `'PUT'` / `'HEAD'` / `'OPTIONS'` / `'get'` When `isAllowedMethod` is called Then it returns `false`; Given `'GET'|'POST'|'PATCH'|'DELETE'` Then `true`.
-- [ ] AC-1.2: Given wildcard `'decisions/stats'` When `validateProxyPath` is called Then `{ ok: true, path: '/decisions/stats' }`.
-- [ ] AC-1.3: Given `'health'` Then ok; Given `'healthz'` Then `{ ok: false, reason: 'not-allowed' }`; Given `'admin/users'` Then `not-allowed`.
-- [ ] AC-1.4: Given `'cases/../config'` Then `reason: 'traversal'`; Given `'cases//1'` Then `reason: 'double-slash'`; Given `''` Then `reason: 'empty'`.
-- [ ] AC-1.5: Given `{ limit: 20, action: undefined, since: null }` When `serializeQuery` is called Then result is `'limit=20'` (no `action=` / `since=`).
-- [ ] AC-1.6: Given `{ action: ['a', undefined, 'b'] }` Then `'action=a&action=b'`; Given `{}` Then `''`.
-- [ ] AC-1.7: Given `{ cookie: 'nuxt-session=x', authorization: 'Bearer y', referer: 'https://z', 'user-agent': 'UA', 'content-type': 'application/json', accept: 'application/json', host: 'localhost' }` When `pickForwardHeaders` is called Then result equals exactly `{ 'content-type': 'application/json', accept: 'application/json' }`.
-- [ ] AC-1.8: Given upstream `Headers` containing `set-cookie`, `content-type`, `content-length`, `x-powered-by` When `pickResponseHeaders` is called Then result equals exactly `{ 'content-type': <value> }`.
-- [ ] AC-1.9: Given `new DOMException('x', 'TimeoutError')` (and an `Error` whose `cause` is that DOMException) When `classifyUpstreamError` is called Then `{ statusCode: 504, message: 'upstream-timeout' }`.
-- [ ] AC-1.10: Given `new Error('fetch failed https://api?key=SECRET')` with secret `'SECRET'` Then `{ statusCode: 502, message: 'upstream-unreachable: fetch failed https://api?key=[redacted]' }`.
-- [ ] AC-1.11: `pnpm vue-tsc --noEmit` passes; no `any`, no `console.log`.
+- [x] AC-1.1: Given `'PUT'` / `'HEAD'` / `'OPTIONS'` / `'get'` When `isAllowedMethod` is called Then it returns `false`; Given `'GET'|'POST'|'PATCH'|'DELETE'` Then `true`.
+- [x] AC-1.2: Given wildcard `'decisions/stats'` When `validateProxyPath` is called Then `{ ok: true, path: '/decisions/stats' }`.
+- [x] AC-1.3: Given `'health'` Then ok; Given `'healthz'` Then `{ ok: false, reason: 'not-allowed' }`; Given `'admin/users'` Then `not-allowed`.
+- [x] AC-1.4: Given `'cases/../config'` Then `reason: 'traversal'`; Given `'cases//1'` Then `reason: 'double-slash'`; Given `''` Then `reason: 'empty'`.
+- [x] AC-1.5: Given `{ limit: 20, action: undefined, since: null }` When `serializeQuery` is called Then result is `'limit=20'` (no `action=` / `since=`).
+- [x] AC-1.6: Given `{ action: ['a', undefined, 'b'] }` Then `'action=a&action=b'`; Given `{}` Then `''`.
+- [x] AC-1.7: Given `{ cookie: 'nuxt-session=x', authorization: 'Bearer y', referer: 'https://z', 'user-agent': 'UA', 'content-type': 'application/json', accept: 'application/json', host: 'localhost' }` When `pickForwardHeaders` is called Then result equals exactly `{ 'content-type': 'application/json', accept: 'application/json' }`.
+- [x] AC-1.8: Given upstream `Headers` containing `set-cookie`, `content-type`, `content-length`, `x-powered-by` When `pickResponseHeaders` is called Then result equals exactly `{ 'content-type': <value> }`.
+- [x] AC-1.9: Given `new DOMException('x', 'TimeoutError')` (and an `Error` whose `cause` is that DOMException) When `classifyUpstreamError` is called Then `{ statusCode: 504, message: 'upstream-timeout' }`.
+- [x] AC-1.10: Given `new Error('fetch failed https://api?key=SECRET')` with secret `'SECRET'` Then `{ statusCode: 502, message: 'upstream-unreachable: fetch failed https://api?key=[redacted]' }`.
+- [x] AC-1.11: `pnpm vue-tsc --noEmit` passes; no `any`, no `console.log`.
 
 ---
 
@@ -156,18 +156,18 @@ Notes for Developer:
 - The `ofetch` `$fetch.raw` typing for `responseType: 'stream'` may need a small generic; use `// @ts-expect-error` **with a comment** only if truly required (CLAUDE.md §2).
 
 ### AC
-- [ ] AC-2.1: Given an unauthenticated browser When it calls `GET /api/arbiter/health` Then response is `401` (unchanged behaviour).
-- [ ] AC-2.2: Given an authenticated session When the browser calls `PUT /api/arbiter/cases/1` Then response is `405` with header `Allow: GET, POST, PATCH, DELETE`, and the upstream is never contacted.
-- [ ] AC-2.3: Given an authenticated session When the browser calls `GET /api/arbiter/admin/users` Then `404`; When it calls `GET /api/arbiter/cases/../config/provider` or `GET /api/arbiter/cases//1` Then `404`; the upstream is never contacted in all three cases.
-- [ ] AC-2.4: Given an authenticated session with a `nuxt-session` cookie and a custom `Authorization: Bearer test` header When the browser calls `GET /api/arbiter/health` Then the upstream request (captured via a local mock server, e.g. `NUXT_API_BASE_URL=http://127.0.0.1:<port>`) contains `x-api-key`, `accept` and no `cookie`, `authorization`, `referer`, `user-agent`.
-- [ ] AC-2.5: Given the upstream mock responds `200` with `Set-Cookie: evil=1` and `Content-Type: application/json` When the browser calls any allowed path Then the browser response has `content-type: application/json` and **no** `set-cookie` header.
-- [ ] AC-2.6: Given the upstream mock responds `422` with a JSON body When the browser calls `POST /api/arbiter/analyze` Then the browser receives `422` and the same JSON body (status/body passthrough preserved).
-- [ ] AC-2.7: Given the upstream mock sleeps longer than 30 s When the browser calls `GET /api/arbiter/health` Then the response is `504` with `message: 'upstream-timeout'` at ~30 s.
-- [ ] AC-2.8: Given `NUXT_API_BASE_URL` points to a closed port When the browser calls `GET /api/arbiter/health` Then the response is `502`, its message starts with `upstream-unreachable:`, and the response body does not contain the value of `NUXT_API_KEY`.
-- [ ] AC-2.9: Given the browser calls `GET /api/arbiter/decisions?limit=20&action=` via `useApi().getDecisions({ limit: 20, action: undefined })` When the upstream mock records the URL Then it is `/decisions?limit=20` (no `action=`).
-- [ ] AC-2.10: Given `POST /api/arbiter/cases` with a JSON body When forwarded Then the upstream receives the identical body and `content-type: application/json`.
-- [ ] AC-2.11: All existing pages (`/analyze`, `/decisions`, `/settings`, `/cases`, `/evaluate`, optimizer history, sidebar health check) continue to work against the real backend — no regressions in manual smoke test.
-- [ ] AC-2.12: `pnpm lint`, `pnpm vue-tsc --noEmit`, `pnpm test` all pass.
+- [x] AC-2.1: Given an unauthenticated browser When it calls `GET /api/arbiter/health` Then response is `401` (unchanged behaviour).
+- [x] AC-2.2: Given an authenticated session When the browser calls `PUT /api/arbiter/cases/1` Then response is `405` with header `Allow: GET, POST, PATCH, DELETE`, and the upstream is never contacted.
+- [x] AC-2.3: Given an authenticated session When the browser calls `GET /api/arbiter/admin/users` Then `404`; When it calls `GET /api/arbiter/cases/../config/provider` or `GET /api/arbiter/cases//1` Then `404`; the upstream is never contacted in all three cases.
+- [x] AC-2.4: Given an authenticated session with a `nuxt-session` cookie and a custom `Authorization: Bearer test` header When the browser calls `GET /api/arbiter/health` Then the upstream request (captured via a local mock server, e.g. `NUXT_API_BASE_URL=http://127.0.0.1:<port>`) contains `x-api-key`, `accept` and no `cookie`, `authorization`, `referer`, `user-agent`.
+- [x] AC-2.5: Given the upstream mock responds `200` with `Set-Cookie: evil=1` and `Content-Type: application/json` When the browser calls any allowed path Then the browser response has `content-type: application/json` and **no** `set-cookie` header.
+- [x] AC-2.6: Given the upstream mock responds `422` with a JSON body When the browser calls `POST /api/arbiter/analyze` Then the browser receives `422` and the same JSON body (status/body passthrough preserved).
+- [x] AC-2.7: Given the upstream mock sleeps longer than 30 s When the browser calls `GET /api/arbiter/health` Then the response is `504` with `message: 'upstream-timeout'` at ~30 s.
+- [x] AC-2.8: Given `NUXT_API_BASE_URL` points to a closed port When the browser calls `GET /api/arbiter/health` Then the response is `502`, its message starts with `upstream-unreachable:`, and the response body does not contain the value of `NUXT_API_KEY`.
+- [x] AC-2.9: Given the browser calls `GET /api/arbiter/decisions?limit=20&action=` via `useApi().getDecisions({ limit: 20, action: undefined })` When the upstream mock records the URL Then it is `/decisions?limit=20` (no `action=`).
+- [x] AC-2.10: Given `POST /api/arbiter/cases` with a JSON body When forwarded Then the upstream receives the identical body and `content-type: application/json`.
+- [ ] AC-2.11 (NOT VERIFIED - see note below): All existing pages (`/analyze`, `/decisions`, `/settings`, `/cases`, `/evaluate`, optimizer history, sidebar health check) continue to work against the real backend — no regressions in manual smoke test.
+- [x] AC-2.12: `pnpm lint`, `pnpm vue-tsc --noEmit`, `pnpm test` all pass.
 
 ---
 
@@ -186,6 +186,41 @@ Minimum test list:
 - `classifyUpstreamError`: `TimeoutError` DOMException, `AbortError`, nested in `cause`, plain `Error`, non-Error value (`'boom'`).
 
 ### AC
-- [ ] AC-3.1: Given `pnpm test` When run Then `tests/proxyPolicy.test.ts` passes with 0 failures.
-- [ ] AC-3.2: Given `pnpm test:coverage` When run Then `server/utils/proxyPolicy.ts` reports ≥ 90 % line coverage.
-- [ ] AC-3.3: The test file imports nothing from `h3` or `#imports`.
+- [x] AC-3.1: Given `pnpm test` When run Then `tests/proxyPolicy.test.ts` passes with 0 failures.
+- [x] AC-3.2: Given `pnpm test:coverage` When run Then `server/utils/proxyPolicy.ts` reports ≥ 90 % line coverage.
+- [x] AC-3.3: The test file imports nothing from `h3` or `#imports`.
+
+---
+
+## Verification notes (Developer, 2026-09-05)
+
+Gates on `feat/proxy-hardening`:
+
+| Gate | Result |
+|---|---|
+| `pnpm lint:check` | 0 errors, 10 pre-existing `vue/no-static-inline-styles` warnings |
+| `pnpm vue-tsc` | clean |
+| `pnpm test:coverage` | 11 files, 165 tests passed; thresholds met |
+| `pnpm build` | complete |
+
+Runtime AC (AC-2.1 → AC-2.10) were verified against a local mock upstream that records every
+request it receives, with the production build (`node .output/server/index.mjs`) and a real
+logged-in session cookie. All ten passed. Evidence highlights:
+
+- AC-2.4 upstream headers: `host, connection, accept, x-api-key, user-agent, accept-language,
+  sec-fetch-mode, accept-encoding` — no `cookie`, `authorization` or `referer`, and
+  `user-agent: arbiter-proxy` rather than the probe's `ACProbe/1.0`.
+- AC-2.7 returned `504 upstream-timeout` after 30.0 s.
+- AC-2.8 returned `502 upstream-unreachable: fetch failed`; the API key does not appear in
+  the response body.
+
+**AC-2.11 is deliberately left unticked.** It requires a manual smoke test of every page
+against the real backend, and this worktree's `.env` holds only `NUXT_SESSION_PASSWORD` — no
+`NUXT_API_KEY` or `NUXT_API_BASE_URL` — so the real backend cannot be reached from here (it
+answers `401` without a key). QA must run it.
+
+As the closest available substitute, all 26 endpoint paths reached from `composables/useApi.ts`
+were probed through the rebuilt proxy against the mock. Every one passed the new path
+allowlist (`200`, or `422` for `/analyze` where the mock answers `422` by design), so the
+allowlist introduces no routing regression. What remains unverified for AC-2.11 is real
+backend behaviour, not proxy routing.

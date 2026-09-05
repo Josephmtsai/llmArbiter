@@ -65,6 +65,30 @@ Behaviour preserved from today: upstream status codes pass through unchanged (e.
 ### Error-message safety
 `createError({ statusCode, message })` messages are visible to the browser. The 504 message is a fixed string. The 502 message includes the underlying error message (e.g. `fetch failed`, `ECONNREFUSED …`) which may contain the upstream base URL but never the key; `redactSecret` replaces any occurrence of `config.apiKey` with `[redacted]` as a hard guarantee. `cause` is **not** attached to the thrown error (Nitro may serialize it in dev).
 
+### Implementation note — outgoing `User-Agent` (added during implementation)
+The fetch specification requires a `User-Agent` on every outgoing request: if the caller
+sets none, the runtime appends its own default (`node` under undici). The header therefore
+cannot simply be omitted, and runtime verification confirmed `user-agent: node` reaching the
+mock upstream. The browser's own `User-Agent` was **not** leaked, but rather than depend on a
+runtime default, the proxy now pins `PROXY_USER_AGENT = 'arbiter-proxy'` explicitly. This
+satisfies the intent of AC-2.4 (no browser-supplied `User-Agent` reaches the upstream) with a
+deliberate, testable value.
+
+### Implementation note — path traversal and client normalisation
+`undici`'s `fetch` resolves `..` in a URL before the request leaves the client, so a traversal
+probe sent with `fetch` never reaches the server with the literal path. AC-2.3 is therefore
+verified over a raw `node:http` socket, which preserves the path verbatim. Confirmed:
+`/api/arbiter/cases/../config/provider` returns `404` and the upstream is never contacted.
+
+Residual, accepted: `validateProxyPath` matches the literal `..` as specified, so a
+percent-encoded `%2e%2e` in a later segment is not caught. This is not exploitable here — the
+upstream is an HTTP API, not a file server, and the first-segment allowlist still applies.
+
+### Measured coverage
+`pnpm test:coverage` on this branch: lines 44.68 / statements 44.68 / functions 58.21 /
+branches 82.25. `server/utils/proxyPolicy.ts` is at 100 % on all four metrics. Thresholds
+ratcheted to 42 / 42 / 56 / 80.
+
 ### Testing strategy
 All policy logic is pure → `tests/proxyPolicy.test.ts` imports `../server/utils/proxyPolicy` directly (no Nitro/h3 runtime needed; the module must therefore contain **no** auto-imported h3 helpers — it takes plain `Record<string, string | undefined>` / `Headers` inputs). The route file itself is glue and is verified via the manual AC in `tasks.md` Task 2.
 

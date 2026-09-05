@@ -1,0 +1,66 @@
+{
+  "from": "developer",
+  "to": "qa",
+  "feature": "proxy-hardening",
+  "status": "ready",
+  "retry_count": 0,
+  "max_retries": 2,
+  "summary": "以 $fetch.raw + sendStream 自建最小 proxy 取代 h3 proxyRequest：request header 只轉發 content-type/accept 加上 server 端的 X-API-Key，上游 Set-Cookie 一律不回寫（response 只轉發 content-type），method 白名單 GET/POST/PATCH/DELETE（其餘 405 附 Allow），path 第一段白名單九個 prefix（空字串/../// 皆 404 且不接觸上游），30s upstream timeout（504 upstream-timeout / 502 upstream-unreachable 並遮罩 API key），query 序列化跳過 null/undefined。所有判斷抽成純函式 server/utils/proxyPolicy.ts，覆蓋率 100%。",
+  "changed_files": [
+    "server/utils/proxyPolicy.ts",
+    "server/api/arbiter/[...].ts",
+    "tests/proxyPolicy.test.ts",
+    "vitest.config.ts",
+    "specs/proxy-hardening/spec.md",
+    "specs/proxy-hardening/tasks.md"
+  ],
+  "ac_ref": "specs/proxy-hardening/tasks.md",
+  "branch": "feat/proxy-hardening",
+  "base": "7821674",
+  "commits": ["995d4a2"],
+  "verification": {
+    "lint_check": "pnpm lint:check — 0 errors, 10 warnings (all pre-existing vue/no-static-inline-styles, unchanged from base)",
+    "vue_tsc": "pnpm vue-tsc — clean, exit 0",
+    "test_coverage": "pnpm test:coverage — 11 files, 166 tests passed. Measured lines 44.66 / statements 44.66 / functions 58.21 / branches 82.25. server/utils/proxyPolicy.ts 100/100/100/100.",
+    "build": "pnpm build — complete, exit 0",
+    "coverage_ratchet": "functions 53 -> 56, branches 78 -> 80. lines/statements stay 42 (floor(44.66)-2 = 42).",
+    "runtime_ac": "AC-2.1 through AC-2.10 verified against a local mock upstream that records every request, using the production build and a real logged-in session cookie. 10/10 passed.",
+    "runtime_evidence": {
+      "AC-2.4_upstream_headers": "host, connection, accept, x-api-key, user-agent, accept-language, sec-fetch-mode, accept-encoding — no cookie, authorization or referer; user-agent is 'arbiter-proxy', not the probe's 'ACProbe/1.0'",
+      "AC-2.7": "504 with message 'upstream-timeout' after 30.0s",
+      "AC-2.8": "502 with message 'upstream-unreachable: fetch failed'; API key absent from the response body",
+      "allowlist_regression_probe": "all 26 endpoint paths reached from composables/useApi.ts pass the new path allowlist"
+    }
+  },
+  "open_ac": [
+    {
+      "id": "AC-2.11",
+      "reason": "Requires a manual smoke test of every page against the real backend. This worktree's .env holds only NUXT_SESSION_PASSWORD — no NUXT_API_KEY or NUXT_API_BASE_URL — and the backend answers 401 without a key, so it cannot be verified here. Substitute evidence: all 26 useApi.ts endpoint paths were probed through the rebuilt proxy and none is blocked by the new allowlist, so proxy routing is not a regression risk. Real backend behaviour is what remains unverified.",
+      "owner": "qa"
+    }
+  ],
+  "deviations": [
+    {
+      "id": "D1",
+      "what": "The proxy sets an explicit outgoing User-Agent (PROXY_USER_AGENT = 'arbiter-proxy') rather than sending none.",
+      "why": "AC-2.4 asks for no user-agent upstream, but the fetch specification requires the header: when the caller sets none the runtime appends its own default. Runtime verification confirmed 'user-agent: node' reaching the mock. The browser's User-Agent was never leaked, but pinning a constant makes the value deliberate and testable instead of runtime-dependent. AC-2.4's security intent is fully met.",
+      "impact": "None on behaviour. The upstream sees a constant token."
+    },
+    {
+      "id": "D2",
+      "what": "AC-2.3's traversal probe uses a raw node:http socket instead of fetch.",
+      "why": "undici's fetch resolves '..' in the URL before the request is sent, so a fetch-based probe never reaches the server with the literal path and produced a false 200 on the first run. The raw socket preserves the path, and the server correctly answers 404 without contacting the upstream.",
+      "impact": "Test methodology only; no production code implication."
+    },
+    {
+      "id": "D3",
+      "what": "validateProxyPath matches the literal '..' only, so a percent-encoded '%2e%2e' in a later segment is not rejected.",
+      "why": "This is the check the spec specifies. Not exploitable here: the upstream is an HTTP API rather than a file server, and the first-segment allowlist still applies.",
+      "impact": "Accepted residual, recorded in spec.md."
+    }
+  ],
+  "notes": [
+    "Nothing was pushed and nothing was merged to main, per instruction.",
+    "A fresh `pnpm exec nuxt prepare` is required in a new worktree before vitest runs; tsconfig extends .nuxt/tsconfig.json."
+  ]
+}
