@@ -181,12 +181,75 @@ describe('POST /api/auth/login', () => {
     expect(other.statusCode).toBe(401)
   })
 
-  it('is not evaded by rotating a forged X-Forwarded-For prefix (AC-2.3)', async () => {
+  it('prefers X-Real-IP over anything the client can write (AC-2.3)', async () => {
     const handler = await freshHandler()
 
-    // Every attempt claims a different origin in the leftmost position. Taking
-    // the leftmost entry -- h3's `xForwardedFor: true` -- would hand each one a
-    // fresh bucket and disable the limiter completely.
+    // X-Real-IP is set by Railway's edge and overwritten there. The forged XFF
+    // rotates at *both* ends here, so if either end were preferred every
+    // attempt would get its own bucket and the limiter would be off.
+    for (let i = 0; i < 5; i += 1) {
+      const err = await expectError(
+        handler,
+        request({
+          headers: {
+            'x-real-ip': '203.0.113.7',
+            'x-forwarded-for': `10.0.0.${i}, 192.0.2.${i}`,
+          },
+          body: { password: 'wrong' },
+        }),
+      )
+      expect(err.statusCode).toBe(401)
+    }
+
+    const blocked = await expectError(
+      handler,
+      request({
+        headers: { 'x-real-ip': '203.0.113.7', 'x-forwarded-for': '10.0.0.99, 192.0.2.99' },
+        body: { password: 'wrong' },
+      }),
+    )
+    expect(blocked.statusCode).toBe(429)
+  })
+
+  it('falls back to X-Envoy-External-Address when X-Real-IP is unusable (AC-2.3)', async () => {
+    const handler = await freshHandler()
+
+    for (let i = 0; i < 5; i += 1) {
+      const err = await expectError(
+        handler,
+        request({
+          headers: {
+            'x-real-ip': 'not-an-address',
+            'x-envoy-external-address': '203.0.113.7',
+            'x-forwarded-for': `10.0.0.${i}`,
+          },
+          body: { password: 'wrong' },
+        }),
+      )
+      expect(err.statusCode).toBe(401)
+    }
+
+    const blocked = await expectError(
+      handler,
+      request({
+        headers: {
+          'x-real-ip': 'not-an-address',
+          'x-envoy-external-address': '203.0.113.7',
+          'x-forwarded-for': '10.0.0.99',
+        },
+        body: { password: 'wrong' },
+      }),
+    )
+    expect(blocked.statusCode).toBe(429)
+  })
+
+  it('keys on the rightmost X-Forwarded-For entry when no edge header is set (AC-2.3)', async () => {
+    const handler = await freshHandler()
+
+    // Last resort only. Which end of Railway's chain is trustworthy is disputed
+    // (see resolveRateLimitKey), so this pins the documented behaviour rather
+    // than claiming the rightmost entry is unforgeable. The case that does not
+    // depend on getting this right is the global cap, below.
     for (let i = 0; i < 5; i += 1) {
       const err = await expectError(
         handler,
@@ -206,6 +269,74 @@ describe('POST /api/auth/login', () => {
       }),
     )
     expect(blocked.statusCode).toBe(429)
+  })
+
+  it('caps the total attempt rate however the key is chosen (AC-2.6)', async () => {
+    const handler = await freshHandler()
+
+    // The worst case the per-address key cannot cover: the attacker controls
+    // the bucket completely and never reuses one, so every request lands in a
+    // fresh per-address window. This is what makes the 8 character floor safe
+    // without having to be right about Railway's forwarding headers.
+    for (let i = 0; i < 30; i += 1) {
+      const err = await expectError(
+        handler,
+        request({
+          ip: undefined,
+          headers: { 'x-forwarded-for': `198.51.100.${i}` },
+          body: { password: 'wrong' },
+        }),
+      )
+      expect(err.statusCode).toBe(401)
+    }
+
+    const blocked = await expectError(
+      handler,
+      request({
+        ip: undefined,
+        headers: { 'x-forwarded-for': '198.51.100.200' },
+        body: { password: 'wrong' },
+      }),
+    )
+    expect(blocked.statusCode).toBe(429)
+    expect(blocked.message).toBe('Too many attempts')
+    expect(setHeader).toHaveBeenLastCalledWith(expect.anything(), 'Retry-After', expect.any(Number))
+    expect(setHeader.mock.lastCall?.[2]).toBeGreaterThanOrEqual(1)
+  })
+
+  it('blocks a fresh, honest address once the global cap is spent (AC-2.6)', async () => {
+    const handler = await freshHandler()
+    for (let i = 0; i < 30; i += 1) {
+      await expectError(
+        handler,
+        request({ headers: { 'x-real-ip': `198.51.100.${i}` }, body: { password: 'wrong' } }),
+      )
+    }
+
+    // Collateral damage is the point: a global cap that exempted anyone would
+    // be bypassed by looking like that person. One minute of shared lockout is
+    // the accepted cost (spec deploy-recovery, R-9).
+    const err = await expectError(
+      handler,
+      request({ headers: { 'x-real-ip': '203.0.113.7' }, body: { password: 'wrong' } }),
+    )
+    expect(err.statusCode).toBe(429)
+  })
+
+  it('leaves the global cap room for ordinary use (AC-2.6)', async () => {
+    const handler = await freshHandler()
+
+    // Six operators, four attempts each: under the per-address limit of 5 and
+    // under the global 30, so nobody is thrown a 429 for someone else's typo.
+    for (let client = 0; client < 6; client += 1) {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const err = await expectError(
+          handler,
+          request({ headers: { 'x-real-ip': `203.0.113.${client}` }, body: { password: 'wrong' } }),
+        )
+        expect(err.statusCode).toBe(401)
+      }
+    }
   })
 
   it('separates genuinely different clients behind the proxy (AC-2.3)', async () => {
@@ -245,10 +376,24 @@ describe('POST /api/auth/login', () => {
     expect(err.statusCode).toBe(429)
   })
 
-  it('falls back to a shared bucket when no address is available at all (AC-2.5)', async () => {
+  it('falls back to one shared bucket when no address is available at all (AC-2.5)', async () => {
     const handler = await freshHandler()
+    // Each attempt sends different junk in every address header, so none of
+    // them resolves. They must all land in the *same* bucket -- if unusable
+    // headers produced distinct keys, sending junk would be the bypass.
     for (let i = 0; i < 6; i += 1) {
-      await expectError(handler, request({ ip: undefined, body: { password: 'wrong' } }))
+      await expectError(
+        handler,
+        request({
+          ip: undefined,
+          headers: {
+            'x-real-ip': `junk-${i}`,
+            'x-envoy-external-address': `junk-${i}`,
+            'x-forwarded-for': `junk-${i}`,
+          },
+          body: { password: 'wrong' },
+        }),
+      )
     }
 
     const err = await expectError(handler, request({ ip: undefined, body: { password: 'wrong' } }))

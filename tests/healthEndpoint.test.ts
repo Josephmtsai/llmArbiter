@@ -1,16 +1,20 @@
 import { afterAll, describe, expect, it, vi } from 'vitest'
 
-// server/api/health.get.ts is Railway's healthcheck target. `defineEventHandler`
+// server/api/health.ts is Railway's healthcheck target. `defineEventHandler`
 // only wraps the function in Nitro, so the stub returns it unchanged and these
 // tests call the real handler directly.
 //
-// AC-3.1 / AC-3.5 / AC-3.6 / AC-3.7 need a real route table (no redirect, not
-// swallowed by the proxy catch-all, GET-only, and `/api/arbiter/health` still
-// 401) and are covered by the runtime checks in the DoD instead.
+// Scope note (review round 1): calling the handler directly can only observe
+// the *body it returns*. It cannot see Nitro routing, method matching, status
+// codes, response headers or `railway.toml` -- which is precisely the layer
+// that broke in production. That layer is covered against the built server in
+// `tests/e2e/health.e2e.test.ts`; the earlier version of this file had fifteen
+// cases that all re-asserted the same object equality and gave false assurance,
+// so what is left here is the body contract and nothing else.
 
 vi.stubGlobal('defineEventHandler', <T>(fn: T) => fn)
 
-const handler = (await import('../server/api/health.get')).default as unknown as (
+const handler = (await import('../server/api/health')).default as unknown as (
   event?: unknown,
 ) => unknown
 
@@ -18,8 +22,7 @@ afterAll(() => {
   vi.unstubAllGlobals()
 })
 
-/** Stand-ins for the request shapes the endpoint must ignore. */
-const ANONYMOUS_EVENT = { path: '/api/health', method: 'GET', node: { req: { headers: {} } } }
+/** A request shape the endpoint must ignore: authenticated, with a session. */
 const AUTHENTICATED_EVENT = {
   path: '/api/health',
   method: 'GET',
@@ -27,52 +30,20 @@ const AUTHENTICATED_EVENT = {
   context: { sessionUser: { name: 'operator' } },
 }
 
-describe('server/api/health.get', () => {
-  it('answers with exactly { status: "ok" } (AC-3.2)', () => {
-    expect(handler(ANONYMOUS_EVENT)).toEqual({ status: 'ok' })
-  })
-
-  it('answers identically with and without a session (AC-3.3)', () => {
-    // A healthcheck that varied by auth state would report the platform's
-    // cookie handling rather than whether this process is alive.
-    expect(handler(AUTHENTICATED_EVENT)).toEqual(handler(ANONYMOUS_EVENT))
-  })
-
-  it('answers identically when called with no event at all (AC-3.3)', () => {
+describe('server/api/health', () => {
+  it('answers with exactly { status: "ok" } and nothing else (AC-3.2, AC-3.4)', () => {
+    // Equality, not a field blacklist: a blacklist only catches the fields
+    // someone thought of, and this endpoint is unauthenticated, so every extra
+    // field would be free reconnaissance.
     expect(handler()).toEqual({ status: 'ok' })
+    expect(Object.keys(handler() as Record<string, unknown>)).toEqual(['status'])
   })
 
-  it('returns a fresh object each call, so a caller cannot poison it (AC-3.2)', () => {
-    expect(handler(ANONYMOUS_EVENT)).not.toBe(handler(ANONYMOUS_EVENT))
-  })
-
-  it('has exactly one key and no others (AC-3.4)', () => {
-    // Equality first: a blacklist only catches the fields someone thought of.
-    const body = handler(ANONYMOUS_EVENT)
-    expect(body).toEqual({ status: 'ok' })
-    expect(Object.keys(body as Record<string, unknown>)).toEqual(['status'])
-  })
-
-  it.each([
-    'NUXT_',
-    'apiKey',
-    'apiBaseUrl',
-    'authPassword',
-    'session',
-    'password',
-    'version',
-    'uptime',
-    'env',
-  ])('never leaks %s in the serialised body (AC-3.4)', (needle) => {
-    // Belt to the equality assertion's braces: this endpoint is unauthenticated,
-    // so every extra field is free reconnaissance for a scanner.
-    expect(JSON.stringify(handler(ANONYMOUS_EVENT))).not.toContain(needle)
-  })
-
-  it('does not read runtime config (AC-3.4)', () => {
-    // Nothing stubs `useRuntimeConfig` in this file. If the handler ever starts
-    // calling it, this throws a ReferenceError rather than quietly shipping
-    // config in the body.
-    expect(() => handler(ANONYMOUS_EVENT)).not.toThrow()
+  it('ignores the request entirely, session included (AC-3.3)', () => {
+    // A healthcheck that varied by auth state would report the platform's
+    // cookie handling rather than whether this process is alive. Nothing here
+    // stubs `useRuntimeConfig` either, so a handler that started reading config
+    // would throw a ReferenceError rather than quietly serialising it.
+    expect(handler(AUTHENTICATED_EVENT)).toEqual({ status: 'ok' })
   })
 })

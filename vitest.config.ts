@@ -96,8 +96,15 @@ export default defineConfig({
       // statements 51.08 / functions 73.02 / branches 87.50. floor(measured) - 2
       // lands on 49 / 49 / 71 / 85 -- exactly the values already here, so the
       // ratchet holds and nothing moves this round. Recorded rather than
-      // skipped: the new server/api/health.get.ts is inside the `server/**/*.ts`
+      // skipped: the new server/api/health.ts is inside the `server/**/*.ts`
       // include and covers 100%, so it did not drag the totals down.
+      // Re-measured by `deploy-recovery` retry #1 on 2026-09-05 (604 tests),
+      // after the review-round-1 work on the rate-limit key, the global login
+      // cap and the startup assertion of the proxy settings: lines 51.42 /
+      // statements 51.42 / functions 73.51 / branches 87.77. floor(measured) - 2
+      // is again 49 / 49 / 71 / 85, so the thresholds still do not move.
+      // (The new tests/e2e/health.e2e.test.ts drives the built server in a
+      // separate process and is excluded here, so it reports no coverage.)
       thresholds: {
         lines: 49,
         statements: 49,

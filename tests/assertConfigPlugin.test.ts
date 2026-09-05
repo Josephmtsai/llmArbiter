@@ -16,7 +16,20 @@ const PLACEHOLDER = 'replace-me-with-openssl-rand-hex-32-output'
 /** Eight random characters: the shortest NUXT_AUTH_PASSWORD the gate accepts. */
 const SHORT_AUTH = 'k7Qm2xTd'
 
+/**
+ * A configuration whose *other* fields are all valid, so each case fails for
+ * exactly the reason it names. The proxy settings are part of this: since
+ * review round 1 the plugin also refuses to boot without them.
+ */
+const VALID_PROXY = { apiKey: 'an-api-key', apiBaseUrl: 'https://arbiter.example.com' }
+
 function boot(config: Record<string, unknown>) {
+  runtimeConfig = { ...VALID_PROXY, ...config }
+  return () => plugin()
+}
+
+/** Boots with no defaults filled in, for the cases about the proxy settings. */
+function bootRaw(config: Record<string, unknown>) {
   runtimeConfig = config
   return () => plugin()
 }
@@ -107,5 +120,62 @@ describe('server/plugins/assert-config', () => {
     // This plugin does not own runtimeConfig.session; it must not fail on a
     // shape the auth module chose not to populate.
     expect(boot(config)).not.toThrow()
+  })
+})
+
+// Review round 1 (F2): a deployment with valid passwords but no NUXT_API_KEY
+// used to start, answer /api/health with 200 and be marked live by Railway,
+// while every dashboard request went upstream with an empty X-API-Key and
+// failed. nuxt.config.ts defaults apiKey to '' and apiBaseUrl to a literal, so
+// "not configured" arrives here as a present-but-useless value.
+describe('server/plugins/assert-config - upstream proxy settings', () => {
+  it.each([
+    ['missing', undefined],
+    ['an empty string', ''],
+    ['only whitespace', '   '],
+    ['not a string', 42],
+  ])('refuses to boot when NUXT_API_KEY is %s', (_label, apiKey) => {
+    expect(bootRaw({ authPassword: STRONG, apiKey, apiBaseUrl: VALID_PROXY.apiBaseUrl })).toThrow(
+      /NUXT_API_KEY must be set to a non-empty value/,
+    )
+  })
+
+  it.each([
+    ['missing', undefined],
+    ['an empty string', ''],
+    ['a bare host', 'arbiter.example.com'],
+    ['a relative path', '/api'],
+    ['a non-http scheme', 'ftp://arbiter.example.com'],
+    ['a file URL', 'file:///etc/passwd'],
+    ['not a string', 42],
+  ])('refuses to boot when NUXT_API_BASE_URL is %s', (_label, apiBaseUrl) => {
+    expect(bootRaw({ authPassword: STRONG, apiKey: VALID_PROXY.apiKey, apiBaseUrl })).toThrow(
+      /NUXT_API_BASE_URL must be/,
+    )
+  })
+
+  it.each(['https://arbiter.example.com', 'http://127.0.0.1:8000', 'https://host/base/path'])(
+    'accepts %s as an upstream base URL',
+    (apiBaseUrl) => {
+      const config = { authPassword: STRONG, apiKey: VALID_PROXY.apiKey, apiBaseUrl }
+      expect(bootRaw(config)).not.toThrow()
+    },
+  )
+
+  it('checks the passwords before the proxy settings', () => {
+    // Ordering matters for the operator reading the crash log: the secret that
+    // is missing should be named first, not shadowed by a second complaint.
+    expect(bootRaw({ authPassword: 'short', apiKey: '', apiBaseUrl: '' })).toThrow(
+      /NUXT_AUTH_PASSWORD/,
+    )
+  })
+
+  it('does not probe the upstream, only the configuration', () => {
+    // Deliberate: reachability is not a property of this deployment's config.
+    // A base URL that nothing is listening on must still boot, or an upstream
+    // blip becomes a failed deploy.
+    expect(
+      bootRaw({ authPassword: STRONG, apiKey: 'k', apiBaseUrl: 'http://127.0.0.1:1' }),
+    ).not.toThrow()
   })
 })

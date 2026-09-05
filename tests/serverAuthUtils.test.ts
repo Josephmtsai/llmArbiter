@@ -6,9 +6,14 @@ import {
   createRateLimiter,
   isIpAddress,
   isPlaceholderSecret,
+  LOGIN_ATTEMPTS_GLOBAL,
+  LOGIN_ATTEMPTS_PER_ADDRESS,
+  LOGIN_RATE_LIMIT_WINDOW_MS,
   MIN_AUTH_PASSWORD_LENGTH,
   MIN_SECRET_LENGTH,
   resetExpectedDigestCache,
+  resolveRateLimitKey,
+  UNKNOWN_RATE_LIMIT_KEY,
   verifyLoginPassword,
 } from '../server/utils/auth'
 import { bufferEquals } from '../server/utils/constantTime'
@@ -346,9 +351,10 @@ describe('isIpAddress', () => {
 })
 
 describe('clientIpFromForwardedFor', () => {
-  it('takes the rightmost entry, which the nearest proxy wrote (AC-2.1)', () => {
-    // Only the last hop is trustworthy: everything to its left was supplied by
-    // the client or by proxies further out.
+  it('takes the rightmost entry (AC-2.1)', () => {
+    // Documented behaviour, not a trust claim: which end of Railway's chain is
+    // unforgeable is disputed (see resolveRateLimitKey), so this header is the
+    // third choice and the global cap is what covers being wrong about it.
     expect(clientIpFromForwardedFor('9.9.9.9, 8.8.8.8, 203.0.113.7')).toBe('203.0.113.7')
   })
 
@@ -373,6 +379,104 @@ describe('clientIpFromForwardedFor', () => {
     ['a whole-header junk value', 'unknown'],
   ])('returns undefined for %s so the caller falls back (AC-2.2)', (_label, header) => {
     expect(clientIpFromForwardedFor(header)).toBeUndefined()
+  })
+})
+
+describe('resolveRateLimitKey', () => {
+  /** Builds the header getter the route passes in. */
+  function headers(map: Record<string, string>) {
+    return (name: string) => map[name]
+  }
+
+  it('prefers X-Real-IP, the header the edge overwrites (AC-2.3)', () => {
+    const key = resolveRateLimitKey(
+      headers({
+        'x-real-ip': '203.0.113.7',
+        'x-envoy-external-address': '198.51.100.4',
+        'x-forwarded-for': '10.0.0.1, 10.0.0.2',
+      }),
+      '192.0.2.9',
+    )
+
+    expect(key).toBe('203.0.113.7')
+  })
+
+  it('falls to X-Envoy-External-Address next (AC-2.3)', () => {
+    const key = resolveRateLimitKey(
+      headers({ 'x-envoy-external-address': '198.51.100.4', 'x-forwarded-for': '10.0.0.1' }),
+      '192.0.2.9',
+    )
+
+    expect(key).toBe('198.51.100.4')
+  })
+
+  it('falls to the rightmost X-Forwarded-For entry next (AC-2.3)', () => {
+    expect(resolveRateLimitKey(headers({ 'x-forwarded-for': '10.0.0.1, 198.51.100.4' }))).toBe(
+      '198.51.100.4',
+    )
+  })
+
+  it('falls to the socket address when no header is usable (AC-2.4)', () => {
+    expect(resolveRateLimitKey(headers({}), '192.0.2.9')).toBe('192.0.2.9')
+    expect(resolveRateLimitKey(headers({}), '::ffff:127.0.0.1')).toBe('::ffff:127.0.0.1')
+  })
+
+  it('falls to one shared bucket when nothing resolves (AC-2.5)', () => {
+    expect(resolveRateLimitKey(headers({}))).toBe(UNKNOWN_RATE_LIMIT_KEY)
+    expect(resolveRateLimitKey(headers({}), null)).toBe(UNKNOWN_RATE_LIMIT_KEY)
+    expect(resolveRateLimitKey(headers({}), 'not-an-address')).toBe(UNKNOWN_RATE_LIMIT_KEY)
+  })
+
+  it.each([
+    ['a hostname', 'evil.com'],
+    ['an empty value', ''],
+    ['a list', '203.0.113.7, 198.51.100.4'],
+    ['a bucket-name injection', 'unknown'],
+  ])(
+    'ignores %s in an edge header, rather than keying a bucket on it (AC-2.4)',
+    (_label, value) => {
+      // Every layer is validated, so a header cannot name an arbitrary bucket --
+      // in particular it cannot collide with UNKNOWN_RATE_LIMIT_KEY. Validation
+      // does not stop a client rotating *valid* addresses (nothing at this layer
+      // can); that is what the global cap is for.
+      const key = resolveRateLimitKey(
+        headers({ 'x-real-ip': value, 'x-envoy-external-address': value }),
+        '192.0.2.9',
+      )
+
+      expect(key).toBe('192.0.2.9')
+    },
+  )
+
+  it('trims surrounding whitespace on an edge header (AC-2.3)', () => {
+    expect(resolveRateLimitKey(headers({ 'x-real-ip': '  203.0.113.7  ' }))).toBe('203.0.113.7')
+  })
+
+  it('is not moved by a client-supplied X-Forwarded-For when an edge header is set', () => {
+    // The scenario the global cap also covers: a client rotating XFF must not
+    // change the bucket while Railway is naming the connecting address.
+    const keys = new Set(
+      ['10.0.0.1', '10.0.0.2, 10.0.0.3', 'garbage'].map((forwarded) =>
+        resolveRateLimitKey(
+          headers({ 'x-real-ip': '203.0.113.7', 'x-forwarded-for': forwarded }),
+          '192.0.2.9',
+        ),
+      ),
+    )
+
+    expect([...keys]).toEqual(['203.0.113.7'])
+  })
+})
+
+describe('login rate limit constants', () => {
+  it('caps the total attempt rate well above the per-address one (AC-2.6)', () => {
+    // The global cap is what makes MIN_AUTH_PASSWORD_LENGTH = 8 safe regardless
+    // of how the per-address key resolves, so it has to be both real (finite,
+    // small) and roomy enough not to fire on ordinary use.
+    expect(LOGIN_ATTEMPTS_PER_ADDRESS).toBe(5)
+    expect(LOGIN_ATTEMPTS_GLOBAL).toBe(30)
+    expect(LOGIN_ATTEMPTS_GLOBAL).toBeGreaterThan(LOGIN_ATTEMPTS_PER_ADDRESS)
+    expect(LOGIN_RATE_LIMIT_WINDOW_MS).toBe(60_000)
   })
 })
 

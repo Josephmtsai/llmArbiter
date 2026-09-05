@@ -1,60 +1,136 @@
 {
   "from": "developer",
-  "to": "qa",
+  "to": "codex-reviewer",
   "feature": "deploy-recovery",
   "status": "ready",
-  "summary": "修好 Railway 兩次部署失敗：(A) assertStrongSecret 加第三參數 minLength（預設維持 MIN_SECRET_LENGTH = 32），新增 MIN_AUTH_PASSWORD_LENGTH = 8，長度改以 value.trim().length 衡量但不 trim 被比對的值，錯誤訊息內插實際下限；assert-config.ts 兩個呼叫端都明確傳入下限。(B) 新增無驗證的 server/api/health.get.ts（固定回 { status: 'ok' }），railway.toml 的 healthcheckPath 改為 /api/health、healthcheckTimeout 依 Human Gate 決議維持 30。文件（.env.example / README.md）同步兩個分歧的下限並修掉兩處既有錯誤敘述。",
+  "summary": "Review round 1 修正（codex verdict: no-ship，3 Major 全數處理）。F1：登入限流的 key 不再單押 X-Forwarded-For —— 新增 resolveRateLimitKey，依序取 X-Real-IP → X-Envoy-External-Address → 最右 XFF → socket → 共用的 'unknown' 桶（每層都過 isIpAddress），並加上與來源無關的全域上限桶 30/60s，讓總猜測速率不依賴「哪個標頭可信」這個 Railway 官方說法自相矛盾的問題。F2：啟動時斷言 NUXT_API_KEY 非空、NUXT_API_BASE_URL 為絕對 http(s) URL，堵住「啟動成功、healthcheck 200、但每個 dashboard 請求都失敗」的洞；只驗組態，不探測上游。F3：server/api/health.get.ts 改名為 health.ts（實測 HEAD /api/health 原本回 404，而 Railway 沒有記載探針用哪個 method），刪掉 tests/healthEndpoint.test.ts 裡 9 條只重講同一條 body 斷言的空殼案例，改以 tests/e2e/health.e2e.test.ts 對 built server 發真實請求，並從 railway.toml 讀出 healthcheckPath 去打那條路徑。",
   "changed_files": [
     "server/utils/auth.ts",
     "server/plugins/assert-config.ts",
-    "server/api/health.get.ts",
+    "server/api/health.ts",
+    "server/api/auth/login.post.ts",
     "railway.toml",
     ".env.example",
     "README.md",
     "tests/serverAuthUtils.test.ts",
     "tests/assertConfigPlugin.test.ts",
     "tests/healthEndpoint.test.ts",
+    "tests/loginRoute.test.ts",
+    "tests/e2e/health.e2e.test.ts",
     "vitest.config.ts",
     "specs/deploy-recovery/spec.md",
     "specs/deploy-recovery/tasks.md",
+    "specs/deploy-recovery/review-codex-1.md",
     "specs/deploy-recovery/handoff-dev.json"
   ],
   "ac_ref": "specs/deploy-recovery/tasks.md",
-  "retry_count": 0,
+  "retry_count": 1,
   "max_retries": 2,
+  "retry_history": [
+    {
+      "round": 1,
+      "trigger": "specs/deploy-recovery/review-codex-1.md — codex adversarial review, verdict no-ship, 3 Major",
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "Major",
+          "title": "限流 key 可由攻擊者控制（login.post.ts:17 用最右的 X-Forwarded-For）",
+          "why_it_matters": "把 NUXT_AUTH_PASSWORD 下限降到 8 的正當性完全建立在這個限流器上，所以它是承重元件。",
+          "codex_recommendation": "改取 X-Forwarded-For 最左邊。",
+          "action": "不採納 codex 的建議。Railway 官方說法自相矛盾（員工 phin 說 edge 會清掉 client 的 XFF、第一個值可信；員工 sam-a 說 client 可偽造但真實 IP 永遠在最左、因為 edge 是「附加」—— 這兩句不能同時為真；社群 zah340 則說附加在尾端、只有最右可信）。改成不依賴解這個歧義的兩層設計。",
+          "changes": [
+            "server/utils/auth.ts: 新增 resolveRateLimitKey(getHeader, socketAddress)，依序 X-Real-IP → X-Envoy-External-Address → 最右 XFF → socket → UNKNOWN_RATE_LIMIT_KEY('unknown')；每一層都走既有的 isIpAddress 驗證，避免任意字串變成桶名或撞到 'unknown' 桶。",
+            "server/utils/auth.ts: 新增 LOGIN_ATTEMPTS_PER_ADDRESS=5、LOGIN_ATTEMPTS_GLOBAL=30、LOGIN_RATE_LIMIT_WINDOW_MS=60_000。",
+            "server/utils/auth.ts: 原註解「Railway's edge appends the address it saw, so the rightmost entry is the last trustworthy one」是錯誤斷言，已改寫為「最右只是有記載的行為之一、是第三順位、兩端都不視為權威」，並附上兩個 station.railway.com 連結。",
+            "server/api/auth/login.post.ts: key 改用 resolveRateLimitKey；新增與來源無關的全域桶（單一 bucket 'all'）；兩個桶都 hit、不短路；任一超限回 429 並帶較大的 Retry-After。同處以註解說明為何不用 getRequestIP(event, { xForwardedFor: true })（h3 取最左，client 寫得進來）。"
+          ],
+          "sizing_rationale": "30/60s = 43,200 次/日。.env.example 要求的 8 個隨機字元 ≥ 36^8 ≈ 2.8e12，用盡一半約需 1e8 年。同時 30 是 per-address 額度（5）的六倍，一般使用（手滑重試、多人同時登入）撞不到。",
+          "tests": [
+            "tests/loginRoute.test.ts: 重寫原第 184 行寫死鏈序的案例。新增「XFF 兩端每次都換值也換不掉 X-Real-IP 這個桶」、「X-Real-IP 不可用時退到 X-Envoy-External-Address」、「兩者皆無才用最右 XFF（標示為最後手段）」、「30 個不同的偽造合法位址各打一次全 401、第 31 次 429 + Retry-After」、「全域額度用完後連一個全新的誠實位址也被擋」、「6 個來源各 4 次共 24 次全部 401（不誤傷正常使用）」；並把共用桶那條加硬成三個位址標頭每次都塞不同垃圾值仍共用一桶。",
+            "tests/serverAuthUtils.test.ts: 新增 describe('resolveRateLimitKey')（優先序、socket 退回含 ::ffff:127.0.0.1、共用 unknown 桶、垃圾值拒絕、空白 trim、有 edge 標頭時 client 的 XFF 推不動 key）與 describe('login rate limit constants')（5 / 30 / 60_000）。"
+          ],
+          "residual_risk": "spec R-9：全域桶讓攻擊者有能力對所有人造成 429 附帶損害；計數在單一 process 內，多 replica 時各算一份。兩者已記在 spec，本輪不處理。"
+        },
+        {
+          "id": "F2",
+          "severity": "Major",
+          "title": "健康但不可用的部署（啟動只驗兩個密碼）",
+          "why_it_matters": "nuxt.config.ts 把 apiKey 預設為 ''、apiBaseUrl 完全沒驗，所以少設 NUXT_API_KEY 的部署會啟動成功、/api/health 回 200、被 Railway 標記為 live，然後每個 dashboard 請求都在上游失敗。",
+          "changes": [
+            "server/plugins/assert-config.ts: 新增 assertPresent（非空字串，回傳 trim 後的值）與 assertHttpUrl（new URL 可解析且 protocol 為 http:/https:），在既有的兩個密碼斷言之後呼叫 assertPresent('NUXT_API_KEY', config.apiKey) 與 assertHttpUrl('NUXT_API_BASE_URL', config.apiBaseUrl)。訊息沿用既有風格，結尾 'See .env.example.'。"
+          ],
+          "deliberately_not_done": "不把上游連通性做進 health 端點，也不在啟動時 ping 上游 —— 只驗組態。上游抖一下不該害整個服務重啟（liveness ≠ readiness）。已在程式註解與 spec AD-11 寫明。",
+          "tests": [
+            "tests/assertConfigPlugin.test.ts: boot() 併入合法的 proxy 設定，新增 bootRaw() 供 proxy 專屬案例；涵蓋 NUXT_API_KEY 缺少／空／只有空白／非字串，NUXT_API_BASE_URL 七種壞形狀（空、空白、相對路徑、無 scheme、file:、ftp:、非字串）、三種合法 URL、密碼先於 proxy 的拋錯順序，以及「只檢查組態、不探測上游」。"
+          ]
+        },
+        {
+          "id": "F3",
+          "severity": "Major",
+          "title": "health 路徑完全沒被測到（單元測試把 defineEventHandler 換成 identity）",
+          "why_it_matters": "那組測試看不到 Nitro 的路由、method 比對、status code、header 與 catch-all 優先序；15 個案例裡有 9 個只是換句話重講同一條 body 相等斷言。實測 built server：GET /api/health 200、HEAD 404、POST 404、GET / 302 —— 探針若用 HEAD，這次修復根本沒修好。",
+          "changes": [
+            "server/api/health.get.ts → server/api/health.ts（git mv）。handler body 不變（固定回 { status: 'ok' }），新增註解段落「Why this file is not health.get.ts」記錄實測的 HEAD 404、Railway 未記載探針 method、以及刻意放棄 AC-3.6 的 method 限縮。",
+            "tests/healthEndpoint.test.ts: 15 案例刪成 2（body 恰好相等且無多餘鍵、完全不看 request 含 session），並加上指向 e2e 檔的範圍說明。空殼案例是刪除而非保留湊數。",
+            "tests/e2e/health.e2e.test.ts（新增，11 tests）：對 node .output/server/index.mjs 發真實請求。GET 與 HEAD 皆 2xx；GET body 恰為 {\"status\":\"ok\"}；GET 與 HEAD 皆無 Set-Cookie；POST/PUT/DELETE/OPTIONS 皆 2xx；/api/health 無 location 而 / 仍 302；另外兩條從 railway.toml 解析出 healthcheckPath 再去請求那條路徑（GET 與 HEAD），而不是拿它跟常數字串比對。"
+          ],
+          "deviation": "AC-3.6（限縮 method 表面）刻意不滿足，已在 tasks.md 記為 DEVIATION、spec 的 AD-7 一併推翻並新增 R-10。理由：Railway 官方文件只寫「查詢到收到任何 2xx」、沒有記載探針用哪個 method，而 HEAD 正是探針慣例；這個 handler 回固定常數、不碰 I/O、不讀組態、不持有狀態，沒有 method 能擴大的表面，所以那個限制保護不到任何東西。",
+          "mutation_check": "手動 mutation 驗證新測試不是空的：把檔案改回 health.get.ts → 11 條中紅 6 條；把 railway.toml 的 healthcheckPath 改回 \"/\" → 紅 2 條。兩個 mutation 都已還原並重新確認 railway.toml 內容。"
+        }
+      ],
+      "codex_items_accepted_without_change": [
+        "assertStrongSecret 的呼叫端、PLACEHOLDER_SECRET_FRAGMENTS 的片段長度（42/37/9/10/16）、built manifest 中 /api/health 掛在 /api/arbiter/** 之外、health 端點不下 session cookie —— codex 已自行驗證無誤，本輪未動。"
+      ],
+      "codex_items_recorded_not_fixed": [
+        "codex 指出 \"\\u200B\\u200B\\u200Babcde\"（三個 U+200B 前綴）不會被 trim 掉，因此 8 字元的檢查可被寬字元繞過。這是 AD-4 的已知邊界；擴大 trim 的字元集會動到比對語意，所以不改，改為記在 spec residual risk R-8。"
+      ]
+    }
+  ],
+  "disagreements_with_codex": [
+    "F1 的修法不照 codex 建議改成取最左的 X-Forwarded-For。理由：Railway 兩位員工的公開回答互相矛盾（一位說 edge 會清掉 client 的 XFF、第一個值就是真的；另一位說 client 可偽造但真實 IP 永遠在最左、因為 edge 是「附加」），社群回覆又說附加在尾端。把 8 字元密碼的安全性壓在「猜對了是哪一端」上，跟原本壓在最右邊一樣脆弱。改用「優先信任 client 寫不進來的 edge 標頭 + 與來源無關的全域上限桶」，兩種說法哪一種為真都成立。",
+    "沒有把 isIpAddress 收緊。它目前會把 '203.0.113.7:443' 當成 IPv6 收下（isIpv6 刻意寬鬆：含 ':'、字元集合法、尾段 443 符合 1–4 位 hex）。收緊它買不到東西 —— 真正的威脅是輪替「合法」位址，那由全域上限桶處理，不是由格式驗證處理；而 isIpAddress 是 codex 已驗證過、且別處也在用的函式，為了一個不影響安全性的形狀去動它是淨負面。驗證的作用僅在於防止任意字串變成桶名、以及撞到共用的 'unknown' 桶，這個作用已經達成。",
+    "接受 codex 對 F2 的附帶指正（原本註解裡「上游探測會害服務重啟」的措辭對 Railway 而言不精確），已改寫程式註解與 spec；但端點仍然完全不探測上游，依 orchestrator 指示。"
+  ],
   "gate_results": {
     "lint": "PASS — pnpm lint:check: 0 errors, 10 pre-existing vue/no-static-inline-styles warnings, none in files changed by this feature",
     "vue-tsc": "PASS — pnpm vue-tsc (nuxt prepare && vue-tsc --noEmit): no diagnostics",
-    "test": "PASS — pnpm test:coverage: 24 files / 584 tests passed. All files 51.08 lines / 51.08 statements / 73.02 functions / 87.50 branches. server/api/health.get.ts, server/utils/auth.ts and server/plugins/assert-config.ts all 100% statements",
-    "build": "PASS — pnpm build: Nitro build complete, chunk routes/api/health.get.mjs emitted; build ran with no NUXT_AUTH_PASSWORD in the environment (AC-2.7 / AC-6.4)",
-    "e2e": "PASS — pnpm test:e2e: tests/e2e/proxy.e2e.test.ts 28/28 passed, unmodified"
+    "test": "PASS — pnpm test: 24 files / 604 tests passed (round 0 was 584). pnpm test:coverage: All files 51.42 lines / 51.42 statements / 73.51 functions / 87.77 branches; server/api 100%, server/plugins 100%, server/utils 99.36%",
+    "build": "PASS — pnpm build: Nitro build complete; chunk .output/server/chunks/routes/api/health.mjs emitted and the route manifest entry is { route: '/api/health', handler: _lazy_CiYE3J, lazy: true, middleware: false, method: undefined } — method: undefined is what makes every method answer 200. Build ran with no NUXT_AUTH_PASSWORD in the environment (AC-2.7 / AC-6.4)",
+    "e2e": "PASS — pnpm test:e2e: 39 tests (tests/e2e/proxy.e2e.test.ts 28 unchanged + tests/e2e/health.e2e.test.ts 11 new)"
   },
   "coverage_ratchet": {
     "rule": "tooling-baseline AD-6: max(current, floor(measured) - 2), only ever up",
-    "measured": { "lines": 51.08, "statements": 51.08, "functions": 73.02, "branches": 87.5 },
+    "measured": { "lines": 51.42, "statements": 51.42, "functions": 73.51, "branches": 87.77 },
     "thresholds_after": { "lines": 49, "statements": 49, "functions": 71, "branches": 85 },
-    "note": "floor(measured) - 2 equals the current values on all four metrics, so nothing moved this round. Recorded in the vitest.config.ts comment block anyway."
+    "note": "floor(measured) - 2 is 49 / 49 / 71 / 85 on all four metrics — exactly the current values, so nothing moved again this round. Recorded in the vitest.config.ts comment block. tests/e2e/health.e2e.test.ts drives the built server in a separate process and is excluded from the unit config, so it reports no coverage."
   },
   "runtime_verification": [
-    "NUXT_AUTH_PASSWORD=8 chars + NUXT_SESSION_PASSWORD=32 chars -> server started (DoD 1)",
+    "NUXT_AUTH_PASSWORD=8 chars + NUXT_SESSION_PASSWORD=32 chars + valid NUXT_API_KEY/NUXT_API_BASE_URL -> server started (DoD 1)",
     "NUXT_AUTH_PASSWORD=7 chars -> refused to boot: 'NUXT_AUTH_PASSWORD must be set and at least 8 characters long. See .env.example.' (DoD 2)",
     "NUXT_SESSION_PASSWORD=31 chars -> refused to boot: 'NUXT_SESSION_PASSWORD must be set and at least 32 characters long. See .env.example.' (DoD 3)",
-    "GET /api/health, no cookie -> 200, body {\"status\":\"ok\"}, content-length 15 (DoD 4, AC-3.1/3.2)",
-    "GET /, no cookie -> 302, unchanged (DoD 5)",
-    "POST /api/health -> 404 'Page not found: /api/health', not 200 (DoD 6, AC-3.6 — see deviations)",
-    "GET /api/arbiter/health, no cookie -> 401, unchanged (DoD 7, AC-3.7)",
-    "6 consecutive POST /api/auth/login from one IP -> 401 x5 then 429 with 'Retry-After: 50' (DoD 8, AC-1.11)"
+    "GET /api/health, no cookie -> 200, body {\"status\":\"ok\"}, no Set-Cookie (DoD 4, AC-3.1/3.2)",
+    "GET /, no cookie -> 302 location=/login?redirect=/ , unchanged (DoD 5)",
+    "POST /api/health -> 200 (DoD 6, was 404 before this round — AC-3.6 DEVIATION)",
+    "HEAD /api/health -> 200, no Set-Cookie (DoD 7, was 404 before this round — the F3 regression point)",
+    "GET /api/arbiter/health, no cookie -> 401, unchanged (DoD 8, AC-3.7)",
+    "6 consecutive POST /api/auth/login from one address -> 401 x5 then 429 with 'Retry-After: 60' (DoD 9, AC-1.11)",
+    "NUXT_API_KEY='' -> refused to boot: 'NUXT_API_KEY must be set to a non-empty value. See .env.example.' (DoD 10, AC-7.8)",
+    "NUXT_API_BASE_URL=not-a-url -> refused to boot: 'NUXT_API_BASE_URL must be an absolute http(s) URL, e.g. https://api.example.com. See .env.example.' (DoD 11, AC-7.9)"
   ],
   "deviations": [
-    "AC-3.6 expected 405 for a non-GET on /api/health; Nitro actually answers 404 'Page not found: /api/health' for a method that matches no registered route. The AC's substance (not 200, no extra method surface) holds. Nitro routing behaviour, not changed. Noted inline in tasks.md.",
-    "AC-1.9's example value 'change' (6 chars) is not in fact a placeholder: isPlaceholderSecret does fragment.includes-into-value, and 'change'.includes('change-me') is false. Under the 8 floor no value can be both too short and a placeholder, since the shortest fragment 'change-me' is 9 chars. The gate ordering is therefore pinned at the 32 floor with 'change-me', which is genuinely both. Noted inline in tasks.md.",
-    "healthcheckTimeout stays 30 per the Human Gate decision; spec AD-10 and its 'raise to 100' section are marked 未採納, and the tasks.md Task 4 code block was corrected from 100 to 30 to match.",
-    "AC-1.7's mixed-whitespace example '   \\n\\t  ' is 7 characters, so it fails the 8 floor on raw length too and would not prove the trim. Used '   \\n\\t   ' (8 characters) instead so the case only fails after trimming.",
-    "README line 60 (NUXT_SESSION_PASSWORD 'min 32 chars for nuxt-auth-utils') was left as-is per the Task 5 table — it was already correct."
+    "AC-3.6 (限縮 method 表面) is deliberately NOT met. server/api/health.get.ts was renamed to server/api/health.ts and every method now answers 200. Measured on the built server before the change: HEAD /api/health -> 404, POST -> 404. Railway's healthcheck docs (https://docs.railway.com/guides/healthchecks) only say the probe polls until it receives any 2xx and never document the method, so the GET-only restriction rested on an unsupported assumption while HEAD is the conventional probe method. The handler returns a constant, touches no I/O, reads no config and holds no state, so there is no method surface to protect. Recorded in tasks.md AC-3.6, spec AD-7 (struck through) and spec R-10.",
+    "spec AD-7 (「以 .get.ts 限縮 method」) is overturned by the above and replaced in the spec with the any-method decision.",
+    "The spec's compensating-control section claimed the rate-limit key was 「不可由 client 偽造」. That claim was wrong and has been corrected in place rather than quietly dropped (F1).",
+    "AC-3.6 was previously reported as a deviation for a different reason (Nitro answers 404, not 405, for an unmatched method). That observation still holds and is now moot: no method is unmatched.",
+    "AC-1.9's example value 'change' (6 chars) is not in fact a placeholder (unchanged from round 0). Gate ordering is pinned at the 32 floor with 'change-me'.",
+    "healthcheckTimeout stays 30 per the Human Gate decision (unchanged from round 0).",
+    "AC-1.7's mixed-whitespace example uses 8 characters so the case only fails after trimming (unchanged from round 0)."
   ],
   "notes_for_qa": [
-    "Two floors are deliberately different and must stay that way: tests/serverAuthUtils.test.ts has separate describe blocks per floor, and the 31-character session case (AC-1.3) is the anti-regression pin. No existing assertion was loosened to /at least \\d+/.",
-    "tests/e2e/proxy.e2e.test.ts and tests/loginRoute.test.ts were not modified and both still pass.",
-    "Before deploying, confirm on Railway that NUXT_AUTH_PASSWORD (>= 8, random, not a dictionary word) and NUXT_SESSION_PASSWORD (>= 32) are both set and neither is an .env.example placeholder (spec R-6)."
+    "F1 的核心不是「選對標頭」，而是「無論 key 選得多差，總速率都有上限」。要驗這一點請跑 tests/loginRoute.test.ts 裡『caps the total attempt rate however the key is chosen』那條，或直接對 built server 用 30 個不同的偽造位址各打一次，第 31 次必須 429。",
+    "tests/e2e/health.e2e.test.ts 需要先 pnpm build。它用 NUXT_API_BASE_URL=http://127.0.0.1:1 啟動 —— 這個位址永遠不會被連線，只是為了滿足 F2 新增的啟動斷言，同時證明啟動不探測上游。",
+    "railway.toml 的 healthcheckPath 現在被 e2e 以「讀出來再去請求」的方式釘住。把它改回 / 或改成不存在的路徑都會讓測試紅，不是字串比對。",
+    "已知殘留風險，都在 spec：R-8（U+200B 等零寬字元不被 trim，刻意不修）、R-9（Railway 轉發標頭語意歧義；緩解為多來源 key + 全域上限，殘留為 429 附帶損害與單 process 計數）、R-10（health 端點接受任何 method）、R-11（NUXT_API_KEY / NUXT_API_BASE_URL 成為硬性開機條件）。",
+    "部署前請在 Railway service variables 確認四個變數：NUXT_AUTH_PASSWORD（>= 8、隨機、非字典字）、NUXT_SESSION_PASSWORD（>= 32）、NUXT_API_KEY（非空）、NUXT_API_BASE_URL（絕對 http(s) URL）。後兩個自本輪起漏設會讓新部署起不來（刻意的 fail-fast，Railway 會保留舊版本繼續服務）。"
   ]
 }

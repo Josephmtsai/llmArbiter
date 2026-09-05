@@ -1,8 +1,42 @@
 import { assertStrongSecret, MIN_AUTH_PASSWORD_LENGTH, MIN_SECRET_LENGTH } from '../utils/auth'
 
 /**
+ * Throws unless `value` is a non-empty string, returning it trimmed.
+ *
+ * `nuxt.config.ts` defaults both proxy settings to a value rather than leaving
+ * them undefined, so "missing" arrives here as `''`, not as absent.
+ */
+function assertPresent(name: string, value: unknown): string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(`${name} must be set to a non-empty value. See .env.example.`)
+  }
+  return value.trim()
+}
+
+/** Throws unless `value` is an absolute http(s) URL. */
+function assertHttpUrl(name: string, value: unknown): void {
+  const raw = assertPresent(name, value)
+  let parsed: URL
+  try {
+    parsed = new URL(raw)
+  } catch {
+    throw new Error(
+      `${name} must be an absolute http(s) URL, e.g. https://api.example.com. See .env.example.`,
+    )
+  }
+  // A relative path parses as a URL only against a base, so `new URL` already
+  // rejects it. This catches the absolute-but-wrong-scheme case (file:, ftp:).
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(
+      `${name} must be an absolute http(s) URL, e.g. https://api.example.com. See .env.example.`,
+    )
+  }
+}
+
+/**
  * Fails the process at startup when a required secret is missing, too short, or
- * still the `.env.example` placeholder.
+ * still the `.env.example` placeholder, or when the upstream proxy settings are
+ * unusable.
  *
  * Nitro plugins run only at runtime, so `nuxt build` in CI is unaffected; this
  * fires on `pnpm dev` and on `node .output/server/index.mjs`.
@@ -31,4 +65,18 @@ export default defineNitroPlugin(() => {
       MIN_SECRET_LENGTH,
     )
   }
+
+  // Everything the dashboard shows goes through server/api/arbiter/[...].ts,
+  // which sends `X-API-Key: <apiKey>` to `apiBaseUrl`. Both default to a value
+  // in nuxt.config.ts, so without this the process starts happily, /api/health
+  // answers 200, Railway marks the deploy live -- and every single dashboard
+  // request then fails upstream with an empty key. Fail at boot instead, while
+  // the previous deployment is still serving.
+  //
+  // Deliberately *not* a reachability probe, here or in /api/health: whether
+  // the upstream answers right now is not a property of this deployment's
+  // configuration, and wiring it into startup would turn an upstream blip into
+  // a failed deploy.
+  assertPresent('NUXT_API_KEY', config.apiKey)
+  assertHttpUrl('NUXT_API_BASE_URL', config.apiBaseUrl)
 })
