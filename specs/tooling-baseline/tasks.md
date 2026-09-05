@@ -19,8 +19,8 @@ pnpm add -D eslint-plugin-vue@^10 typescript-eslint@^8 eslint-config-prettier@^1
 不得混用 npm / yarn；不得手動編輯 `pnpm-lock.yaml`。
 
 ### AC
-- [ ] AC-1.1: Given fresh clone，When 執行 `pnpm install --frozen-lockfile`，Then 五個套件出現在 `devDependencies` 且 lockfile 一致（exit 0）。
-- [ ] AC-1.2: Given `package.json`，When 檢視 `devDependencies`，Then 沒有新增 `@nuxt/eslint`（AD-1）。
+- [x] AC-1.1: Given fresh clone，When 執行 `pnpm install --frozen-lockfile`，Then 五個套件出現在 `devDependencies` 且 lockfile 一致（exit 0）。
+- [x] AC-1.2: Given `package.json`，When 檢視 `devDependencies`，Then 沒有新增 `@nuxt/eslint`（AD-1）。
 
 ---
 
@@ -82,13 +82,13 @@ export default tseslint.config(
 - 若 `eslint-plugin-vue@10` 的 config key 名稱與上面不同（例如 `flat/strongly-recommended` 改名），以套件 README 為準並在 handoff-dev.json 註記。
 
 ### AC
-- [ ] AC-2.1: Given `eslint.config.js` 存在，When 執行 `pnpm exec eslint --print-config pages/index.vue`，Then 輸出包含 `vue/require-v-for-key`（Priority A）與 `vue/require-default-prop`（Priority B）且 `vue/attributes-order`（Priority C）不為 error。
-- [ ] AC-2.2: Given 一個含 `console.log('x')` 的暫時 `.ts` 檔，When 執行 `pnpm lint:check`，Then 回報 `no-console` error 且 exit code ≠ 0。
-- [ ] AC-2.3: Given 一個含 `const a: any = 1` 的暫時 `.ts` 檔，When 執行 `pnpm lint:check`，Then 回報 `@typescript-eslint/no-explicit-any` error。
-- [ ] AC-2.4: Given 一個含 101 字元純程式碼（非字串、非 URL）行的暫時 `.ts` 檔，When 執行 `pnpm lint:check`，Then 回報 `max-len` error。
-- [ ] AC-2.5: Given `pages/cases.vue`，When 執行 `pnpm lint:check`，Then 不出現 `vue/multi-word-component-names`。
-- [ ] AC-2.6: Given `components/ui/UiButton.vue`（單一檔案），When 執行 `pnpm exec eslint components/ui/UiButton.vue`，Then 不出現 `no-undef`（Nuxt auto-import 不誤報）。
-- [ ] AC-2.7: Given `.nuxt/` 已由 `nuxt prepare` 產生，When 執行 `pnpm lint:check`，Then 不掃描 `.nuxt/`、`.output/`、`coverage/`（可用 `--debug` 或違規檔案路徑確認）。
+- [x] AC-2.1: Given `eslint.config.js` 存在，When 執行 `pnpm exec eslint --print-config pages/index.vue`，Then 輸出包含 `vue/require-v-for-key`（Priority A）與 `vue/require-default-prop`（Priority B）且 `vue/attributes-order`（Priority C）不為 error。
+- [x] AC-2.2: Given 一個含 `console.log('x')` 的暫時 `.ts` 檔，When 執行 `pnpm lint:check`，Then 回報 `no-console` error 且 exit code ≠ 0。
+- [x] AC-2.3: Given 一個含 `const a: any = 1` 的暫時 `.ts` 檔，When 執行 `pnpm lint:check`，Then 回報 `@typescript-eslint/no-explicit-any` error。
+- [x] AC-2.4: Given 一個含 101 字元純程式碼（非字串、非 URL）行的暫時 `.ts` 檔，When 執行 `pnpm lint:check`，Then 回報 `max-len` error。
+- [x] AC-2.5: Given `pages/cases.vue`，When 執行 `pnpm lint:check`，Then 不出現 `vue/multi-word-component-names`。
+- [x] AC-2.6: Given `components/ui/UiButton.vue`（單一檔案），When 執行 `pnpm exec eslint components/ui/UiButton.vue`，Then 不出現 `no-undef`（Nuxt auto-import 不誤報）。
+- [x] AC-2.7: Given `.nuxt/` 已由 `nuxt prepare` 產生，When 執行 `pnpm lint:check`，Then 不掃描 `.nuxt/`、`.output/`、`coverage/`（可用 `--debug` 或違規檔案路徑確認）。
 
 ---
 
@@ -123,9 +123,9 @@ graphify-out/
 理由：`format` script 是 `prettier --write .`，不排除 `specs/`、`docs/`、`*.md` 會把 SA/QA 文件與 openspec 全部重排，污染 diff。
 
 ### AC
-- [ ] AC-3.1: Given 現有 `composables/useApi.ts`，When 執行 `pnpm exec prettier --check composables/useApi.ts`，Then 輸出不含「would reformat」以外的錯誤（可接受因 printWidth 造成的換行差異，但**不得**出現分號或雙引號的變更；用 `prettier --write` 後 `git diff` 驗證）。
-- [ ] AC-3.2: Given `.prettierignore`，When 執行 `pnpm format`，Then `git status` 中 `specs/`、`docs/`、`openspec/`、`*.md` 沒有任何變更。
-- [ ] AC-3.3: Given `eslint.config.js` 已含 `eslint-config-prettier`，When 對已 `prettier --write` 過的檔案執行 `pnpm lint:check`，Then 不出現任何 `vue/html-indent`、`vue/max-attributes-per-line`、`vue/html-self-closing` 錯誤（兩者不打架）。
+- [x] AC-3.1: Given 現有 `composables/useApi.ts`，When 執行 `pnpm exec prettier --check composables/useApi.ts`，Then 輸出不含「would reformat」以外的錯誤（可接受因 printWidth 造成的換行差異，但**不得**出現分號或雙引號的變更；用 `prettier --write` 後 `git diff` 驗證）。
+- [x] AC-3.2: Given `.prettierignore`，When 執行 `pnpm format`，Then `git status` 中 `specs/`、`docs/`、`openspec/`、`*.md` 沒有任何變更。
+- [x] AC-3.3: Given `eslint.config.js` 已含 `eslint-config-prettier`，When 對已 `prettier --write` 過的檔案執行 `pnpm lint:check`，Then 不出現任何 `vue/html-indent`、`vue/max-attributes-per-line`、`vue/html-self-closing` 錯誤（兩者不打架）。
 
 ---
 
@@ -146,12 +146,12 @@ graphify-out/
 - `@typescript-eslint/no-unused-vars`：`tsconfig` 已開 `noUnusedLocals`，預期 0。
 
 ### AC
-- [ ] AC-4.1: Given Task 1–3 完成，When 執行 `pnpm lint:check`，Then exit code 0 且 error 數為 0（warning 可有）。
-- [ ] AC-4.2: Given baseline 修正後，When 執行 `pnpm vue-tsc`，Then exit code 0（自動修正沒有破壞型別）。
-- [ ] AC-4.3: Given baseline 修正後，When 執行 `pnpm test`，Then 4 支既有測試全部通過。
-- [ ] AC-4.4: Given baseline 修正後，When 執行 `pnpm build`，Then exit code 0。
-- [ ] AC-4.5: Given spec.md「Baseline Log」，When 檢視，Then 每條首次違規的規則都有數量與處置；任何降為 `warn` 的規則都有記錄。
-- [ ] AC-4.6: Given `git log`，When 檢視，Then baseline 自動修正是獨立的 `chore:` commit，不含 Task 2/3/5–8 的設定檔變更。
+- [x] AC-4.1: Given Task 1–3 完成，When 執行 `pnpm lint:check`，Then exit code 0 且 error 數為 0（warning 可有）。
+- [x] AC-4.2: Given baseline 修正後，When 執行 `pnpm vue-tsc`，Then exit code 0（自動修正沒有破壞型別）。
+- [x] AC-4.3: Given baseline 修正後，When 執行 `pnpm test`，Then 4 支既有測試全部通過。
+- [x] AC-4.4: Given baseline 修正後，When 執行 `pnpm build`，Then exit code 0。
+- [x] AC-4.5: Given spec.md「Baseline Log」，When 檢視，Then 每條首次違規的規則都有數量與處置；任何降為 `warn` 的規則都有記錄。
+- [x] AC-4.6: Given `git log`，When 檢視，Then baseline 自動修正是獨立的 `chore:` commit，不含 Task 2/3/5–8 的設定檔變更。
 
 ---
 
@@ -176,10 +176,10 @@ graphify-out/
 ```
 
 ### AC
-- [ ] AC-5.1: Given 終端機，When 執行 `pnpm test`，Then Vitest 跑完一次即結束（不進 watch 模式），exit code 反映測試結果。
-- [ ] AC-5.2: Given 終端機，When 執行 `pnpm test:watch`，Then 進入 watch 模式（手動 `q` 離開）。
-- [ ] AC-5.3: Given `pnpm lint:check`，When 有 fixable 違規，Then 只回報不修改檔案（`git status` 乾淨）。
-- [ ] AC-5.4: Given `pnpm test:coverage`，When 執行，Then 產出 `coverage/lcov.info` 並在終端印出 text 摘要。
+- [x] AC-5.1: Given 終端機，When 執行 `pnpm test`，Then Vitest 跑完一次即結束（不進 watch 模式），exit code 反映測試結果。
+- [x] AC-5.2: Given 終端機，When 執行 `pnpm test:watch`，Then 進入 watch 模式（手動 `q` 離開）。
+- [x] AC-5.3: Given `pnpm lint:check`，When 有 fixable 違規，Then 只回報不修改檔案（`git status` 乾淨）。
+- [x] AC-5.4: Given `pnpm test:coverage`，When 執行，Then 產出 `coverage/lcov.info` 並在終端印出 text 摘要。
 
 ---
 
@@ -214,13 +214,13 @@ ENV HUSKY=0
 首次啟用：`pnpm install`（觸發 `prepare`）→ `git config core.hooksPath` 應為 `.husky/_`。
 
 ### AC
-- [ ] AC-6.1: Given 執行過 `pnpm install`，When 執行 `git config core.hooksPath`，Then 輸出 `.husky/_`。
-- [ ] AC-6.2: Given 暫存一個含 `console.log` 的 `.ts` 檔，When `git commit`，Then commit 被 pre-commit hook 擋下（exit ≠ 0）且訊息含 `no-console`。
-- [ ] AC-6.3: Given 暫存一個格式不符（例如含分號、雙引號）但無 lint error 的 `.ts` 檔，When `git commit`，Then commit 成功且提交內容已被 Prettier 重排（分號移除）。
-- [ ] AC-6.4: Given 暫存一個與任何測試無關的檔案變更，When `git commit`，Then `vitest run --changed` 不因「No test files found」而失敗。
-- [ ] AC-6.5: Given `HUSKY=0` 環境變數，When 在**沒有 `.git/` 的目錄**（模擬 Docker build stage：複製專案到暫存目錄並刪除 `.git`）執行 `pnpm install --frozen-lockfile`，Then exit code 0。若本機有 Docker，改以 `docker build .` 驗證。
-- [ ] AC-6.6: Given `.husky/pre-push` 存在（Option 1），When `git push` 且 `vue-tsc` 有型別錯誤，Then push 被擋下。
-- [ ] AC-6.7: Given `.husky/` 目錄，When 執行 `pnpm lint:check`，Then `.husky/**` 不被掃描（Task 2 ignores）。
+- [x] AC-6.1: Given 執行過 `pnpm install`，When 執行 `git config core.hooksPath`，Then 輸出 `.husky/_`。
+- [x] AC-6.2: Given 暫存一個含 `console.log` 的 `.ts` 檔，When `git commit`，Then commit 被 pre-commit hook 擋下（exit ≠ 0）且訊息含 `no-console`。
+- [x] AC-6.3: Given 暫存一個格式不符（例如含分號、雙引號）但無 lint error 的 `.ts` 檔，When `git commit`，Then commit 成功且提交內容已被 Prettier 重排（分號移除）。
+- [x] AC-6.4: Given 暫存一個與任何測試無關的檔案變更，When `git commit`，Then `vitest run --changed` 不因「No test files found」而失敗。
+- [x] AC-6.5: Given `HUSKY=0` 環境變數，When 在**沒有 `.git/` 的目錄**（模擬 Docker build stage：複製專案到暫存目錄並刪除 `.git`）執行 `pnpm install --frozen-lockfile`，Then exit code 0。若本機有 Docker，改以 `docker build .` 驗證。
+- [x] AC-6.6: Given `.husky/pre-push` 存在（Option 1），When `git push` 且 `vue-tsc` 有型別錯誤，Then push 被擋下。
+- [x] AC-6.7: Given `.husky/` 目錄，When 執行 `pnpm lint:check`，Then `.husky/**` 不被掃描（Task 2 ignores）。
 
 ---
 
@@ -270,10 +270,10 @@ export default defineConfig({
 設定 `include` 後**重新量測**（AD-6）；若任一項低於門檻，把該項改為「量測值向下取整 − 2」並在 spec.md Baseline Log 記錄四個量測值。
 
 ### AC
-- [ ] AC-7.1: Given `vitest.config.ts` 更新，When 執行 `pnpm test:coverage`，Then exit code 0 且終端 text 報表只列出 `include` 內的目錄（不含 `app.vue`、`nuxt.config.ts`、`tailwind.config.ts`、`layouts/`、`tests/`）。
-- [ ] AC-7.2: Given 暫時把 `thresholds.lines` 改成 `99`，When 執行 `pnpm test:coverage`，Then exit code ≠ 0 且訊息含 "ERROR: Coverage for lines"（門檻真的會擋）。改回後恢復 exit 0。
-- [ ] AC-7.3: Given spec.md Baseline Log，When 檢視，Then 四個重新量測的 coverage 數字已填入，且每個 threshold ≤ 對應量測值。
-- [ ] AC-7.4: Given `vitest.config.ts`，When 檢視，Then thresholds 上方有 ratchet 規則註解。
+- [x] AC-7.1: Given `vitest.config.ts` 更新，When 執行 `pnpm test:coverage`，Then exit code 0 且終端 text 報表只列出 `include` 內的目錄（不含 `app.vue`、`nuxt.config.ts`、`tailwind.config.ts`、`layouts/`、`tests/`）。
+- [x] AC-7.2: Given 暫時把 `thresholds.lines` 改成 `99`，When 執行 `pnpm test:coverage`，Then exit code ≠ 0 且訊息含 "ERROR: Coverage for lines"（門檻真的會擋）。改回後恢復 exit 0。
+- [x] AC-7.3: Given spec.md Baseline Log，When 檢視，Then 四個重新量測的 coverage 數字已填入，且每個 threshold ≤ 對應量測值。
+- [x] AC-7.4: Given `vitest.config.ts`，When 檢視，Then thresholds 上方有 ratchet 規則註解。
 
 ---
 
@@ -302,9 +302,9 @@ deploy job 不變。`--passWithNoTests` 移除。
 
 ### AC
 - [ ] AC-8.1: Given PR 推上 GitHub，When CI verify job 執行，Then 出現 `Lint` 與 `Test (with coverage)` 兩個步驟且全部綠燈。
-- [ ] AC-8.2: Given `ci.yml`，When grep `passWithNoTests`，Then 無結果。
+- [x] AC-8.2: Given `ci.yml`，When grep `passWithNoTests`，Then 無結果。
 - [ ] AC-8.3: Given 一個故意含 `console.log` 的 PR（可用暫時 branch 驗證後關閉），When CI 執行，Then verify job 在 `Lint` 步驟失敗，`deploy` job 不執行。
-- [ ] AC-8.4: Given CI 的 `Lint` 步驟，When 檢視，Then 位於 `Prepare Nuxt types` 之後（保險起見，即使 AD-1 方案不依賴 `.nuxt/`）。
+- [x] AC-8.4: Given CI 的 `Lint` 步驟，When 檢視，Then 位於 `Prepare Nuxt types` 之後（保險起見，即使 AD-1 方案不依賴 `.nuxt/`）。
 
 ---
 
@@ -317,3 +317,5 @@ deploy job 不變。`--passWithNoTests` 移除。
 - `Dockerfile`
 - `specs/tooling-baseline/spec.md`（Baseline Log 填寫）
 - Task 4 自動修正影響的所有 `*.ts` / `*.vue`（列出檔數即可，逐檔清單附在 commit）
+
+> **AC-8.1 / AC-8.3 未勾選**：兩條都要求觀察 GitHub Actions 上的 `Lint` 與 `Test (with coverage)` 步驟實際執行，必須 push 才能驗證。本機無法證實，故保留未勾。其餘 35 條已於 2026-09-05 在 main（ef0555c）基礎上實測通過。

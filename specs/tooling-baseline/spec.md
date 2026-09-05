@@ -158,3 +158,18 @@ SA 建議 Option 1。若採 Option 1，需要同意另開 `docs:` commit 修改 
 
 ## Acceptance Criteria
 See `tasks.md`.
+
+### 複驗（2026-09-05, base ef0555c）
+
+第二個 session 在獨立 worktree 平行實作了同一 feature，兩條分支四項 gate 皆通過。main 採用先合入的版本後，於 main 基礎上重跑全部 gate 與 AC：
+
+| Gate | 結果 |
+| --- | --- |
+| `pnpm lint:check` | exit 0，0 error / 10 warning（全為 `vue/no-static-inline-styles`，OQ-2 已定為 warn） |
+| `pnpm vue-tsc` | exit 0 |
+| `pnpm test:coverage` | exit 0，lines 44.22 / branches 80.51 / functions 55.14 / statements 44.22 |
+| `pnpm build` | exit 0 |
+
+門檻 42/42/53/78 全部低於實測值；暫時把 `lines` 調到 99 可重現 `ERROR: Coverage for lines (44.22%) does not meet global threshold (99%)` 並 exit 1，證實門檻確實會擋。
+
+AC 實測 35/37 通過，AC-8.1 與 AC-8.3 需 push 後觀察 GitHub Actions，本機無法驗證。

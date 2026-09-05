@@ -80,7 +80,10 @@
   ],
   "manual_fixes": [
     {
-      "files": ["pages/settings.vue", "pages/decisions.vue"],
+      "files": [
+        "pages/settings.vue",
+        "pages/decisions.vue"
+      ],
       "issue": "Prettier 的 semi: false 會把 inline event handler 內用分號分隔的多個敘述拆成換行且不補分號，Vue template compiler 無法解析。pnpm build 失敗，但 pnpm vue-tsc 與 pnpm test 都不會發現（只有 build 會炸）。",
       "fix": "3 處全部改為 <script setup> 內的具名 handler，行為不變：settings.vue onRuleToggle(rule, $event)、decisions.vue prevPage() / nextPage()。"
     }
@@ -134,5 +137,35 @@
     "清除了 repo 根目錄下的 --port/ 目錄（751K，是 `nuxt dev --port` 打錯時 Nuxt 把 --port 當 rootDir 產生的 .nuxt 輸出）。未被 git 追蹤也未被 .gitignore 排除，會被 eslint 掃到。",
     "本機 Git 為 2.30.1.windows.1（2021 年），建議升級：除了擋住 lint-staged 17，這個版本也早於多個 Git 安全性修補。",
     "非本次範圍：重新整理頁面後主題不會從 localStorage 還原（app.vue 的 useHead htmlAttrs 寫死 dark，覆蓋了 layouts/default.vue 的 onMounted(init)）。已在 specs/guide-flow-diagrams/handoff-dev.json 記錄，待另開 fix/theme-persist branch 處理。"
-  ]
+  ],
+  "followup": {
+    "branch": "chore/tooling-baseline-followup",
+    "base": "ef0555c",
+    "date": "2026-09-05",
+    "why": "第二個 session 在 worktree 平行實作了同一 feature（branch feat/tooling-baseline）。兩條分支四項 gate 皆通過，main 採用先合入的這一版。平行版本唯一 main 沒有的實質改進為 pre-commit 的 fresh-clone 守衛，已在本分支補上；其餘內容重複，未 rebase（38 個重排檔案會全面衝突且無收益）。",
+    "changed_files": [
+      ".husky/pre-commit",
+      "specs/tooling-baseline/tasks.md",
+      "specs/tooling-baseline/spec.md",
+      "specs/tooling-baseline/handoff-dev.json"
+    ],
+    "change": "pre-commit 在 .nuxt/tsconfig.json 不存在時先跑一次 nuxt prepare。vitest 透過 tsconfig extends 讀該檔，fresh clone 下 hook 的 vitest run --changed 會在跑起來前就失敗。",
+    "reverification": {
+      "base_commit": "ef0555c（含 tooling-baseline 與 theme-persistence）",
+      "pnpm lint:check": "exit 0 — 0 error / 10 warning（全為 vue/no-static-inline-styles）",
+      "pnpm vue-tsc": "exit 0",
+      "pnpm test:coverage": "exit 0 — lines 44.22 / branches 80.51 / functions 55.14 / statements 44.22（高於門檻 42/78/53/42）",
+      "pnpm build": "exit 0",
+      "AC 實測": "37 條中 35 條通過。AC-8.1 與 AC-8.3 需 push 後觀察 GitHub Actions，本機無法驗證，tasks.md 保留未勾並註明原因。",
+      "AC-7.2 門檻有效性": "暫時把 lines 調到 99 → exit 1，訊息 ERROR: Coverage for lines (44.22%) does not meet global threshold (99%)；改回後 exit 0。",
+      "AC-6.2": "含 console.log 的暫存 .ts 被 pre-commit 擋下，commit exit 1，HEAD 未變。",
+      "AC-6.3": "含分號與雙引號的暫存 .ts commit 成功，提交內容已被 Prettier 改為無分號 + 單引號。",
+      "AC-6.6": "注入型別錯誤後以 husky 實際使用的 sh -e 執行 .husky/pre-push，exit 2。",
+      "AC-6.5": "複製 package.json/lockfile 到無 .git 的暫存目錄，HUSKY=0 pnpm install --frozen-lockfile exit 0（輸出 HUSKY=0 skip install）。"
+    },
+    "still_open": [
+      "review.backlog 的 Minor 3–8 未處理，其中 Minor 3（hook 自帶 set -e）本次刻意未動以免擴大範圍。",
+      "AC-8.1 / AC-8.3 待 push 後驗證。"
+    ]
+  }
 }
