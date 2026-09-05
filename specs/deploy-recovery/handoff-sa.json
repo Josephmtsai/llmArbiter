@@ -1,0 +1,45 @@
+{
+  "from": "sa",
+  "to": "developer",
+  "feature": "deploy-recovery",
+  "status": "ready",
+  "summary": "修復 Railway 兩次部署失敗：(A) assertStrongSecret 對 NUXT_AUTH_PASSWORD 與 NUXT_SESSION_PASSWORD 共用同一個 32 字元下限造成 crashloop，改為 per-secret 下限（新增 MIN_AUTH_PASSWORD_LENGTH = 8、MIN_SECRET_LENGTH = 32 維持不變，assertStrongSecret 加第三參數 minLength 且長度改以 trim 後衡量）；(B) railway.toml 的 healthcheckPath = \"/\" 打到受 middleware/auth.ts 保護的頁面回 302，新增無驗證的 server/api/health.get.ts（固定回 { status: 'ok' }）並把 healthcheckPath 改指 /api/health、healthcheckTimeout 維持 30",
+  "artifacts": ["specs/deploy-recovery/spec.md", "specs/deploy-recovery/tasks.md"],
+  "assumptions": [
+    "問題 A 不是 regression：已用 `git show 1035083^1:nuxt.config.ts` 確認 merge 前 main 就有 runtimeConfig.authPassword（第 9 行），env var 名稱 NUXT_AUTH_PASSWORD 從未變過。auth-hardening 的 fail-closed 啟動檢查只是把一個本來就設錯的 Railway 變數暴露出來；在此之前 app 照常啟動但拿使用者輸入去比對空字串，等於壞掉的 auth。因此要修的是「下限對 auth password 過嚴」，不是「拿掉斷言」",
+    "NUXT_SESSION_PASSWORD 是 nuxt-auth-utils 的 cookie 加密金鑰（iron-webcrypto seal key），該套件本身要求 32 字元，必須維持 32 不可調降；把 MIN_SECRET_LENGTH 直接改成 8 會同時放寬 session，讓斷言失效並把錯誤延後到 runtime 請求",
+    "auth password 下限取使用者所述 8–15 區間的下緣 8，這樣他在區間內選任何長度都能過；取 12 或 15 會讓「我設了 10 個字」再度 crashloop",
+    "8 字元可接受的理由是登入端點既有的 rate limiter（server/api/auth/login.post.ts 以 createRateLimiter({ limit: 5, windowMs: 60_000 }) 建立 module-level singleton，每 IP 每 60 秒 5 次，成功失敗皆計、排在 body 驗證之前、IP 取 X-Forwarded-For 最右側不可偽造）。單 IP 上限 7,200 次/日 vs 36^8 ≈ 2.8e12 的空間。tasks.md 開了 AC-1.10 / AC-1.11 專門驗證 rate limit 未被本次改動影響",
+    "assertStrongSecret 採「加第三參數 minLength，預設維持 MIN_SECRET_LENGTH（32）」而非複製函式或 name→min 查表：只有一條程式路徑，且預設值取嚴的那個，未來新呼叫端忘記傳會拿到 32 而非 8（失敗方向安全）。assert-config.ts 兩個呼叫端都明確傳入，session 那個即使等於預設也照寫",
+    "MIN_SECRET_LENGTH 這個 export 名稱保留不改名不刪除（.nuxt/types/nitro-imports.d.ts 的 Nitro auto-import 表引用它）",
+    "trim 建議：採用「長度以 value.trim().length 衡量」，但不 trim 被比對的值。理由是 32 個空白要刻意打出來，8 個空白則一次貼上失誤就會發生；且 isPlaceholderSecret 已經是 trim().toLowerCase()，兩道檢查用同一套正規化才一致。不 trim 儲存值是因為那會默默改變既有部署要輸入的密碼（spec R-2）",
+    "placeholder 檢查完全不動（位置仍在長度之後、實作與 PLACEHOLDER_SECRET_FRAGMENTS 內容不變）。下限降到 8 後，9 字元的短片段 'change-me' 不再被長度閘門擋掉，必須由 placeholder 檢查接手 —— 已寫成 AC-1.8",
+    "問題 B 根因：pages/index.vue:4 有 definePageMeta({ middleware: 'auth' })，middleware/auth.ts:14 在 SSR 階段對未登入請求 navigateTo('/login') 回 302；Railway healthcheck 只接受 2xx",
+    "已驗證 server/api/health.get.ts 不受 app 端 middleware/auth.ts 影響：它是 Nitro server route，不進 Vue Router；沒有 server/middleware/ 目錄（無全域 Nitro middleware）；middleware/auth.ts 不是 .global 而是逐頁掛載；server/api/auth/check.get.ts 已實證這條路徑上沒有 app 端守衛",
+    "已驗證不會被 catch-all 攔到：catch-all 在 server/api/arbiter/[...].ts，Nitro 依檔案位置只註冊在 /api/arbiter/** 之下（server/utils/proxyPolicy.ts:81 的 PROXY_MOUNT_PREFIX = '/api/arbiter/' 佐證）；server/api/ 底下無任何其他 [...].ts",
+    "server/utils/proxyPolicy.ts:30 的 ALLOWED_PATH_PREFIXES 含 'health'，但那是允許瀏覽器經 proxy 打上游 API 的 /api/arbiter/health（composables/useApi.ts:285），會走 getSessionUser 檢查且存活取決於上游 —— 與本次新增的本地 /api/health 是不同的東西，AC-3.7 釘住它仍回 401",
+    "health 端點不得洩漏任何組態：body 固定為 { status: 'ok' }，不讀 useRuntimeConfig、不接 query、不查 session、不探上游、不回版本或 uptime。AC-3.4 以「完全相等」斷言為主、關鍵字黑名單為輔",
+    "health 端點刻意不遮蓋啟動失敗：assert-config 是 Nitro plugin，組態錯誤時 process 直接終止，永遠不會有東西回應 healthcheck。這是正確的 fail-closed",
+    "healthcheckTimeout = 30 並非本次失敗原因（日誌是 'Attempt #1 failed with HTTP 302'，明確失敗回應而非逾時）。建議提高到 100 純粹是餘裕，健康部署第一次就通過完全不受影響；AC-4.2 只要求 ≥ 30，維持 30 亦可通過",
+    "tests/e2e/proxy.e2e.test.ts:39 的 PASSWORD = 'e2e-password-at-least-32-characters-long'（40 字元，第 160–161 行同時餵給兩個 env var）：40 ≥ 32 ≥ 8 兩個下限都通過，且不是任何 PLACEHOLDER_SECRET_FRAGMENTS 的子字串，因此不需修改；但 Developer 仍須實跑 pnpm test:e2e 確認",
+    "tests/serverAuthUtils.test.ts:124 的 /must be set and at least 32 characters long/ 斷言與其 it.each 必須依「檢查用的下限」拆開，不可只把正則放寬成 /at least \\d+/ —— 那會讓測試對「哪個 secret 套哪個下限」失去分辨力，正是 AC-1.3 要防的回歸",
+    "tests/assertConfigPlugin.test.ts 既有的 ['too short', 'a'.repeat(31)] 對 NUXT_AUTH_PASSWORD 不再成立（31 ≥ 8 會通過），必須改為 7 字元，並另外新增 session: { password: 'a'.repeat(31) } 的案例覆蓋 AC-2.3",
+    "server/api/health.get.ts 落在 vitest coverage 的 include（server/**/*.ts）內，新檔必須有測試，否則拉低 statements/functions；依 tooling-baseline AD-6 ratchet 規則（實測向下取整減 2、只升不降）更新 vitest.config.ts 門檻，現值 lines 49 / statements 49 / functions 71 / branches 85",
+    "Railway 目前是單一 replica（沿用 auth-hardening assumption 1）。8 字元的可接受性以「單 replica + 每 IP in-memory rate limit」為前提，擴到多 replica 時必須重新評估（spec R-3，要求寫進 README）"
+  ],
+  "residual_risks": [
+    "R-1（中，接受）：8 字元若是字典詞，rate limiter 擋得住窮舉但擋不住猜中（常見詞表前 100 名在 5 次/分鐘下數十分鐘可試完）。緩解是 .env.example / README 明確要求隨機產生；斷言刻意不做字典檢查",
+    "R-2（低，記錄不修）：前後帶空白的 secret 通過斷言後，登入必須連空白一起輸入才相符（比對用原字串）。trim 儲存值屬行為變更，需另外的 Human Gate",
+    "R-3（中，記錄不修）：rate limiter 是 per-IP / in-memory / 單 instance，分散式來源可繞過每 IP 額度",
+    "R-4（極低）：長度用 String.length（UTF-16 code unit），非字素",
+    "R-5（極低，接受）：/api/health 是公開未驗證端點，但回應是固定常數、不碰 I/O，洩漏的資訊不多於 / 的 302 已透露的",
+    "R-6（低）：若 Railway 上的變數其實是名稱設錯而非太短，降低下限後仍會失敗 —— DoD 要求部署前人工確認兩個變數皆已設定且長度達標",
+    "R-7（低）：兩個下限分歧後可能被人「順手統一」，以 AC-1.3（session 必須拒絕 31 字元）與常數上的註解釘住"
+  ],
+  "human_gate": {
+    "decision": "approved",
+    "decided_at": "2026-09-05",
+    "decided_by": "human",
+    "notes": "三點決議：(1) 核可 NUXT_AUTH_PASSWORD 下限降到 8（安全性讓步，補償控制為登入端點 5 次/60 秒 per-IP rate limit，殘留風險 R-1 / R-3 已知悉並接受）；(2) 採用 AD-4「長度以 trim 後衡量」；(3) healthcheckTimeout 維持 30，不調高 —— AC-4.2 只要求 >= 30 故仍通過，spec 中「建議提高到 100」一節請標記為未採納。"
+  }
+}

@@ -2,8 +2,43 @@ import { createHash } from 'node:crypto'
 
 import { bufferEquals } from './constantTime'
 
-/** Minimum length for `NUXT_AUTH_PASSWORD` and `NUXT_SESSION_PASSWORD`. */
+/**
+ * Minimum length for `NUXT_SESSION_PASSWORD`, and the default for any caller
+ * that does not say otherwise. 32 is not ours to lower: nuxt-auth-utils uses
+ * this value as the iron-webcrypto seal key and requires 32 characters itself.
+ */
 export const MIN_SECRET_LENGTH = 32
+
+/**
+ * Minimum length for `NUXT_AUTH_PASSWORD`. Deliberately lower than
+ * MIN_SECRET_LENGTH: this one is a human-typed login password, and the login
+ * endpoint is rate limited (`server/api/auth/login.post.ts`), which is what
+ * makes 8 defensible here. That rate limiter is a load-bearing part of this
+ * number -- see spec `deploy-recovery`, AD-2 and R-1/R-3/R-9.
+ */
+export const MIN_AUTH_PASSWORD_LENGTH = 8
+
+/** Per-address login attempts allowed inside one `LOGIN_RATE_LIMIT_WINDOW_MS`. */
+export const LOGIN_ATTEMPTS_PER_ADDRESS = 5
+
+/**
+ * Login attempts allowed inside one window across *all* sources combined.
+ *
+ * This is the backstop that makes MIN_AUTH_PASSWORD_LENGTH = 8 defensible
+ * without having to be right about which end of `X-Forwarded-For` Railway
+ * writes (see `resolveRateLimitKey`). Whatever the per-address key resolves to
+ * -- a real address, a forged one, or the shared `unknown` bucket -- the total
+ * guess rate for the whole process is capped here.
+ *
+ * 30/minute is ~43k guesses a day. Against the 8 random characters
+ * `.env.example` asks for (>= 36^8) that is a rounding error, while still being
+ * six times the per-address allowance, so the handful of operators this
+ * single-replica dashboard has never collide with it.
+ */
+export const LOGIN_ATTEMPTS_GLOBAL = 30
+
+/** Fixed window shared by both login limiters. */
+export const LOGIN_RATE_LIMIT_WINDOW_MS = 60_000
 
 /**
  * Fragments of the values shipped in `.env.example`, lower-cased. They are
@@ -68,12 +103,24 @@ export function verifyLoginPassword(input: string, expected: string): boolean {
 
 /**
  * Throws unless `value` is a usable secret. Shared by the startup assertion so
- * every secret is held to the same rule.
+ * every secret goes through the same two gates -- length, then placeholder.
+ *
+ * `minLength` defaults to the *stricter* floor on purpose: a future caller that
+ * forgets to pass one gets 32, not 8, so the failure direction is safe.
  */
-export function assertStrongSecret(name: string, value: unknown): void {
-  if (typeof value !== 'string' || value.length < MIN_SECRET_LENGTH) {
+export function assertStrongSecret(
+  name: string,
+  value: unknown,
+  minLength: number = MIN_SECRET_LENGTH,
+): void {
+  // Measured after trim. The raw length would wave through a secret that is
+  // mostly padding; at the old floor of 32 that took deliberate effort, at 8 it
+  // is one stray copy-paste away. Only the *measurement* is trimmed -- the
+  // stored value is left untouched, because trimming it would silently change
+  // what an existing deployment has to type (spec deploy-recovery, R-2).
+  if (typeof value !== 'string' || value.trim().length < minLength) {
     throw new Error(
-      `${name} must be set and at least ${MIN_SECRET_LENGTH} characters long. See .env.example.`,
+      `${name} must be set and at least ${minLength} characters long. See .env.example.`,
     )
   }
   if (isPlaceholderSecret(value)) {
@@ -104,13 +151,17 @@ export function isIpAddress(value: string): boolean {
 }
 
 /**
- * Extracts the client address from an `X-Forwarded-For` header value.
+ * Extracts an address from an `X-Forwarded-For` header value, taking the
+ * *rightmost* entry.
  *
- * Each proxy *appends* the address it received the request from, so the
- * rightmost entry is the one written by the hop closest to us -- the only entry
- * a client cannot forge. h3's `getRequestIP(event, { xForwardedFor: true })`
- * takes the leftmost entry instead, which is entirely client-supplied: sending
- * a fresh fake prefix per attempt would give every request its own bucket.
+ * Read the caveat on `resolveRateLimitKey` before relying on this: which end of
+ * the chain Railway writes is genuinely unsettled, so this is the third choice,
+ * not the first, and neither end is treated as authoritative on its own.
+ * Rightmost is still the better of the two guesses -- under a proxy that
+ * appends, it is the only entry a client cannot write; under a proxy that
+ * prepends and strips, it is a stable client-supplied value rather than a
+ * per-request one, because a client that rotates it only ever splits *its own*
+ * bucket while the global cap keeps counting.
  *
  * Returns undefined when the header is absent or its last entry is not an
  * address, so the caller falls back instead of keying a bucket on junk.
@@ -120,6 +171,68 @@ export function clientIpFromForwardedFor(header: string | undefined | null): str
   const last = header.split(',').pop()?.trim()
   if (!last || !isIpAddress(last)) return undefined
   return last
+}
+
+/** The bucket every request with no usable address shares. */
+export const UNKNOWN_RATE_LIMIT_KEY = 'unknown'
+
+/** Reads a header, returning it only if it is a bare IP address. */
+function headerAddress(value: string | undefined | null): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  return isIpAddress(trimmed) ? trimmed : undefined
+}
+
+/**
+ * Picks the rate-limit bucket key for a login attempt.
+ *
+ * ## Why this is not simply "read X-Forwarded-For"
+ *
+ * The public guidance on how Railway's edge writes forwarding headers
+ * contradicts itself, including between Railway's own staff:
+ *
+ * - https://station.railway.com/questions/security-critical-questions-on-edge-prox-8fddd775
+ *   -- staff answer: the edge strips `X-Forwarded-For` and the client cannot
+ *   override it, so the first entry is the real address.
+ * - https://station.railway.com/questions/which-header-should-i-rely-on-for-real-c-d78a6f96
+ *   -- staff answer: a client *can* send a forged XFF, yet the real address is
+ *   "always leftmost" because the edge *appends*. Those two halves cannot both
+ *   be true; if the edge appends to a client-supplied chain, leftmost is the
+ *   forged value. The same thread has a community answer stating the opposite
+ *   ordering, and the same staff answer names `X-Real-IP` as the single source
+ *   of truth for the connecting IP.
+ *
+ * So the ordering of the XFF chain is not something this code can safely
+ * assert. Rather than bet on one reading, the key is resolved from the least
+ * client-writable source available, and the login route pairs this with a
+ * global cap (`LOGIN_ATTEMPTS_GLOBAL`) that holds no matter which reading is
+ * right -- including the case where the key is entirely attacker-chosen.
+ *
+ * Order, most trustworthy first:
+ *
+ * 1. `X-Real-IP` -- set by Railway's edge as the connecting IP and overwritten
+ *    there, so a client-sent value does not survive.
+ * 2. `X-Envoy-External-Address` -- Railway fronts services with Envoy, which
+ *    sets this itself for externally-originated requests.
+ * 3. `X-Forwarded-For`, rightmost entry -- see `clientIpFromForwardedFor`.
+ * 4. The socket address, for direct or local connections with no proxy at all.
+ * 5. `UNKNOWN_RATE_LIMIT_KEY`, a bucket shared by everything unidentifiable.
+ *    Failing into one shared bucket is the safe direction (Human Gate).
+ *
+ * Every layer goes through `isIpAddress`, so a header cannot smuggle an
+ * arbitrary string in as a bucket key and mint buckets that way.
+ */
+export function resolveRateLimitKey(
+  getHeader: (name: string) => string | undefined | null,
+  socketAddress?: string | undefined | null,
+): string {
+  return (
+    headerAddress(getHeader('x-real-ip')) ??
+    headerAddress(getHeader('x-envoy-external-address')) ??
+    clientIpFromForwardedFor(getHeader('x-forwarded-for')) ??
+    headerAddress(socketAddress) ??
+    UNKNOWN_RATE_LIMIT_KEY
+  )
 }
 
 export interface RateLimitResult {
