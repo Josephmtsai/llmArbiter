@@ -45,6 +45,12 @@ jobs:
       - name: Proxy end-to-end check
         run: pnpm test:e2e
 
+      # Deletes one proxy security control at a time from the built bundle and
+      # requires the end-to-end suite to fail. Guards against the suite going
+      # vacuous the way review round 2 found it.
+      - name: Proxy mutation check
+        run: pnpm test:e2e:mutation
+
   deploy:
     runs-on: ubuntu-latest
     needs: verify
