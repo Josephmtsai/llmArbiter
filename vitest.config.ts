@@ -70,11 +70,14 @@ export default defineConfig({
       // tooling-baseline starting point of 41/41/51/78: measured
       // lines 44.22 / statements 44.22 / functions 55.14 / branches 80.51.
       // Branches stays at 78 - floor(80.51) - 2 is still 78.
+      // Ratcheted by `proxy-hardening` on 2026-09-05: measured lines 44.68 /
+      // statements 44.68 / functions 58.21 / branches 82.25. Lines and statements
+      // stay at 42 - floor(44.68) - 2 is still 42.
       thresholds: {
         lines: 42,
         statements: 42,
-        functions: 53,
-        branches: 78,
+        functions: 56,
+        branches: 80,
       },
     },
   },
