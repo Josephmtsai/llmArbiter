@@ -69,12 +69,20 @@ export default defineConfig({
       // §5). Ratcheted by `theme-persistence` on 2026-09-05 from the
       // tooling-baseline starting point of 41/41/51/78: measured
       // lines 44.22 / statements 44.22 / functions 55.14 / branches 80.51.
-      // Branches stays at 78 - floor(80.51) - 2 is still 78.
+      // Branches stayed at 78 there - floor(80.51) - 2 is still 78.
+      // Ratcheted again by `auth-hardening` on 2026-09-05: measured
+      // lines 49.80 / statements 49.80 / functions 70.25 / branches 85.43,
+      // after retry #1 added behavioural tests for the login route and the
+      // startup assertion, both of which were at 0%.
+      // Ratcheted once more by `auth-hardening` retry #2 on 2026-09-05:
+      // measured lines 50.18 / statements 50.18 / functions 71.00 /
+      // branches 86.06, after adding the session-outcome, probe-coalescing,
+      // constant-time and placeholder-matching tests.
       thresholds: {
-        lines: 42,
-        statements: 42,
-        functions: 53,
-        branches: 78,
+        lines: 48,
+        statements: 48,
+        functions: 69,
+        branches: 84,
       },
     },
   },

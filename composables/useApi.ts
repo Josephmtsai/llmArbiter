@@ -40,8 +40,52 @@ interface GetCasesParams {
 }
 
 export function useApi() {
+  // Captured here in setup context rather than inside the interceptor: the
+  // interceptor can fire after the call stack has left the Nuxt app context.
+  // `route` stays reactive, so fullPath is still current when a 401 arrives.
+  const route = useRoute()
+  const authStore = useAuthStore()
+
+  /**
+   * A 401 on `/api/arbiter/*` has two unrelated causes: our own session expired,
+   * or the upstream API rejected a request we were perfectly entitled to make.
+   * Signing the user out on the second is wrong, and the response alone cannot
+   * tell them apart -- so ask the server before touching anything.
+   *
+   * The probe is coalesced and generation-stamped inside the store, which is
+   * what settles the two races here: a burst of 401s across several `useApi()`
+   * instances shares one request, and a probe outstanding when the user signs
+   * back in reports `unknown` instead of clearing the new session.
+   *
+   * Only a confirmed `unauthenticated` signs the user out. `unknown` means the
+   * check itself failed to complete, which is not evidence of anything.
+   */
+  async function verifyAndSignOut(): Promise<void> {
+    const outcome = await authStore.check()
+    if (outcome !== 'unauthenticated') return
+    // Re-read the route: the probe is a round trip, and the user may have
+    // reached the login page while it was outstanding.
+    if (route.path === '/login') return
+    if (!authStore.claimSignOut()) return
+    authStore.reset()
+    void navigateTo({ path: '/login', query: { redirect: route.fullPath } })
+  }
+
   const api = $fetch.create({
     baseURL: '/api/arbiter',
+    onResponseError({ response }) {
+      if (
+        !shouldHandleUnauthorized({
+          status: response.status,
+          // Typed `boolean | undefined` by Nuxt; only `true` means client.
+          isClient: import.meta.client === true,
+          path: route.path,
+        })
+      ) {
+        return
+      }
+      void verifyAndSignOut()
+    },
   })
 
   function normalizePrompt(prompt: PromptVersion): PromptVersion {

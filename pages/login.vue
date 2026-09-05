@@ -2,11 +2,13 @@
 definePageMeta({ layout: 'auth', middleware: [] })
 
 const authStore = useAuthStore()
+const route = useRoute()
 const password = ref('')
 
 async function submit() {
   const ok = await authStore.login(password.value)
-  if (ok) await navigateTo('/')
+  // resolveSafeRedirect rejects anything that is not a same-origin path.
+  if (ok) await navigateTo(resolveSafeRedirect(route.query.redirect))
 }
 </script>
 

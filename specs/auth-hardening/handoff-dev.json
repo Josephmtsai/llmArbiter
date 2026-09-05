@@ -1,0 +1,264 @@
+{
+  "from": "developer",
+  "to": "codex-reviewer",
+  "feature": "auth-hardening",
+  "status": "ready",
+  "retry_count": 2,
+  "max_retries": 2,
+  "branch": "feat/auth-hardening",
+  "base": "7821674fecc59932acde8a87cebe382db119e092",
+  "commits": ["7e128f5", "7ab35f4", "f41403c", "05316cb", "107e0ef", "90097f1", "04f37ba", "3eb84b1"],
+  "summary": "Retry #2：修掉 codex review 第二輪的 1 P0 / 3 P1 / 3 P2。P0 是 retry #1 自己引入的迴歸 —— resolveSafeRedirect 只在解析前檢查一次，正規化後會產出 protocol-relative 目標（/a/%2e%2e//evil.com 的 pathname 是 //evil.com），改為對正規化結果重跑同一組檢查，並讓 /login 比對不分大小寫。另外 check() 改回傳三態（網路錯誤與 5xx 不再等於已登出）、探測收斂與世代戳記移進 store（跨 useApi 實例只導頁一次、過期探測不覆蓋新 session）、rate limiter 容量路徑不再繞過節流做全表掃描、constantTime.ts 補上直接測試、AC-7.3 以純函式 shouldHandleUnauthorized 補齊驗證、placeholder 改為正規化後的片段比對。",
+  "ac_ref": "specs/auth-hardening/tasks.md",
+  "review_ref": "specs/auth-hardening/review-codex-2.md",
+  "changed_files": [
+    ".env.example",
+    "components/AppTopBar.vue",
+    "composables/useApi.ts",
+    "middleware/auth.ts",
+    "pages/login.vue",
+    "server/api/auth/login.post.ts",
+    "server/plugins/assert-config.ts",
+    "server/utils/auth.ts",
+    "server/utils/constantTime.ts",
+    "specs/auth-hardening/handoff-dev.json",
+    "specs/auth-hardening/review-codex-1.md",
+    "specs/auth-hardening/review-codex-2.md",
+    "specs/auth-hardening/spec.md",
+    "specs/auth-hardening/tasks.md",
+    "stores/useAuthStore.ts",
+    "tests/appTopBarLogout.test.ts",
+    "tests/assertConfigPlugin.test.ts",
+    "tests/authMiddleware.test.ts",
+    "tests/authRedirect.test.ts",
+    "tests/constantTime.test.ts",
+    "tests/loginRedirect.test.ts",
+    "tests/loginRoute.test.ts",
+    "tests/serverAuthUtils.test.ts",
+    "tests/useApiAuthInterceptor.test.ts",
+    "tests/useApiEndpoints.test.ts",
+    "tests/useAuthStore.test.ts",
+    "utils/auth.ts",
+    "vitest.config.ts"
+  ],
+  "changed_files_retry_2": [
+    "composables/useApi.ts",
+    "middleware/auth.ts",
+    "server/utils/auth.ts",
+    "specs/auth-hardening/handoff-dev.json",
+    "specs/auth-hardening/review-codex-2.md",
+    "specs/auth-hardening/spec.md",
+    "specs/auth-hardening/tasks.md",
+    "stores/useAuthStore.ts",
+    "tests/authMiddleware.test.ts",
+    "tests/authRedirect.test.ts",
+    "tests/constantTime.test.ts",
+    "tests/serverAuthUtils.test.ts",
+    "tests/useApiAuthInterceptor.test.ts",
+    "tests/useAuthStore.test.ts",
+    "utils/auth.ts",
+    "vitest.config.ts"
+  ],
+  "retry_history": [
+    {
+      "retry": 1,
+      "date": "2026-09-05",
+      "trigger": "codex adversarial review verdict no-ship (8 Major / 3 Minor)",
+      "review_artifact": "specs/auth-hardening/review-codex-1.md",
+      "commit": "90097f1",
+      "fixes_summary": "XFF 改取最右側條目、placeholder secret 明確拒絕、rate limiter 加上 maxKeys 與 fail-closed 並停止每次全表掃描、登入失敗清除 authenticated、401 攔截先探測 session 再登出、補上 login route 與 assert-config 的行為覆蓋（0% → 100%）、把 timingSafeEqual 抽到可 mock 的 seam、resolveSafeRedirect 改為先 normalise 再判斷並擋控制字元、RateLimiter 加 size getter、expected digest 加一格 memo。逐項對照見 tasks.md 文末〈Retry #1 修正對照〉與 commit 90097f1。"
+    },
+    {
+      "retry": 2,
+      "date": "2026-09-05",
+      "trigger": "codex review 第二輪：1 P0 / 3 P1 / 3 P2",
+      "review_artifact": "specs/auth-hardening/review-codex-2.md",
+      "fixes": [
+        {
+          "severity": "P0",
+          "finding": "resolveSafeRedirect 正規化後會產出 protocol-relative 目標。new URL('/a/%2e%2e//evil.com', PARSE_BASE).pathname 是 //evil.com，而輸入完全通過解析前的檢查。倚賴的 url.origin !== PARSE_BASE 對相對路徑輸入恆為 false，在這個情境下是死碼，永遠擋不到它。此外 /login 為大小寫敏感比對，/LOGIN 走到同一個頁面卻放行。",
+          "fix": "把四道檢查抽成 isRootedRelativePath()（開頭為 /、非 //、不含反斜線、無 C0+DEL 控制字元），對原始輸入與正規化後的輸出各跑一次。新增 isLoginPath() 做 toLowerCase() 後比對 /login 與 /login/。origin 檢查保留為縱深防禦，並在註解寫明它擋不到這一類，以免下一個讀者再次誤信。",
+          "files": ["utils/auth.ts", "tests/authRedirect.test.ts"],
+          "ac": ["AC-4.7", "AC-4.8"],
+          "test": "tests/authRedirect.test.ts 新增 10 個案例（40 → 50）：AC-4.7 五個正規化後變 //evil.com 的輸入（/a/%2e%2e//evil.com、/a/%2E%2E//evil.com、/a/..//evil.com、/%2e%2e//evil.com、/settings/%2e%2e/%2e%2e//evil.com），AC-4.8 五個大小寫變體（/LOGIN、/Login、/lOgIn/、/LOGIN?redirect=/x、/settings/%2e%2e/LogIn）。已實測：移掉正規化後的那次 isRootedRelativePath 會讓 AC-4.7 全數失敗。"
+        },
+        {
+          "severity": "P1",
+          "finding": "check() 把網路錯誤與 5xx 一律當成『已登出』。探測失敗不是任何事情的證據，卻會觸發登出。",
+          "fix": "check() 改回傳 CheckOutcome = 'authenticated' | 'unauthenticated' | 'unknown'。只有 401 或 { ok: false } 算未登入；其餘（網路失敗、5xx、timeout、無 status 的錯誤）回 'unknown' 且完全不寫入 authenticated。呼叫端各自決定：middleware 對 'unknown' fail closed（導回 /login，因為它決定的是要不要放人進來），401 攔截器對 'unknown' 什麼都不做（因為登出是破壞性的方向）。兩邊註解都寫明這個不對稱是設計而非疏漏。",
+          "files": ["stores/useAuthStore.ts", "middleware/auth.ts", "composables/useApi.ts"],
+          "ac": ["AC-6.9", "AC-6.10", "AC-5.5", "AC-7.8"],
+          "test": "tests/useAuthStore.test.ts 的 AC-6.10 五案例表（網路失敗 / 500 / 502 / 504 / 無 status 的錯誤）斷言回 'unknown' 且 authenticated 不被更動；tests/authMiddleware.test.ts AC-5.5；tests/useApiAuthInterceptor.test.ts AC-7.8。"
+        },
+        {
+          "severity": "P1",
+          "finding": "探測的收斂狀態放在 useApi() 的閉包裡，不同實例各有一份；跨實例的 401 會重複探測與重複導頁。慢探測回來時也沒有時序判斷，會覆蓋使用者剛重新建立的 session。",
+          "fix": "pendingProbe 收斂、generation 世代計數器與 claimSignOut() 全部移進 useAuthStore。login()（成功與失敗都算）與成功的 logout() 把世代 +1；runProbe() 開始時記下世代，回來時若世代已變就回 'unknown' 並丟棄結果，不寫 authenticated。claimSignOut() 以世代為鍵，同一世代內只有第一次回 true，下一次登入／登出自動釋放。useApi 內原本的 pendingSignOut / handleUnauthorized 一併刪除。",
+          "files": ["stores/useAuthStore.ts", "composables/useApi.ts"],
+          "ac": ["AC-6.11", "AC-6.12", "AC-6.13", "AC-7.7"],
+          "test": "tests/useAuthStore.test.ts：AC-6.11 三個並行 check() 只發一次 $fetch、settle 後會重新探測；AC-6.12 以 URL-keyed mockImplementation 讓探測期間插入 login / logout，斷言探測回 'unknown' 且不覆蓋；AC-6.13 claimSignOut 的世代語意。tests/useApiAuthInterceptor.test.ts 新增『redirects once across separate useApi() instances』。",
+          "deviation": "D6"
+        },
+        {
+          "severity": "P1",
+          "finding": "rate limiter 容量已滿的路徑無視 lastSweep 節流，直接強制全表掃描；表一滿，攻擊者每個請求都能買到一次 O(maxKeys) —— 正是節流本來要擋的成本。",
+          "fix": "移除容量路徑上的 sweep(now) 與其後的重新查表，直接 return denied()。節流的那次清掃成為唯一的回收路徑，最壞情況下表也只會滿一個 window。fail closed 依交辦指示維持不變，未改為 fail open。",
+          "files": ["server/utils/auth.ts", "tests/serverAuthUtils.test.ts"],
+          "ac": ["AC-1.14"],
+          "test": "tests/serverAuthUtils.test.ts『does not sweep off the capacity path, even with a stale bucket』：maxKeys 3，時間軸 T0 / T0+59000 / T0+61000 / T0+62000 / T0+120000 / T0+121000，觀察容量路徑上 size 不因表內已有過期 bucket 而下降。"
+        },
+        {
+          "severity": "P2",
+          "finding": "server/utils/constantTime.ts 只被當作 mock seam，本身沒有任何直接測試。",
+          "fix": "新增 tests/constantTime.test.ts（4 cases），以行為而非 spy 釘住對 node:crypto.timingSafeEqual 的委派。交辦指示要求的 spy 作法在本專案不可行，三種路徑皆已實測失敗，證據見 D7。",
+          "files": ["tests/constantTime.test.ts"],
+          "ac": ["AC-1.15"],
+          "test": "關鍵案例是長度不同時拋 RangeError —— ===、.equals()、Buffer.compare() 都只會安靜回 false，只有真的 timingSafeEqual 會拒絕；加上『內容相同但物件不同 → true』，排除了這個 wrapper 存在目的所要防的每一種捷徑寫法。",
+          "deviation": "D7"
+        },
+        {
+          "severity": "P2",
+          "finding": "AC-7.3（SSR 分支不得導頁或改 store）長期掛著未勾選，以『測試環境限制』結案。",
+          "fix": "依交辦指示未改動 vitest.config.ts 的 nuxt-import-meta-flags transform。改為把決策抽成純函式 shouldHandleUnauthorized({ status, isClient, path })，isClient 由參數傳入；攔截器唯一的職責變成把 import.meta.client === true 餵進去。純函式的兩個 isClient 分支都直接測得到。攔截器測試以 vi.stubGlobal 綁進真正的這個函式而非 stub，兩邊不會各說各話。",
+          "files": ["utils/auth.ts", "composables/useApi.ts", "tests/useApiAuthInterceptor.test.ts"],
+          "ac": ["AC-7.3"],
+          "test": "tests/useApiAuthInterceptor.test.ts 的 describe('shouldHandleUnauthorized') 區塊涵蓋 isClient true/false 兩個分支。AC-7.3 已勾選，本 spec 現已無未勾選項目。"
+        },
+        {
+          "severity": "P2",
+          "finding": "placeholder 比對是完全相等（ReadonlySet），大小寫、前後空白、附加字尾任一發生就完全失效 —— 而那正是 placeholder 實際外流的樣子。",
+          "fix": "PLACEHOLDER_SECRETS 改為 PLACEHOLDER_SECRET_FRAGMENTS 陣列加上 isPlaceholderSecret()：先 trim().toLowerCase()，再以 includes 做片段比對，並納入 change-me / replace-me / your-secret-here 三個常見詞根。文件與註解明確寫出範圍僅止於『擋掉複製貼上』，未描述成能防禦刻意繞過。",
+          "files": ["server/utils/auth.ts", "tests/serverAuthUtils.test.ts"],
+          "ac": ["AC-3.8"],
+          "test": "7 個拒絕案例（大小寫、前後空白換行、附加字尾、前置字首、短詞根補長）＋ 2 個放行案例（openssl hex、長 passphrase）＋ 一條把界線寫在案上的測試：『is a guard against copy-paste, not against a determined operator』斷言一個不在清單上的弱密碼會被放行。"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "lint": {
+      "command": "pnpm lint:check",
+      "result": "pass",
+      "detail": "exit 0；0 errors / 10 warnings（皆為既有的 vue/no-static-inline-styles，不在本次變更檔案中）"
+    },
+    "types": {
+      "command": "pnpm vue-tsc",
+      "result": "pass",
+      "detail": "exit 0（nuxt prepare && vue-tsc --noEmit）"
+    },
+    "tests": {
+      "command": "pnpm test",
+      "result": "pass",
+      "detail": "exit 0；21 test files / 361 tests 全數通過（retry #1 為 20 files / 311 tests）"
+    },
+    "coverage_run": {
+      "command": "pnpm test:coverage",
+      "result": "pass",
+      "detail": "exit 0；門檻調升為 48/84/69/48 後重新驗證通過"
+    },
+    "build": {
+      "command": "pnpm build",
+      "result": "pass",
+      "detail": "exit 0，Build complete!，4.85 MB（1.07 MB gzip）"
+    },
+    "format": {
+      "command": "npx prettier --check（12 個變更檔）",
+      "result": "pass",
+      "detail": "All matched files use Prettier code style!"
+    },
+    "runtime": {
+      "command": "node .output/server/index.mjs（受控 env 的驗證腳本，retry #1 前執行）",
+      "result": "pass",
+      "detail": "14/14 runtime 檢查通過，涵蓋 AC-5.1、AC-3.7 與 logout 清除 session。retry #2 未改動 pages/login.vue；middleware/auth.ts 的改動只在『拿到非 authenticated 時導頁』，導頁目標與 query 未變，該批驗證仍成立。"
+    },
+    "coverage": {
+      "statements": 50.18,
+      "branches": 86.06,
+      "functions": 71.0,
+      "lines": 50.18,
+      "thresholds_before": { "statements": 47, "branches": 83, "functions": 68, "lines": 47 },
+      "thresholds_after": { "statements": 48, "branches": 84, "functions": 69, "lines": 48 },
+      "per_file": {
+        "server/utils/auth.ts": "100 / 100 / 100 / 100",
+        "server/utils/constantTime.ts": "100 / 100 / 100 / 100",
+        "server/api/auth/login.post.ts": "100 / 100 / 100 / 100",
+        "server/plugins/assert-config.ts": "100 / 100 / 100 / 100",
+        "utils/auth.ts": "100 / 100 / 100 / 100",
+        "middleware/auth.ts": "100 / 100 / 100 / 100",
+        "stores/useAuthStore.ts": "lines 100 / branches 91.89（retry #1 為 85.71；未覆蓋分支在第 4、69、87 行，為 SSR-only 的 useRequestHeaders 路徑與型別防禦性 fallback，不涉及安全決策）",
+        "composables/useApi.ts": "statements 100"
+      }
+    }
+  },
+  "ac_summary": {
+    "total": 65,
+    "passed": 65,
+    "unverified": 0,
+    "unverified_ids": [],
+    "new_in_retry_2": [
+      "AC-1.14",
+      "AC-1.15",
+      "AC-3.8",
+      "AC-4.7",
+      "AC-4.8",
+      "AC-5.5",
+      "AC-6.9",
+      "AC-6.10",
+      "AC-6.11",
+      "AC-6.12",
+      "AC-6.13",
+      "AC-7.8"
+    ],
+    "newly_ticked": ["AC-7.3"]
+  },
+  "deviations": [
+    {
+      "id": "D1",
+      "item": "server/utils/auth.ts 函式命名",
+      "detail": "spec 寫 verifyPassword，實作改名為 verifyLoginPassword。nuxt-auth-utils 已 auto-import 語意不同的 verifyPassword(hash, plain)，同名會造成 nuxt prepare 的 Duplicated imports 警告與全域靜默覆蓋。已同步更新 spec.md。"
+    },
+    {
+      "id": "D2",
+      "item": "AC-5.1 的 redirect 字面編碼",
+      "detail": "實測 Location 為 /login?redirect=/decisions?limit=10，而非 AC 文字寫的 percent-encoded 形式。Vue Router 不會對 query value 內的 / 與 ? 做編碼；以 URLSearchParams 解析後得到 /decisions?limit=10，導向目標與 AC 期望一致，僅字面不同。"
+    },
+    {
+      "id": "D3",
+      "item": "AC-7.3（retry #2 已解決，保留紀錄）",
+      "detail": "retry #1 時因 vitest 的 import.meta.client transform 而無法驗證。retry #2 未動 transform（交辦指示明令禁止），改以純函式 shouldHandleUnauthorized 把 isClient 變成參數，兩個分支皆可測，AC-7.3 已勾選。仍建議 QA 在真實 SSR 環境（pnpm build 後 node .output/server/index.mjs，帶失效 cookie 直接請求頁面）順手覆核一次端到端行為。"
+    },
+    {
+      "id": "D4",
+      "item": "本 worktree 的 .env 缺少 NUXT_AUTH_PASSWORD",
+      "detail": "依交辦指示未修改 .env。因此本 worktree 直接跑 pnpm dev 會被啟動斷言擋下（這正是 AC-3.2 的預期行為）。部署環境（Railway）需確保此環境變數已設定、長度 >= 32 且不是 placeholder。"
+    },
+    {
+      "id": "D5",
+      "item": "retry #1 新增檔案 server/utils/constantTime.ts",
+      "detail": "交辦指示要求證明密碼比對走的是 timing-safe 原語，未指定作法；在不新增檔案的前提下無法在 Vitest 中觀測到 node:crypto 的呼叫。因此把 timingSafeEqual 包成單行第一方模組作為 mock seam。retry #2 為這一行本身補上了直接測試（見 D7）。"
+    },
+    {
+      "id": "D6",
+      "item": "探測狀態放在 store 的 setup closure，而非交辦指示寫的 module-level singleton",
+      "detail": "交辦指示第 3 點寫的是『module-level singleton in the store』，實作放在 defineStore 的 setup 函式閉包內。理由：Nuxt SSR 下 module scope 是跨請求共用的，一個訪客的探測結果會回答到另一個訪客身上，等於把 session 狀態串台。Pinia 每個請求各自建立 store 實例，setup closure 才是這份狀態正確的生命週期。對 client 端行為完全相同（一個瀏覽器分頁就是一個 app 實例），對 SSR 則是修正而非退讓。交辦指示的目標『跨 useApi 實例共用同一份收斂狀態』完全達成，AC-7.7 的跨實例測試可證。"
+    },
+    {
+      "id": "D7",
+      "item": "constantTime.ts 以行為驗證取代交辦指示要求的 node:crypto spy",
+      "detail": "交辦指示第 5 點要求『直接測試 constantTime.ts，spy node:crypto 的 timingSafeEqual』。spy 在本專案不可行，三種作法皆以拋棄式探測測試實證失敗：(a) Vite 把 Node builtin externalise，vi.mock('node:crypto', factory) 攔不到 —— factory 的 stub 被忽略、真函式照跑（探測結果 expected true to be 'SENTINEL'）；(b) module namespace 物件是凍結的，Object.isFrozen(namespace) === true，vi.spyOn 拋 Cannot redefine property: timingSafeEqual；(c) CJS 的 require('crypto') 物件雖可變更，但改動對 ESM named export 不可見（探測結果 RESULT= true，仍是真函式）。唯一能讓 spy 成立的作法是在整個 vitest 設定裡 alias node:crypto，波及範圍遠大於這一條斷言的價值，已排除。改為行為驗證：長度不同時拋 RangeError（===、.equals()、Buffer.compare() 都只會安靜回 false，只有真的 timingSafeEqual 會拒絕）＋ 內容相同但物件不同回 true ＋ 與 timingSafeEqual 在 5 組輸入上逐一比對結果。唯一仍無法以測試證明的是 timing 特性本身，那本來就無法測，也正是這個模組只有一行的原因。注意 tests/serverAuthUtils.test.ts 對『verifyLoginPassword 一定經過 bufferEquals』的 spy 仍然成立且未改動 —— 那 mock 的是第一方模組，不是 builtin。"
+    }
+  ],
+  "notes_for_reviewer": [
+    "retry #2 新增的 12 個 AC 編號刻意避開既有編號：commit 前發現 AC-1.9 / AC-2.5 / AC-3.5 / AC-5.2 都已被 retry #1 佔用且語意不同，已改為 AC-1.14 / AC-1.15 / AC-3.8 / AC-5.5。tasks.md 與測試名稱兩邊一致。",
+    "P0 是 retry #1 自己引入的迴歸：當時把『先過濾再 normalise 再判斷』實作成只檢查一次，而正規化本身會產生新的 protocol-relative 目標。這次的修法是同一組檢查跑兩次（原始輸入 + 正規化輸出），不是加特例。",
+    "url.origin !== PARSE_BASE 這道檢查刻意保留但已在註解降級為縱深防禦：對相對路徑輸入它恆為 false（實測），擋不到 P0 那一類。保留是因為 tests/authRedirect.test.ts 有一個以 stub URL 讓 origin 變成 https://evil.com 的既有案例（AC-4.6），移除會失去那條分支覆蓋。",
+    "middleware 對 'unknown' fail closed、401 攔截器對 'unknown' 不動作 —— 這個相反的處理是刻意的，理由是前者決定放人進來、後者決定把人登出。若 review 認為兩者應該一致，請一併考慮這個不對稱的成因。",
+    "rate limiter 的 fail closed 未改為 fail open（交辦指示明確要求維持）。",
+    "未改動 vitest.config.ts 的 nuxt-import-meta-flags transform（交辦指示明令禁止）；只調升了 coverage thresholds。",
+    "未觸碰 server/api/arbiter/[...].ts 與 server/utils/proxyPolicy.ts（proxy-hardening 的範圍）。",
+    "vitest.config.ts 門檻已升為 48/84/69/48；與 proxy-hardening 分支合併時請取兩者較高值。",
+    "本分支落後 main 一個 docs-only commit（c8546cd），尚未 rebase。",
+    "未 push、未 merge 到 main，未使用 --no-verify。",
+    "retry_count 已達 max_retries 2：本輪若再 FAIL，依 SDLC 規則管線進入 blocked，交回人工判斷。"
+  ]
+}
