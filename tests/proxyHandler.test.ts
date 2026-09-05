@@ -31,8 +31,7 @@ function upstreamOk(overrides: Partial<UpstreamResponse> = {}): UpstreamResponse
 function makeRequest(overrides: Partial<ProxyRequest> = {}): ProxyRequest {
   return {
     method: 'GET',
-    wildcard: 'decisions',
-    query: {},
+    rawUrl: '/api/arbiter/decisions',
     headers: {},
     ...overrides,
   }
@@ -104,7 +103,7 @@ describe('runProxy - authentication gate', () => {
 
   it('checks auth before the path gate and never calls upstream', async () => {
     const h = makeHarness({ getSessionUser: vi.fn(async () => undefined) })
-    const outcome = await runProxy(makeRequest({ wildcard: 'admin/users' }), h.deps)
+    const outcome = await runProxy(makeRequest({ rawUrl: '/api/arbiter/admin/users' }), h.deps)
 
     expect(outcome).toMatchObject({ statusCode: 401 })
     expect(h.fetchUpstream).not.toHaveBeenCalled()
@@ -130,13 +129,15 @@ describe('runProxy - method gate', () => {
 describe('runProxy - path gate', () => {
   // AC-2.4
   it.each([
-    ['admin/users', 'unlisted prefix'],
-    ['cases/../config', 'traversal in the decoded form Nitro produces'],
-    ['health/%2e%2e/admin', 'still-encoded traversal, should it ever arrive undecoded'],
-    ['', 'empty wildcard'],
-  ])('returns 404 for %s (%s)', async (wildcard) => {
+    ['/api/arbiter/admin/users', 'unlisted prefix'],
+    ['/api/arbiter/cases/../config', 'literal traversal'],
+    ['/api/arbiter/health/%2e%2e/admin', 'encoded traversal'],
+    ['/api/arbiter/health/%2F%2E%2E%2Fadmin', 'traversal behind a reserved slash'],
+    ['/api/arbiter/', 'empty wildcard'],
+    ['/api/other/health', 'a target outside the mount prefix'],
+  ])('returns 404 for %s (%s)', async (rawUrl) => {
     const h = makeHarness()
-    const outcome = await runProxy(makeRequest({ wildcard }), h.deps)
+    const outcome = await runProxy(makeRequest({ rawUrl }), h.deps)
 
     expect(outcome).toEqual({ kind: 'error', statusCode: 404, message: 'Not Found' })
     expect(h.fetchUpstream).not.toHaveBeenCalled()
@@ -145,7 +146,7 @@ describe('runProxy - path gate', () => {
   // AC-2.5 -- the reason is useful in a log and a map of the allowlist in a response.
   it('logs the rejection reason without returning it', async () => {
     const h = makeHarness()
-    const outcome = await runProxy(makeRequest({ wildcard: 'admin/users' }), h.deps)
+    const outcome = await runProxy(makeRequest({ rawUrl: '/api/arbiter/admin/users' }), h.deps)
 
     expect(h.logError).toHaveBeenCalledWith('[proxy] path rejected (not-allowed)')
     expect(JSON.stringify(outcome)).not.toContain('not-allowed')
@@ -154,12 +155,9 @@ describe('runProxy - path gate', () => {
 
 describe('runProxy - upstream request construction', () => {
   // AC-2.6
-  it('builds the upstream URL from the validated path and serialized query', async () => {
+  it('builds the upstream URL from the validated path and the raw query', async () => {
     const h = makeHarness()
-    await runProxy(
-      makeRequest({ wildcard: 'decisions', query: { limit: 20, action: undefined } }),
-      h.deps,
-    )
+    await runProxy(makeRequest({ rawUrl: '/api/arbiter/decisions?limit=20' }), h.deps)
 
     expect(h.fetchUpstream).toHaveBeenCalledWith(
       'https://upstream.test/decisions?limit=20',
@@ -167,19 +165,35 @@ describe('runProxy - upstream request construction', () => {
     )
   })
 
-  it('omits the question mark when the query serializes to nothing', async () => {
+  it('omits the question mark when the target carries no query', async () => {
     const h = makeHarness()
-    await runProxy(makeRequest({ query: { a: undefined } }), h.deps)
+    await runProxy(makeRequest({ rawUrl: '/api/arbiter/decisions' }), h.deps)
 
     expect(h.fetchUpstream.mock.calls[0][0]).toBe('https://upstream.test/decisions')
   })
 
-  // Nitro decodes the wildcard before the handler sees it, so a rule name posted
-  // as 'my%20rule' arrives with a literal space. It has to go back out encoded --
-  // a raw space cannot appear in an HTTP request line.
-  it('re-encodes a decoded space in the upstream URL', async () => {
+  // The query is relayed verbatim: parsing and re-serialising it is what lost
+  // data before, so an encoded space in a value must survive as '%20'.
+  it('relays the query byte for byte', async () => {
     const h = makeHarness()
-    await runProxy(makeRequest({ wildcard: 'config/rules/my rule' }), h.deps)
+    await runProxy(makeRequest({ rawUrl: '/api/arbiter/cases?q=a%20b&flag' }), h.deps)
+
+    expect(h.fetchUpstream.mock.calls[0][0]).toBe('https://upstream.test/cases?q=a%20b&flag')
+  })
+
+  // Review round 2, finding 1. Taking the path off the raw request line is what
+  // keeps an encoded '?' inside the path; h3's router had already split there and
+  // the proxy silently targeted a different rule with a 200.
+  it('keeps an encoded question mark in the path instead of splitting the target', async () => {
+    const h = makeHarness()
+    await runProxy(makeRequest({ rawUrl: '/api/arbiter/config/rules/a%3Fb' }), h.deps)
+
+    expect(h.fetchUpstream.mock.calls[0][0]).toBe('https://upstream.test/config/rules/a%3Fb')
+  })
+
+  it('forwards an encoded space in the path unchanged', async () => {
+    const h = makeHarness()
+    await runProxy(makeRequest({ rawUrl: '/api/arbiter/config/rules/my%20rule' }), h.deps)
 
     expect(h.fetchUpstream.mock.calls[0][0]).toBe('https://upstream.test/config/rules/my%20rule')
   })
@@ -227,7 +241,7 @@ describe('runProxy - request body', () => {
 
   it.each(['POST', 'PATCH', 'DELETE'])('forwards the raw body for %s', async (method) => {
     const h = makeHarness()
-    await runProxy(makeRequest({ method, wildcard: 'analyze' }), h.deps)
+    await runProxy(makeRequest({ method, rawUrl: '/api/arbiter/analyze' }), h.deps)
 
     expect(h.readBody).toHaveBeenCalledOnce()
     expect(h.fetchUpstream.mock.calls[0][1].body).toEqual(Buffer.from('{"a":1}'))
@@ -241,7 +255,10 @@ describe('runProxy - request body', () => {
         throw new Error('aborted mid-body')
       }),
     })
-    const outcome = await runProxy(makeRequest({ method: 'POST', wildcard: 'analyze' }), h.deps)
+    const outcome = await runProxy(
+      makeRequest({ method: 'POST', rawUrl: '/api/arbiter/analyze' }),
+      h.deps,
+    )
 
     expect(outcome).toEqual({ kind: 'error', statusCode: 400, message: 'Invalid Request Body' })
     expect(h.fetchUpstream).not.toHaveBeenCalled()
@@ -254,7 +271,10 @@ describe('runProxy - request body', () => {
       // nothing in the type guarantees it and String(error) is the fallback.
       readBody: vi.fn(() => Promise.reject('ECONNRESET')),
     })
-    const outcome = await runProxy(makeRequest({ method: 'POST', wildcard: 'analyze' }), h.deps)
+    const outcome = await runProxy(
+      makeRequest({ method: 'POST', rawUrl: '/api/arbiter/analyze' }),
+      h.deps,
+    )
 
     expect(outcome).toEqual({ kind: 'error', statusCode: 400, message: 'Invalid Request Body' })
     expect(h.logError).toHaveBeenCalledWith('[proxy] request body unreadable: ECONNRESET')
@@ -343,6 +363,59 @@ describe('runProxy - upstream redirects', () => {
 
     expect(h.logError).toHaveBeenCalledWith('[proxy] upstream redirect refused (status 302)')
   })
+
+  // Review round 2, finding 2. A manual-redirect response still carries a live
+  // body, and the pipeline that would drain it never runs for a refused 3xx. The
+  // earlier tests all passed `body: null`, which hid it: the upstream socket
+  // stayed occupied until GC or the 30s signal, so a redirect loop could drain
+  // the connection pool while every request got a prompt 502.
+  it('cancels the body of a refused redirect', async () => {
+    const cancel = vi.fn(async () => undefined)
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('redirect page'))
+      },
+      cancel,
+    })
+    const h = makeHarness({
+      fetchUpstream: vi.fn(async () => upstreamOk({ status: 302, body })),
+    })
+
+    const outcome = await runProxy(makeRequest(), h.deps)
+
+    expect(outcome).toEqual({ kind: 'error', statusCode: 502, message: 'upstream-unreachable' })
+    expect(cancel).toHaveBeenCalledOnce()
+    expect(body.locked).toBe(false)
+  })
+
+  // A body that refuses to cancel must not turn the 502 into an unhandled
+  // rejection: the browser still gets its 502.
+  it('still returns 502 when cancelling the redirect body rejects', async () => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('redirect page'))
+      },
+      cancel: () => Promise.reject(new Error('socket already gone')),
+    })
+    const h = makeHarness({
+      fetchUpstream: vi.fn(async () => upstreamOk({ status: 302, body })),
+    })
+
+    const outcome = await runProxy(makeRequest(), h.deps)
+
+    expect(outcome).toEqual({ kind: 'error', statusCode: 502, message: 'upstream-unreachable' })
+  })
+
+  // A 3xx with no body at all is the common case and must not throw.
+  it('handles a refused redirect that carries no body', async () => {
+    const h = makeHarness({
+      fetchUpstream: vi.fn(async () => upstreamOk({ status: 307, body: null })),
+    })
+
+    const outcome = await runProxy(makeRequest(), h.deps)
+
+    expect(outcome).toEqual({ kind: 'error', statusCode: 502, message: 'upstream-unreachable' })
+  })
 })
 
 describe('runProxy - successful response', () => {
@@ -361,7 +434,10 @@ describe('runProxy - successful response', () => {
         }),
       ),
     })
-    const outcome = await runProxy(makeRequest({ method: 'POST', wildcard: 'analyze' }), h.deps)
+    const outcome = await runProxy(
+      makeRequest({ method: 'POST', rawUrl: '/api/arbiter/analyze' }),
+      h.deps,
+    )
 
     expect(outcome.kind).toBe('stream')
     if (outcome.kind !== 'stream') return

@@ -17,8 +17,13 @@ export default defineEventHandler(async (event) => {
   const outcome = await runProxy(
     {
       method: event.method,
-      wildcard: getRouterParam(event, '_') ?? '',
-      query: getQuery(event),
+      // The raw request line, not `getRouterParam` / `getQuery`. h3 runs
+      // `_decodePath` before routing (decodeURIComponent-based, only %2F and %25
+      // protected), so an encoded '?' becomes a real query delimiter and the
+      // router hands over a truncated wildcard -- `config/rules/a%3Fb` arrived as
+      // `config/rules/a` with `{b: ''}` as the query. `originalUrl` is captured by
+      // h3 before any layer rewrites `req.url`, so it is the only unmodified copy.
+      rawUrl: event.node.req.originalUrl ?? event.node.req.url ?? '',
       headers: getRequestHeaders(event),
     },
     {

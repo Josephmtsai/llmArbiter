@@ -16,8 +16,7 @@ import {
   isRedirectStatus,
   pickForwardHeaders,
   pickResponseHeaders,
-  serializeQuery,
-  validateProxyPath,
+  validateProxyTarget,
   type AllowedMethod,
 } from './proxyPolicy'
 
@@ -45,9 +44,13 @@ export interface UpstreamInit {
 
 export interface ProxyRequest {
   method: string
-  /** Catch-all router parameter. Nitro hands it over already percent-decoded. */
-  wildcard: string
-  query: Record<string, unknown>
+  /**
+   * The **raw** request target off the request line, path and query together
+   * (`event.node.req.originalUrl`). Not the router parameter: h3 percent-decodes
+   * the path before routing, which turns an encoded '?' into a real delimiter and
+   * silently truncates the path. See `validateProxyTarget`.
+   */
+  rawUrl: string
   headers: Record<string, string | string[] | undefined>
 }
 
@@ -108,7 +111,7 @@ export async function runProxy(request: ProxyRequest, deps: ProxyDeps): Promise<
     }
   }
 
-  const validated = validateProxyPath(request.wildcard)
+  const validated = validateProxyTarget(request.rawUrl)
   if (!validated.ok) {
     // The rejection reason is logged but never returned: telling a caller apart
     // 'not-allowed' from 'traversal' hands them a map of the allowlist.
@@ -118,8 +121,9 @@ export async function runProxy(request: ProxyRequest, deps: ProxyDeps): Promise<
 
   const { apiKey } = deps.config
   const base = deps.config.apiBaseUrl.replace(/\/$/, '')
-  const query = serializeQuery(request.query)
-  const url = `${base}${validated.path}${query ? '?' + query : ''}`
+  // The query is relayed byte for byte as the client wrote it; parsing and
+  // re-serialising it is exactly the round trip that lost data before.
+  const url = `${base}${validated.path}${validated.query ? '?' + validated.query : ''}`
 
   const headers: Record<string, string> = {
     ...pickForwardHeaders(request.headers),
@@ -164,6 +168,10 @@ export async function runProxy(request: ProxyRequest, deps: ProxyDeps): Promise<
     // carry `X-API-Key` to the redirect target, and relaying it would let the
     // upstream steer the browser to an arbitrary origin.
     deps.logError(`[proxy] upstream redirect refused (status ${upstream.status})`)
+    // A manual-redirect response still carries a live body. Returning without
+    // cancelling it holds the upstream socket open until GC or the 30s signal,
+    // so a redirect loop could drain the connection pool.
+    await upstream.body?.cancel().catch(() => undefined)
     return { kind: 'error', statusCode: 502, message: 'upstream-unreachable' }
   }
 

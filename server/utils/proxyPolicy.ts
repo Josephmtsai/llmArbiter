@@ -74,100 +74,128 @@ const NORMALIZATION_ORIGIN = 'https://proxy.invalid'
 const NORMALIZATION_BASE = NORMALIZATION_ORIGIN + '/'
 
 /**
- * Refused outright: C0 controls, DEL, backslash (the URL parser rewrites it to
- * '/' for special schemes) and the '?' / '#' delimiters, which the parser would
- * split into query/fragment and so silently shorten the path.
- *
- * A space is deliberately NOT refused. Nitro percent-decodes the path before the
- * handler sees it, so `config/rules/my%20rule` arrives here with a literal space
- * and is a legitimate value -- `composables/useApi.ts` builds rule names and
- * review-queue ids with `encodeURIComponent`.
+ * Mount point of this route. The wildcard is cut from the *raw* request target
+ * rather than read back out of `getRouterParam`, so the prefix is spelled out
+ * here. See `validateProxyTarget` for why the raw form is the only safe input.
  */
-const UNSAFE_CHARS = /[\u0000-\u001f\u007f\\?#]/
+export const PROXY_MOUNT_PREFIX = '/api/arbiter/'
 
 /**
- * Validates the catch-all wildcard (no query string, no leading slash) and
- * returns the upstream path, correctly percent-encoded.
+ * Refused outright: anything outside printable ASCII (a raw request target is
+ * always printable ASCII, so a literal space or a control byte means the client
+ * did not encode it), plus '\' -- which the URL parser rewrites to '/' -- and
+ * the '?' / '#' delimiters, which would silently shorten the path.
+ */
+const UNSAFE_CHARS = /[^!-~]|[\\?#]/
+
+/**
+ * A '%' that does not begin a valid escape, e.g. 'config/rules/100%'. The URL
+ * parser passes these through untouched, so the identity check below cannot see
+ * them and they would be forwarded upstream as a malformed path.
+ */
+const BAD_ESCAPE = /%(?![0-9A-Fa-f]{2})/
+
+/** A raw query is printable ASCII too, and '#' can never legally reach the server. */
+const UNSAFE_QUERY_CHARS = /[^!-~]|#/
+
+/**
+ * Uppercases hex escapes so the identity check compares like with like: the
+ * WHATWG serializer emits '%2F', so a client's '%2f' names the same path and
+ * must not be rejected for spelling it in lower case.
+ */
+function canonicalizeEscapes(value: string): string {
+  return value.replace(/%([0-9a-f]{2})/g, (_match, hex: string) => '%' + hex.toUpperCase())
+}
+
+/**
+ * Validates a **raw, still percent-encoded** path suffix (no query string, no
+ * leading slash) and returns the upstream path.
  *
- * Nitro hands the wildcard over already decoded with `decodeURI` semantics --
- * verified at runtime against the built server: `%2e%2e` arrives as `..`, `%20`
- * as a space, while reserved `%2f` stays encoded. The function therefore does
- * **not** decode again; a second decode is its own bypass class.
+ * The input must be raw. An earlier version of this route took h3's decoded
+ * router parameter, and review round 2 showed why that cannot be made correct:
+ * h3 runs `_decodePath` before routing, which is `decodeURIComponent`-based with
+ * only `%2F` and `%25` protected. So `%3F` becomes a real '?' *before* the
+ * router splits the query, and `/api/arbiter/config/rules/a%3Fb` silently
+ * proxied to `/config/rules/a?b=` -- a different resource, with a 200. No
+ * validation downstream of that split can recover the lost characters, so
+ * `validateProxyTarget` reads the request line instead.
  *
- * Because the function is pure and callers can change, it does not rely on that
- * decoding for safety. Two independent invariants hold:
+ * Two invariants hold on the raw value:
  *
- * - **Literal form.** No `..`, no leading `/`, no `//`, no character that lets
- *   the parser split or rewrite the path.
+ * - **Literal form.** No '..', no leading '/', no '//', no character that lets
+ *   the parser split or rewrite the path, and no malformed escape.
  * - **Parser identity.** The path is run through the same parser that builds the
- *   request URL and must come back unchanged: `new URL(wildcard, base)` must
- *   keep the origin and yield a `pathname` whose `decodeURI` form is exactly
- *   `'/' + wildcard`. This is what catches anything the literal check cannot --
- *   a single `.` segment (`health/.` is sent as `/health/`), and any still-encoded
- *   dot segment (`health/%2e%2e/admin` parses to `/admin`) if one ever reaches
- *   this function undecoded. Comparing the *decoded* round trip rather than the
- *   raw pathname is what lets a legitimate literal space through while still
- *   pinning the path the request is built from.
+ *   request URL and must come back unchanged: `new URL(canonical, base)` must
+ *   keep the origin and yield exactly `'/' + canonical`. This is what catches
+ *   what the literal checks cannot: a single '.' segment, which carries no '..'
+ *   and no '//' yet is silently rewritten (`health/.` becomes `/health/`, so
+ *   `health/./x` would be sent as `/health/x` after the allowlist ran).
  */
 export function validateProxyPath(wildcard: string): PathValidation {
   if (wildcard === '') return { ok: false, reason: 'empty' }
   if (UNSAFE_CHARS.test(wildcard)) return { ok: false, reason: 'unsafe-char' }
+  if (BAD_ESCAPE.test(wildcard)) return { ok: false, reason: 'malformed' }
+
+  const canonical = canonicalizeEscapes(wildcard)
 
   // Substring rather than segment matching: no real endpoint contains '..' inside
   // a segment, so the stricter form costs nothing and needs no dot-segment parser.
-  if (wildcard.includes('..')) return { ok: false, reason: 'traversal' }
-  if (wildcard.startsWith('/') || wildcard.includes('//')) {
+  if (canonical.includes('..')) return { ok: false, reason: 'traversal' }
+  // An encoded dot as well. A '.' needs no encoding inside a path segment, so
+  // '%2E' only ever appears to smuggle a dot segment past a literal check -- and
+  // the identity check alone does not catch it: the WHATWG parser does not treat
+  // a reserved '%2F' as a separator, so 'health/%2F%2E%2E/admin' survives it
+  // byte-for-byte, while an ASGI upstream decodes the whole thing and lands on
+  // '/health/../admin'.
+  if (canonical.includes('%2E')) return { ok: false, reason: 'traversal' }
+  if (canonical.startsWith('/') || canonical.includes('//')) {
     return { ok: false, reason: 'double-slash' }
   }
 
   let parsed: URL
   try {
-    parsed = new URL(wildcard, NORMALIZATION_BASE)
+    parsed = new URL(canonical, NORMALIZATION_BASE)
   } catch {
     return { ok: false, reason: 'malformed' }
   }
   if (parsed.origin !== NORMALIZATION_ORIGIN) return { ok: false, reason: 'not-normalized' }
+  if (parsed.pathname !== '/' + canonical) return { ok: false, reason: 'not-normalized' }
 
-  let roundTrip: string
-  try {
-    roundTrip = decodeURI(parsed.pathname)
-  } catch {
-    // A stray '%' that is not a valid escape, e.g. 'config/rules/100%'.
-    return { ok: false, reason: 'malformed' }
-  }
-  if (roundTrip !== '/' + wildcard) return { ok: false, reason: 'not-normalized' }
-
-  const firstSegment = wildcard.split('/')[0]
+  const firstSegment = canonical.split('/')[0]
   if (!ALLOWED_PREFIX_SET.has(firstSegment)) return { ok: false, reason: 'not-allowed' }
 
-  // The parser's own encoding, not the raw wildcard: a decoded space must go out
-  // as '%20', since a raw space cannot appear in an HTTP request line.
   return { ok: true, path: parsed.pathname }
 }
 
-export type QueryInput = Record<string, unknown>
+export type TargetValidation =
+  | { ok: true; path: string; query: string }
+  | { ok: false; reason: PathRejection }
 
 /**
- * Serializes a query object, skipping null/undefined values instead of emitting
- * `key=`. Arrays become repeated keys with null/undefined items skipped.
- * Returns '' when nothing remains; the caller prepends '?'.
+ * Validates a raw request target (`event.node.req.originalUrl`) and splits it
+ * into the upstream path and the query string.
+ *
+ * Both halves come from the request line verbatim, which is the whole point:
+ * h3's decoded router parameter and `getQuery` have already lost the difference
+ * between an encoded delimiter and a real one. The query is forwarded exactly as
+ * the client wrote it rather than parsed and re-serialised, so it cannot drift
+ * either.
  */
-export function serializeQuery(query: QueryInput): string {
-  const params = new URLSearchParams()
+export function validateProxyTarget(rawUrl: string): TargetValidation {
+  const queryIndex = rawUrl.indexOf('?')
+  const rawPath = queryIndex === -1 ? rawUrl : rawUrl.slice(0, queryIndex)
+  const query = queryIndex === -1 ? '' : rawUrl.slice(queryIndex + 1)
 
-  for (const [key, value] of Object.entries(query)) {
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        if (item === null || item === undefined) continue
-        params.append(key, String(item))
-      }
-      continue
-    }
-    if (value === null || value === undefined) continue
-    params.append(key, String(value))
-  }
+  // The route only ever runs under its own mount, so a mismatch means the raw
+  // target was rewritten by something upstream of the handler. Refuse rather
+  // than guess at the wildcard.
+  if (!rawPath.startsWith(PROXY_MOUNT_PREFIX)) return { ok: false, reason: 'malformed' }
+  if (UNSAFE_QUERY_CHARS.test(query)) return { ok: false, reason: 'unsafe-char' }
 
-  return params.toString()
+  const validated = validateProxyPath(rawPath.slice(PROXY_MOUNT_PREFIX.length))
+  if (!validated.ok) return validated
+
+  return { ok: true, path: validated.path, query }
 }
 
 /**
