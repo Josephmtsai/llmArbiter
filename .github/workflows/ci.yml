@@ -41,6 +41,10 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Drives the built server over a raw socket. Must follow the build.
+      - name: Proxy end-to-end check
+        run: pnpm test:e2e
+
   deploy:
     runs-on: ubuntu-latest
     needs: verify

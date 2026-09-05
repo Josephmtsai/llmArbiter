@@ -1,5 +1,5 @@
 import vue from '@vitejs/plugin-vue'
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 // Nuxt substitutes import.meta.client / import.meta.server at build time.
 // Vitest does not, and its `define` option does not cover import.meta either, so
@@ -50,6 +50,10 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // The proxy end-to-end suite drives a built server in a separate process, so
+    // it needs `pnpm build` and reports no coverage. It has its own config and
+    // its own CI step: `pnpm test:e2e`.
+    exclude: [...configDefaults.exclude, 'tests/e2e/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
@@ -70,14 +74,15 @@ export default defineConfig({
       // tooling-baseline starting point of 41/41/51/78: measured
       // lines 44.22 / statements 44.22 / functions 55.14 / branches 80.51.
       // Branches stays at 78 - floor(80.51) - 2 is still 78.
-      // Ratcheted by `proxy-hardening` on 2026-09-05: measured lines 44.68 /
-      // statements 44.68 / functions 58.21 / branches 82.25. Lines and statements
-      // stay at 42 - floor(44.68) - 2 is still 42.
+      // Ratcheted by `proxy-hardening` on 2026-09-05 (review round 1, after the
+      // route was split into the testable `runProxy` core): measured lines 45.36 /
+      // statements 45.36 / functions 59.33 / branches 83.15. Branches stays at 81 -
+      // floor(83.15) - 2 is 81.
       thresholds: {
-        lines: 42,
-        statements: 42,
-        functions: 56,
-        branches: 80,
+        lines: 43,
+        statements: 43,
+        functions: 57,
+        branches: 81,
       },
     },
   },

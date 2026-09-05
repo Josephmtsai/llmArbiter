@@ -55,29 +55,94 @@ export function isAllowedMethod(method: string): method is AllowedMethod {
   return ALLOWED_METHOD_SET.has(method)
 }
 
-export type PathRejection = 'empty' | 'traversal' | 'double-slash' | 'not-allowed'
+export type PathRejection =
+  | 'empty'
+  | 'traversal'
+  | 'double-slash'
+  | 'not-allowed'
+  | 'malformed'
+  | 'unsafe-char'
+  | 'not-normalized'
 
 export type PathValidation = { ok: true; path: string } | { ok: false; reason: PathRejection }
 
 /**
+ * Origin used only to run the wildcard through the WHATWG URL parser. `.invalid`
+ * is reserved by RFC 2606, so a bug that let this value escape could never resolve.
+ */
+const NORMALIZATION_ORIGIN = 'https://proxy.invalid'
+const NORMALIZATION_BASE = NORMALIZATION_ORIGIN + '/'
+
+/**
+ * Refused outright: C0 controls, DEL, backslash (the URL parser rewrites it to
+ * '/' for special schemes) and the '?' / '#' delimiters, which the parser would
+ * split into query/fragment and so silently shorten the path.
+ *
+ * A space is deliberately NOT refused. Nitro percent-decodes the path before the
+ * handler sees it, so `config/rules/my%20rule` arrives here with a literal space
+ * and is a legitimate value -- `composables/useApi.ts` builds rule names and
+ * review-queue ids with `encodeURIComponent`.
+ */
+const UNSAFE_CHARS = /[\u0000-\u001f\u007f\\?#]/
+
+/**
  * Validates the catch-all wildcard (no query string, no leading slash) and
- * returns the upstream path. Check order: empty -> traversal -> double-slash ->
- * allowlist. A leading slash in the wildcard would produce `//` once prefixed,
- * so it is rejected as `double-slash`.
+ * returns the upstream path, correctly percent-encoded.
+ *
+ * Nitro hands the wildcard over already decoded with `decodeURI` semantics --
+ * verified at runtime against the built server: `%2e%2e` arrives as `..`, `%20`
+ * as a space, while reserved `%2f` stays encoded. The function therefore does
+ * **not** decode again; a second decode is its own bypass class.
+ *
+ * Because the function is pure and callers can change, it does not rely on that
+ * decoding for safety. Two independent invariants hold:
+ *
+ * - **Literal form.** No `..`, no leading `/`, no `//`, no character that lets
+ *   the parser split or rewrite the path.
+ * - **Parser identity.** The path is run through the same parser that builds the
+ *   request URL and must come back unchanged: `new URL(wildcard, base)` must
+ *   keep the origin and yield a `pathname` whose `decodeURI` form is exactly
+ *   `'/' + wildcard`. This is what catches anything the literal check cannot --
+ *   a single `.` segment (`health/.` is sent as `/health/`), and any still-encoded
+ *   dot segment (`health/%2e%2e/admin` parses to `/admin`) if one ever reaches
+ *   this function undecoded. Comparing the *decoded* round trip rather than the
+ *   raw pathname is what lets a legitimate literal space through while still
+ *   pinning the path the request is built from.
  */
 export function validateProxyPath(wildcard: string): PathValidation {
   if (wildcard === '') return { ok: false, reason: 'empty' }
-  if (wildcard.includes('..')) return { ok: false, reason: 'traversal' }
+  if (UNSAFE_CHARS.test(wildcard)) return { ok: false, reason: 'unsafe-char' }
 
-  const path = '/' + wildcard
-  if (path.slice(1).includes('//') || wildcard.startsWith('/')) {
+  // Substring rather than segment matching: no real endpoint contains '..' inside
+  // a segment, so the stricter form costs nothing and needs no dot-segment parser.
+  if (wildcard.includes('..')) return { ok: false, reason: 'traversal' }
+  if (wildcard.startsWith('/') || wildcard.includes('//')) {
     return { ok: false, reason: 'double-slash' }
   }
+
+  let parsed: URL
+  try {
+    parsed = new URL(wildcard, NORMALIZATION_BASE)
+  } catch {
+    return { ok: false, reason: 'malformed' }
+  }
+  if (parsed.origin !== NORMALIZATION_ORIGIN) return { ok: false, reason: 'not-normalized' }
+
+  let roundTrip: string
+  try {
+    roundTrip = decodeURI(parsed.pathname)
+  } catch {
+    // A stray '%' that is not a valid escape, e.g. 'config/rules/100%'.
+    return { ok: false, reason: 'malformed' }
+  }
+  if (roundTrip !== '/' + wildcard) return { ok: false, reason: 'not-normalized' }
 
   const firstSegment = wildcard.split('/')[0]
   if (!ALLOWED_PREFIX_SET.has(firstSegment)) return { ok: false, reason: 'not-allowed' }
 
-  return { ok: true, path }
+  // The parser's own encoding, not the raw wildcard: a decoded space must go out
+  // as '%20', since a raw space cannot appear in an HTTP request line.
+  return { ok: true, path: parsed.pathname }
 }
 
 export type QueryInput = Record<string, unknown>
@@ -141,15 +206,35 @@ export function pickResponseHeaders(headers: Headers): Record<string, string> {
   return picked
 }
 
+/**
+ * A 3xx from the upstream is treated as a fault rather than relayed. `redirect:
+ * 'manual'` stops undici following it -- undici drops `authorization` / `cookie`
+ * on a cross-origin hop but keeps custom headers, so a followed redirect would
+ * carry `X-API-Key` to whatever origin the upstream named.
+ */
+export function isRedirectStatus(status: number): boolean {
+  return status >= 300 && status < 400
+}
+
 /** Replaces every occurrence of `secret` with '[redacted]'. Empty secret is a no-op. */
 export function redactSecret(message: string, secret: string): string {
   if (!secret) return message
   return message.split(secret).join('[redacted]')
 }
 
+/** Fixed strings; never interpolated. See `UpstreamFailure.message`. */
+export type UpstreamFailureMessage = 'upstream-timeout' | 'upstream-unreachable'
+
 export interface UpstreamFailure {
   statusCode: 502 | 504
-  message: string
+  /**
+   * Sent to the browser, so it is a fixed token carrying no cause text: the raw
+   * cause names internal hostnames, IPs and ports (`connect ECONNREFUSED
+   * 10.0.7.12:8000`), which the API-key redaction does not cover.
+   */
+  message: UpstreamFailureMessage
+  /** Server-side log line only. The API key is still redacted as a hard guarantee. */
+  detail: string
 }
 
 function errorName(value: unknown): string | undefined {
@@ -177,11 +262,12 @@ function errorCause(value: unknown): unknown {
 export function classifyUpstreamError(error: unknown, secret: string): UpstreamFailure {
   const cause = errorCause(error)
   const names = [errorName(error), errorName(cause)]
+  const raw = errorMessage(cause) ?? errorMessage(error) ?? 'unknown'
+  const detail = redactSecret(raw, secret)
 
   if (names.includes('TimeoutError') || names.includes('AbortError')) {
-    return { statusCode: 504, message: 'upstream-timeout' }
+    return { statusCode: 504, message: 'upstream-timeout', detail }
   }
 
-  const message = errorMessage(cause) ?? errorMessage(error) ?? 'unknown'
-  return { statusCode: 502, message: `upstream-unreachable: ${redactSecret(message, secret)}` }
+  return { statusCode: 502, message: 'upstream-unreachable', detail }
 }

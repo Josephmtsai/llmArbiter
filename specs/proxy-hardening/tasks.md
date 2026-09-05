@@ -224,3 +224,66 @@ were probed through the rebuilt proxy against the mock. Every one passed the new
 allowlist (`200`, or `422` for `/analyze` where the mock answers `422` by design), so the
 allowlist introduces no routing regression. What remains unverified for AC-2.11 is real
 backend behaviour, not proxy routing.
+
+---
+
+## Task 4 — Pipeline tests for the request core (added in review round 1)
+
+`server/api/arbiter/[...].ts` was split: the policy pipeline moved to
+`server/utils/proxyHandler.ts` (`runProxy`, plain injected dependencies), leaving the route file
+as an imperative h3 shell. `tests/proxyHandler.test.ts` covers the pipeline without booting
+Nitro.
+
+### Acceptance Criteria
+
+- [x] AC-4.1: `runProxy` returns `401` before evaluating the method or path gate, and never calls
+      `fetchUpstream`, when `getSessionUser` resolves to `undefined`.
+- [x] AC-4.2: A disallowed method returns `405` with `Allow: GET, POST, PATCH, DELETE`.
+- [x] AC-4.3: Every rejected path returns a bare `404`; the rejection reason is passed to
+      `logError` and appears nowhere in the outcome.
+- [x] AC-4.4: The upstream request carries `X-API-Key` and `User-Agent: arbiter-proxy`, and
+      carries no `cookie`, `authorization`, `referer` or browser `user-agent`.
+- [x] AC-4.5: A `readBody` rejection returns `400 Invalid Request Body` and does **not** forward
+      an empty body; a non-`Error` rejection is logged via `String(error)` without crashing.
+- [x] AC-4.6: A `TimeoutError` / `AbortError` maps to `504 upstream-timeout`, anything else to
+      `502 upstream-unreachable`; the detail is logged and the API key is redacted from it.
+- [x] AC-4.7: Any upstream 3xx returns `502` and is neither followed nor relayed.
+- [x] AC-4.8: An upstream status outside 200–599 collapses to `502` rather than crashing.
+- [x] AC-4.9: With no `createTimeoutSignal` injected, the real default produces a live
+      `AbortSignal` (the production path is executed, not only the test double).
+- [x] AC-4.10: `server/utils/proxyHandler.ts` reports 100 % lines / statements / branches /
+      functions under `pnpm test:coverage`.
+
+---
+
+## Task 5 — End-to-end route test (added in review round 1, second pass)
+
+The route file itself had no automated coverage, and that gap hid a real defect: the handler was
+written against the assumption that Nitro hands the catch-all wildcard over percent-encoded. It
+does not — it decodes with `decodeURI` semantics. Both unit layers stayed green while
+`/api/arbiter/config/rules/my%20rule` 404'd.
+
+`tests/e2e/proxy.e2e.test.ts` spawns the **built** server (`.output/server/index.mjs`) plus a
+mock upstream and drives it over a raw `node:http` socket, because `fetch`/undici resolves `..`
+client-side and would make every traversal case vacuous. It needs `pnpm build`, so it is
+excluded from `pnpm test` / `pnpm test:coverage` and has its own config
+(`vitest.e2e.config.ts`) and script (`pnpm test:e2e`).
+
+### Acceptance Criteria
+
+- [x] AC-5.1: Written verbatim onto the wire, none of `health/%2e%2e/admin`, `health/.%2e/admin`,
+      `health/%2E%2E/admin`, `health/%2e%2e/%2e%2e/admin`, `cases/../config/provider`,
+      `health/..%2fadmin`, `health/.` or `admin/users` returns anything but `404`, and the mock
+      upstream records no request for any of them.
+- [x] AC-5.2: A `404` body contains neither `not-allowed` nor `traversal`.
+- [x] AC-5.3: `GET /api/arbiter/config/rules/my%20rule` returns `200` and the upstream receives
+      `/config/rules/my%20rule` — the encoded space is decoded by Nitro and re-encoded by the
+      proxy, not rejected.
+- [x] AC-5.4: `GET /api/arbiter/health` reaches the upstream as `/health`;
+      `GET /api/arbiter/decisions?limit=5` as `/decisions?limit=5`.
+- [x] AC-5.5: Every request the upstream received carries `x-api-key`, carries no `cookie`, and
+      carries exactly `user-agent: arbiter-proxy`.
+- [x] AC-5.6: `pnpm test:e2e` runs in CI as its own step directly after `pnpm build`
+      (`.github/workflows/ci.yml`).
+- [x] AC-5.7: The suite is non-vacuous: with the traversal and `not-normalized` guards deleted
+      from the built bundle, 7 of the 8 AC-5.1 cases fail. Re-verified green after restoring.
